@@ -1,0 +1,94 @@
+[package]
+name = "maviola"
+description = "High-level MAVLink communication library with support for essential micro-services."
+version = "0.1.0-alpha1"
+edition = "2021"
+authors = ["Mykhailo Ziatin <ziatin@mathwithoutend.org>"]
+repository = "https://gitlab.com/mavka/libs/maviola"
+readme = "../README.md"
+license = "MIT OR Apache-2.0"
+homepage = "https://gitlab.com/mavka/libs/maviola"
+keywords = ["MAVLink", "UAV", "drones"]
+categories = [
+    "aerospace::protocols",
+    "aerospace::drones",
+    "aerospace::unmanned-aerial-vehicles",
+]
+resolver = "2"
+
+[lib]
+name = "maviola"
+path = "src/lib.rs"
+
+###########################################################
+# Dependencies
+###########################################################
+[dependencies]
+log = "0.4.20"
+mavio = { version = "0.1.0" }
+serde = { version = "1.0.193", default-features = false, features = ["derive"], optional = true }
+serde_arrays = { version = "0.1.0", default-features = false, optional = true }
+tokio = { version = "1.35.1", features = ["io-util"], optional = true }
+
+[dev-dependencies]
+env_logger = "0.10.1"
+portpicker = "0.1.1"
+
+###########################################################
+# Features
+###########################################################
+[features]
+## Default features.
+default = ["minimal"]
+## Enables unstable API features.
+unstable = []
+## Enables serde support.
+serde = [
+    "dep:serde",
+    "mavio/serde",
+    "dep:serde_arrays",
+]
+## Enables tokio (async) support
+tokio = ["dep:tokio"]
+
+###########################################################
+# Dialects
+###########################################################
+## Include `ardupilotmega` dialect
+ardupilotmega = ["common", "mavio/ardupilotmega"]
+## Include `ASLUAV` dialect
+asluav = ["mavio/asluav"]
+## Include `AVSSUAS` dialect
+avssuas = ["common", "mavio/avssuas"]
+## Include `common` dialect
+common = ["minimal", "mavio/common"]
+## Include `csAirLink` dialect
+csairlink = ["mavio/csairlink"]
+## Include `cubepilot` dialect
+cubepilot = ["common", "mavio/cubepilot"]
+## Include `development` dialect
+development = ["common", "mavio/development"]
+## Include `icarous` dialect
+icarous = ["mavio/icarous"]
+## Include `matrixpilot` dialect
+matrixpilot = ["common", "mavio/matrixpilot"]
+## Include `minimal` dialect
+minimal = ["mavio/minimal"]
+## Include `paparazzi` dialect
+paparazzi = ["common", "mavio/paparazzi"]
+## Include `standard` dialect
+standard = ["minimal", "mavio/standard"]
+## Include `ualberta` dialect
+ualberta = ["common", "mavio/ualberta"]
+## Include `uAvionix` dialect
+uavionix = ["common", "mavio/uavionix"]
+
+## Include `all` meta-dialect
+all = ["common", "ardupilotmega"]
+
+###########################################################
+# Metadata
+###########################################################
+[package.metadata.docs.rs]
+# Features to include into `docs.rs` documentation
+features = ["serde", "all", "unstable"]
