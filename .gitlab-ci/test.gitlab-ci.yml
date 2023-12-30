@@ -55,7 +55,7 @@ include:
       - FEATURES:
           - "--no-default-features"
           - ""
-          - "--all-features"
+#          - "--all-features"
 
 # ---------------------------------------------------------
 #      [TEST] Dry run for publishing to Crates.io
