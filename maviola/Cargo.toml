@@ -25,13 +25,14 @@ path = "src/lib.rs"
 ###########################################################
 [dependencies]
 log = "0.4.20"
-mavio = { version = "0.1.0" }
+mavio = { version = "0.2.0-rc2", path = "../../mavio/mavio" }
 serde = { version = "1.0.193", default-features = false, features = ["derive"], optional = true }
 serde_arrays = { version = "0.1.0", default-features = false, optional = true }
 tokio = { version = "1.35.1", features = ["io-util"], optional = true }
+thiserror = "1.0.56"
 
 [dev-dependencies]
-env_logger = "0.10.1"
+env_logger = "0.11.1"
 portpicker = "0.1.1"
 
 ###########################################################
@@ -63,7 +64,7 @@ avssuas = ["common", "mavio/avssuas"]
 ## Include `common` dialect
 common = ["minimal", "mavio/common"]
 ## Include `csAirLink` dialect
-csairlink = ["mavio/csairlink"]
+cs_air_link = ["mavio/cs_air_link"]
 ## Include `cubepilot` dialect
 cubepilot = ["common", "mavio/cubepilot"]
 ## Include `development` dialect
@@ -84,7 +85,22 @@ ualberta = ["common", "mavio/ualberta"]
 uavionix = ["common", "mavio/uavionix"]
 
 ## Include `all` meta-dialect
-all = ["common", "ardupilotmega"]
+all = [
+    "ardupilotmega",
+    "common",
+    "asluav",
+    "avssuas",
+    "cs_air_link",
+    "cubepilot",
+    "development",
+    "icarous",
+    "matrixpilot",
+    "minimal",
+    "paparazzi",
+    "standard",
+    "ualberta",
+    "uavionix",
+]
 
 ###########################################################
 # Metadata

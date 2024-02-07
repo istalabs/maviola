@@ -26,16 +26,11 @@
     html_favicon_url = "https://gitlab.com/mavka/libs/maviola/-/raw/main/avatar.png?ref_type=heads"
 )]
 
+pub mod errors;
+pub mod io;
+
 #[doc(inline = true)]
 pub extern crate mavio;
 
 #[doc(inline = true)]
 pub use mavio::dialects;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn tests_are_ok() {
-        assert!(true);
-    }
-}
