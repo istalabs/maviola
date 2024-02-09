@@ -5,7 +5,7 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
 use crate::io::sync::connection::{
-    ConnectionBuilder, ConnectionConf, ConnectionEvent, ConnectionInfo,
+    ConnectionBuilder, ConnectionConf, ConnectionConfInfo, ConnectionEvent, ConnectionInfo,
 };
 use crate::io::sync::tcp::connection::{TcpConnection, TcpReceiver, TcpSender};
 use crate::io::utils::resolve_socket_addr;
@@ -41,25 +41,29 @@ impl ConnectionBuilder for TcpClientConf {
         ) = mpsc::channel();
 
         thread::spawn(move || {
-            let info = ConnectionInfo::TcpClient { server_addr };
+            let conn_conf_info = ConnectionInfo::TcpClient { server_addr };
+            let receiver = TcpReceiver::new(
+                0,
+                conn_conf_info.clone(),
+                tx.clone(),
+                mavio::Receiver::new(reader),
+            );
+            let sender = TcpSender::new(
+                0,
+                conn_conf_info.clone(),
+                tx.clone(),
+                mavio::Sender::new(stream),
+            );
             let conn = TcpConnection {
                 id: 0,
-                info: info.clone(),
-                receiver: Arc::new(Mutex::new(Box::new(TcpReceiver {
-                    id: 0,
-                    receiver: mavio::Receiver::new(reader),
-                    event_chan: tx.clone(),
-                }))),
-                sender: Arc::new(Mutex::new(Box::new(TcpSender {
-                    id: 0,
-                    sender: mavio::Sender::new(stream),
-                    event_chan: tx.clone(),
-                }))),
-                event_chan: tx.clone(),
+                info: conn_conf_info.clone(),
+                receiver: Arc::new(Mutex::new(Box::new(receiver))),
+                sender: Arc::new(Mutex::new(Box::new(sender))),
+                events_chan: tx.clone(),
             };
 
-            if tx.send(ConnectionEvent::New(Box::new(conn))).is_err() {
-                log::error!("unable to send connection for {info:?}");
+            if let Err(err) = tx.send(ConnectionEvent::New(Box::new(conn))) {
+                log::error!("{conn_conf_info:?} unable to register connection: {err:?}");
             }
         });
 
@@ -67,4 +71,10 @@ impl ConnectionBuilder for TcpClientConf {
     }
 }
 
-impl ConnectionConf for TcpClientConf {}
+impl ConnectionConf for TcpClientConf {
+    fn info(&self) -> ConnectionConfInfo {
+        ConnectionConfInfo::TcpClient {
+            remote_addr: self.addr,
+        }
+    }
+}

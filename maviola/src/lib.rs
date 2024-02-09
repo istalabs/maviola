@@ -28,6 +28,8 @@
 
 pub mod errors;
 pub mod io;
+pub mod prelude;
+pub mod protocol;
 
 #[doc(inline = true)]
 pub extern crate mavio;

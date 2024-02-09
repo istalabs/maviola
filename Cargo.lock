@@ -316,6 +316,7 @@ version = "0.2.0-rc2"
 dependencies = [
  "crc-any",
  "mavspec",
+ "paste",
  "serde",
  "serde_arrays",
  "sha2",
@@ -407,6 +408,12 @@ checksum = "a6a622008b6e321afc04970976f62ee297fdbaa6f95318ca343e3eebb9648441"
 dependencies = [
  "memchr",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c"
 
 [[package]]
 name = "pin-project-lite"

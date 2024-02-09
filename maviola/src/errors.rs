@@ -1,6 +1,6 @@
 //! Maviola errors.
 
-use std::sync::Arc;
+use std::sync::{Arc, PoisonError};
 
 use mavio::errors::{FrameError, MessageError};
 
@@ -16,15 +16,33 @@ pub enum Error {
 
     /// Frame encoding/decoding error.
     #[error("frame decoding/encoding error: {0:?}")]
-    Frame(FrameError),
+    Frame(#[from] FrameError),
 
     /// Message encoding/decoding and specification discovery error.
     #[error("message decoding/encoding error: {0:?}")]
     Message(MessageError),
 
+    /// Node errors.
+    #[error("node error: {0:?}")]
+    Node(#[from] NodeError),
+
     /// Other errors.
     #[error("error: {0}")]
     Other(String),
+}
+
+/// Node errors.
+#[derive(Clone, Debug, thiserror::Error)]
+pub enum NodeError {
+    /// Transport no longer active error.
+    #[error("transport is no longer active")]
+    Inactive,
+    /// Error within a thread.
+    #[error("thread error: {0}")]
+    Thread(String),
+    /// Failed due to poisoned mutex.
+    #[error("poisoned mutex: {0}")]
+    Poisoned(String),
 }
 
 impl From<mavio::errors::CoreError> for Error {
@@ -43,9 +61,9 @@ impl From<MessageError> for Error {
     }
 }
 
-impl From<FrameError> for Error {
-    fn from(value: FrameError) -> Self {
-        Error::Frame(value)
+impl<Guard> From<PoisonError<Guard>> for Error {
+    fn from(value: PoisonError<Guard>) -> Self {
+        Error::Node(NodeError::Poisoned(format!("{:?}", value)))
     }
 }
 

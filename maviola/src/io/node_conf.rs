@@ -1,307 +1,40 @@
 //! MAVLink node configuration.
 
 use std::marker::PhantomData;
-use std::sync::Arc;
 
-use mavio::protocol::{DialectImpl, DialectMessage};
+use crate::io::node_variants::{
+    Dialect, HasDialect, HasIdentifier, HasVersion, Identified, NoDialect, NotIdentified,
+    NotVersioned, Versioned,
+};
+use mavio::protocol::{DialectImpl, DialectMessage, MavLinkVersion};
 
 use crate::io::sync::ConnectionConf;
 
 /// MAVLink node configuration.
 ///
 /// Node configuration can be instantiated only through [`NodeConfBuilder`](builder::NodeConfBuilder).
-pub struct NodeConf<I: variants::HasId, D: variants::HasDialect, M: DialectMessage + 'static> {
-    system_id: Option<u8>,
-    component_id: Option<u8>,
-    dialect: Option<&'static dyn DialectImpl<Message = M>>,
-    conn_conf: Option<Arc<dyn ConnectionConf>>,
-    _has_dialect: PhantomData<D>,
-    _has_id: PhantomData<I>,
+#[derive(Debug)]
+pub struct NodeConf<I: HasIdentifier, D: HasDialect, V: HasVersion, M: DialectMessage + 'static> {
+    pub(crate) id: I,
+    pub(crate) dialect: D,
+    pub(crate) version: V,
+    conn_conf: Box<dyn ConnectionConf>,
+    _marker_message: PhantomData<M>,
 }
 
-/// Variants of [`NodeConf`].
-pub mod variants {
-    /// Marker for [`NodeConf`](super::NodeConf) with or without [`dialect`](super::NodeConf::dialect).
-    ///
-    /// Variants:
-    ///
-    /// * [`NoDialect`]
-    /// * [`WithDialect`]
-    pub trait HasDialect {}
-
-    /// Variant of [`NodeConf`](super::NodeConf) without a [`dialect`](super::NodeConf::dialect).
-    /// Message decoding is not possible, only raw MAVLink frames can be communicated.
-    pub struct NoDialect();
-    impl HasDialect for NoDialect {}
-
-    /// Variant of [`NodeConf`](super::NodeConf) with a [`dialect`](super::NodeConf::dialect) being
-    /// specified. Message encoding/decoding is available.
-    pub struct WithDialect();
-    impl HasDialect for WithDialect {}
-
-    /// Marker for [`NodeConf`](super::NodeConf) with or without
-    /// [`system_id`](super::NodeConf::system_id) and [`component_id`](super::NodeConf::component_id).
-    ///
-    /// Variants:
-    ///
-    /// * [`NoId`]
-    /// * [`WithId`]
-    pub trait HasId {}
-
-    /// Variant of [`NodeConf`](super::NodeConf) without [`system_id`](super::NodeConf::system_id)
-    /// and [`component_id`](super::NodeConf::component_id). This node can't produce messages and
-    /// can be used only as a proxy.
-    pub struct NoId();
-    impl HasId for NoId {}
-
-    /// Variant of [`NodeConf`](super::NodeConf) with [`system_id`](super::NodeConf::system_id)
-    /// and [`component_id`](super::NodeConf::component_id) being defined. This node can produce
-    /// messages.
-    pub struct WithId();
-    impl HasId for WithId {}
-}
-
-/// Builder for [`NodeConf`].
-pub mod builder {
-    use crate::io::sync::ConnectionConf;
-    use mavio::protocol::{DialectImpl, DialectMessage};
-    use std::marker::PhantomData;
-    use std::sync::Arc;
-
-    use super::variants::{HasDialect, NoDialect, NoId, WithDialect, WithId};
-    use super::NodeConf;
-
-    /// Marker trait for [`NodeConfBuilder`] with or without [`NodeConf::system_id`].
-    pub trait HasSystemId {}
-
-    /// Marker for [`NodeConfBuilder`] without [`NodeConf::system_id`].
-    pub struct NoSystemId();
-    impl HasSystemId for NoSystemId {}
-
-    /// Marker for [`NodeConfBuilder`] with [`NodeConf::system_id`] set.
-    pub struct WithSystemId();
-    impl HasSystemId for WithSystemId {}
-
-    /// Marker trait for [`NodeConfBuilder`] with or without [`NodeConf::component_id`].
-    pub trait HasComponentId {}
-
-    /// Marker for [`NodeConfBuilder`] without [`NodeConf::component_id`].
-    pub struct NoComponentId();
-    impl HasComponentId for NoComponentId {}
-
-    /// Marker for [`NodeConfBuilder`] with [`NodeConf::component_id`] set.
-    pub struct WithComponentId();
-    impl HasComponentId for WithComponentId {}
-
-    /// Marker trait for [`NodeConfBuilder`] with or without [`NodeConf::conn_conf`].
-    pub trait HasConnectionConf {}
-
-    /// Marker for [`NodeConfBuilder`] without [`NodeConf::conn_conf`].
-    pub struct NoConnectionConf();
-    impl HasConnectionConf for NoConnectionConf {}
-
-    /// Marker for [`NodeConfBuilder`] with [`NodeConf::conn_conf`] set.
-    pub struct WithConnectionConf();
-    impl HasConnectionConf for WithConnectionConf {}
-
-    /// Builder for [`NodeConf`].
-    #[derive(Clone, Default)]
-    pub struct NodeConfBuilder<
-        S: HasSystemId,
-        C: HasComponentId,
-        T: HasConnectionConf,
-        D: HasDialect,
-        M: DialectMessage + 'static,
-    > {
-        system_id: Option<u8>,
-        component_id: Option<u8>,
-        dialect: Option<&'static dyn DialectImpl<Message = M>>,
-        conn_conf: Option<Arc<dyn ConnectionConf>>,
-        _has_system_id: PhantomData<S>,
-        _has_component_id: PhantomData<C>,
-        _has_conn_conf: PhantomData<T>,
-        _has_dialect: PhantomData<D>,
-    }
-
-    impl<M: DialectMessage> NodeConfBuilder<NoSystemId, NoComponentId, NoConnectionConf, NoDialect, M> {
-        /// Instantiates an empty [`NodeConfBuilder`].
-        pub fn new() -> Self {
-            Self {
-                system_id: None,
-                component_id: None,
-                dialect: None,
-                conn_conf: None,
-                _has_system_id: Default::default(),
-                _has_component_id: Default::default(),
-                _has_conn_conf: Default::default(),
-                _has_dialect: Default::default(),
-            }
-        }
-    }
-
-    impl<C: HasComponentId, T: HasConnectionConf, D: HasDialect, M: DialectMessage>
-        NodeConfBuilder<NoSystemId, C, T, D, M>
-    {
-        /// Sets [`NodeConf::system_id`].
-        pub fn set_system_id(&self, system_id: u8) -> NodeConfBuilder<WithSystemId, C, T, D, M> {
-            NodeConfBuilder {
-                system_id: Some(system_id),
-                component_id: self.component_id,
-                dialect: self.dialect,
-                conn_conf: self.conn_conf.clone(),
-                _has_system_id: PhantomData,
-                _has_component_id: PhantomData,
-                _has_conn_conf: PhantomData,
-                _has_dialect: PhantomData,
-            }
-        }
-    }
-
-    impl<S: HasSystemId, T: HasConnectionConf, D: HasDialect, M: DialectMessage>
-        NodeConfBuilder<S, NoComponentId, T, D, M>
-    {
-        /// Sets [`NodeConf::component_id`].
-        pub fn set_component_id(
-            &self,
-            component_id: u8,
-        ) -> NodeConfBuilder<S, WithComponentId, T, D, M> {
-            NodeConfBuilder {
-                system_id: self.system_id,
-                component_id: Some(component_id),
-                dialect: self.dialect,
-                conn_conf: self.conn_conf.clone(),
-                _has_system_id: PhantomData,
-                _has_component_id: PhantomData,
-                _has_conn_conf: PhantomData,
-                _has_dialect: PhantomData,
-            }
-        }
-    }
-
-    impl<S: HasSystemId, C: HasComponentId, D: HasDialect, M: DialectMessage>
-        NodeConfBuilder<S, C, NoConnectionConf, D, M>
-    {
-        /// Sets [`NodeConf::component_id`].
-        pub fn set_conn_conf(
-            &self,
-            conn_conf: impl ConnectionConf + 'static,
-        ) -> NodeConfBuilder<S, C, WithConnectionConf, D, M> {
-            NodeConfBuilder {
-                system_id: self.system_id,
-                component_id: self.component_id,
-                dialect: self.dialect,
-                conn_conf: Some(Arc::new(conn_conf)),
-                _has_system_id: PhantomData,
-                _has_component_id: PhantomData,
-                _has_conn_conf: PhantomData,
-                _has_dialect: PhantomData,
-            }
-        }
-    }
-
-    impl<S: HasSystemId, C: HasComponentId, T: HasConnectionConf, M: DialectMessage>
-        NodeConfBuilder<S, C, T, NoDialect, M>
-    {
-        /// Sets [`NodeConf::dialect`].
-        pub fn set_dialect<DM: DialectMessage>(
-            &self,
-            dialect: &'static dyn DialectImpl<Message = DM>,
-        ) -> NodeConfBuilder<S, C, T, WithDialect, DM> {
-            NodeConfBuilder {
-                system_id: self.system_id,
-                component_id: self.component_id,
-                dialect: Some(dialect),
-                conn_conf: self.conn_conf.clone(),
-                _has_system_id: PhantomData,
-                _has_component_id: PhantomData,
-                _has_conn_conf: PhantomData,
-                _has_dialect: PhantomData,
-            }
-        }
-    }
-
-    impl<M: DialectMessage>
-        NodeConfBuilder<NoSystemId, NoComponentId, WithConnectionConf, NoDialect, M>
-    {
-        /// Builds and instance of [`NodeConf`] without defined [`NodeConf::system_id`],
-        /// [`NodeConf::component_id`], and [`NodeConf::dialect`].
-        pub fn build(&self) -> NodeConf<NoId, NoDialect, crate::dialects::minimal::Message> {
-            NodeConf {
-                system_id: None,
-                component_id: None,
-                dialect: None,
-                conn_conf: self.conn_conf.clone(),
-                _has_dialect: PhantomData,
-                _has_id: PhantomData,
-            }
-        }
-    }
-
-    impl<M: DialectMessage>
-        NodeConfBuilder<WithSystemId, WithComponentId, WithConnectionConf, NoDialect, M>
-    {
-        /// Builds and instance of [`NodeConf`] with defined [`NodeConf::system_id`] and
-        /// [`NodeConf::component_id`] without a specific [`NodeConf::dialect`].
-        pub fn build(&self) -> NodeConf<WithId, NoDialect, crate::dialects::minimal::Message> {
-            NodeConf {
-                system_id: self.system_id,
-                component_id: self.component_id,
-                dialect: None,
-                conn_conf: self.conn_conf.clone(),
-                _has_dialect: PhantomData,
-                _has_id: PhantomData,
-            }
-        }
-    }
-
-    impl<M: DialectMessage>
-        NodeConfBuilder<NoSystemId, NoComponentId, WithConnectionConf, WithDialect, M>
-    {
-        /// Builds and instance of [`NodeConf`] without defined [`NodeConf::system_id`],
-        /// [`NodeConf::component_id`] and specified [`NodeConf::dialect`].
-        pub fn build(&self) -> NodeConf<NoId, WithDialect, M> {
-            NodeConf {
-                system_id: None,
-                component_id: None,
-                dialect: self.dialect,
-                conn_conf: self.conn_conf.clone(),
-                _has_dialect: PhantomData,
-                _has_id: PhantomData,
-            }
-        }
-    }
-
-    impl<M: DialectMessage>
-        NodeConfBuilder<WithSystemId, WithComponentId, WithConnectionConf, WithDialect, M>
-    {
-        /// Builds and instance of [`NodeConf`] with defined [`NodeConf::system_id`],
-        /// [`NodeConf::component_id`], and [`NodeConf::dialect`].
-        pub fn build(&self) -> NodeConf<WithId, WithDialect, M> {
-            NodeConf {
-                system_id: self.system_id,
-                component_id: self.component_id,
-                dialect: self.dialect,
-                conn_conf: self.conn_conf.clone(),
-                _has_dialect: PhantomData,
-                _has_id: PhantomData,
-            }
-        }
-    }
-}
-
-impl<D: variants::HasDialect, M: DialectMessage> NodeConf<variants::WithId, D, M> {
+impl<D: HasDialect, V: HasVersion, M: DialectMessage> NodeConf<Identified, D, V, M> {
     /// MAVLink system ID.
     pub fn system_id(&self) -> u8 {
-        self.system_id.unwrap()
+        self.id.system_id
     }
 
     /// MAVLink component ID.
     pub fn component_id(&self) -> u8 {
-        self.component_id.unwrap()
+        self.id.component_id
     }
 }
 
-impl NodeConf<variants::NoId, variants::NoDialect, crate::dialects::minimal::Message> {
+impl NodeConf<NotIdentified, NoDialect, NotVersioned, crate::dialects::minimal::Message> {
     /// Creates an empty [`NodeBuilder`](builder::NodeConfBuilder).
     ///
     /// # Usage
@@ -353,25 +86,238 @@ impl NodeConf<variants::NoId, variants::NoDialect, crate::dialects::minimal::Mes
     pub fn builder() -> builder::NodeConfBuilder<
         builder::NoSystemId,
         builder::NoComponentId,
-        builder::NoConnectionConf,
-        variants::NoDialect,
+        builder::NoConnConf,
+        NoDialect,
+        NotVersioned,
         crate::dialects::minimal::Message,
     > {
         builder::NodeConfBuilder::new()
     }
 }
 
-impl<I: variants::HasId, M: DialectMessage> NodeConf<I, variants::WithDialect, M> {
+impl<I: HasIdentifier, V: HasVersion, M: DialectMessage> NodeConf<I, Dialect<M>, V, M> {
     /// MAVLink dialect.
     pub fn dialect(&self) -> &'static dyn DialectImpl<Message = M> {
-        self.dialect.unwrap()
+        self.dialect.0
     }
 }
 
-impl<I: variants::HasId, D: variants::HasDialect, M: DialectMessage> NodeConf<I, D, M> {
+impl<I: HasIdentifier, D: HasDialect, V: HasVersion, M: DialectMessage> NodeConf<I, D, V, M> {
     /// Connection configuration.
     pub fn conn_conf(&self) -> &dyn ConnectionConf {
-        self.conn_conf.as_ref().unwrap().as_ref()
+        self.conn_conf.as_ref()
+    }
+}
+
+impl<I: HasIdentifier, D: HasDialect, M: DialectMessage> NodeConf<I, D, Versioned, M> {
+    /// MAVLink version.
+    pub fn version(&self) -> &MavLinkVersion {
+        &self.version.0
+    }
+}
+
+/// Builder for [`NodeConf`].
+pub mod builder {
+    use std::marker::PhantomData;
+
+    use crate::io::node_variants::{HasVersion, NotVersioned, Versioned};
+    use mavio::protocol::{DialectImpl, DialectMessage, MavLinkVersion};
+
+    use crate::io::sync::ConnectionConf;
+
+    use super::NodeConf;
+    use super::{Dialect, HasDialect, Identified, NoDialect, NotIdentified};
+
+    /// Marker trait for [`NodeConfBuilder`] with or without [`NodeConf::system_id`].
+    pub trait HasSystemId {}
+
+    /// Marker for [`NodeConfBuilder`] without [`NodeConf::system_id`].
+    pub struct NoSystemId();
+    impl HasSystemId for NoSystemId {}
+
+    /// Marker for [`NodeConfBuilder`] with [`NodeConf::system_id`] set.
+    pub struct SystemId(u8);
+    impl HasSystemId for SystemId {}
+
+    /// Marker trait for [`NodeConfBuilder`] with or without [`NodeConf::component_id`].
+    pub trait HasComponentId {}
+
+    /// Marker for [`NodeConfBuilder`] without [`NodeConf::component_id`].
+    pub struct NoComponentId();
+    impl HasComponentId for NoComponentId {}
+
+    /// Marker for [`NodeConfBuilder`] with [`NodeConf::component_id`] set.
+    pub struct ComponentId(u8);
+    impl HasComponentId for ComponentId {}
+
+    /// Marker trait for [`NodeConfBuilder`] with or without [`NodeConf::conn_conf`].
+    pub trait HasConnConf {}
+
+    /// Marker for [`NodeConfBuilder`] without [`NodeConf::conn_conf`].
+    pub struct NoConnConf();
+    impl HasConnConf for NoConnConf {}
+
+    /// Marker for [`NodeConfBuilder`] with [`NodeConf::conn_conf`] set.
+    pub struct ConnConf(Box<dyn ConnectionConf>);
+    impl HasConnConf for ConnConf {}
+
+    /// Builder for [`NodeConf`].
+    #[derive(Clone, Debug, Default)]
+    pub struct NodeConfBuilder<
+        S: HasSystemId,
+        C: HasComponentId,
+        CC: HasConnConf,
+        D: HasDialect,
+        V: HasVersion,
+        M: DialectMessage + 'static,
+    > {
+        system_id: S,
+        component_id: C,
+        dialect: D,
+        conn_conf: CC,
+        version: V,
+        _marker_message: PhantomData<M>,
+    }
+
+    impl<M: DialectMessage>
+        NodeConfBuilder<NoSystemId, NoComponentId, NoConnConf, NoDialect, NotVersioned, M>
+    {
+        /// Instantiates an empty [`NodeConfBuilder`].
+        pub fn new() -> Self {
+            Self {
+                system_id: NoSystemId(),
+                component_id: NoComponentId(),
+                dialect: NoDialect(),
+                conn_conf: NoConnConf(),
+                version: NotVersioned(),
+                _marker_message: Default::default(),
+            }
+        }
+    }
+
+    impl<C: HasComponentId, CC: HasConnConf, D: HasDialect, V: HasVersion, M: DialectMessage>
+        NodeConfBuilder<NoSystemId, C, CC, D, V, M>
+    {
+        /// Sets [`NodeConf::system_id`].
+        pub fn set_system_id(self, system_id: u8) -> NodeConfBuilder<SystemId, C, CC, D, V, M> {
+            NodeConfBuilder {
+                system_id: SystemId(system_id),
+                component_id: self.component_id,
+                dialect: self.dialect,
+                conn_conf: self.conn_conf,
+                version: self.version,
+                _marker_message: PhantomData,
+            }
+        }
+    }
+
+    impl<S: HasSystemId, T: HasConnConf, D: HasDialect, V: HasVersion, M: DialectMessage>
+        NodeConfBuilder<S, NoComponentId, T, D, V, M>
+    {
+        /// Sets [`NodeConf::component_id`].
+        pub fn set_component_id(
+            self,
+            component_id: u8,
+        ) -> NodeConfBuilder<S, ComponentId, T, D, V, M> {
+            NodeConfBuilder {
+                system_id: self.system_id,
+                component_id: ComponentId(component_id),
+                dialect: self.dialect,
+                conn_conf: self.conn_conf,
+                version: self.version,
+                _marker_message: PhantomData,
+            }
+        }
+    }
+
+    impl<S: HasSystemId, C: HasComponentId, D: HasDialect, V: HasVersion, M: DialectMessage>
+        NodeConfBuilder<S, C, NoConnConf, D, V, M>
+    {
+        /// Sets [`NodeConf::component_id`].
+        pub fn set_conn_conf(
+            self,
+            conn_conf: impl ConnectionConf + 'static,
+        ) -> NodeConfBuilder<S, C, ConnConf, D, V, M> {
+            NodeConfBuilder {
+                system_id: self.system_id,
+                component_id: self.component_id,
+                dialect: self.dialect,
+                conn_conf: ConnConf(Box::new(conn_conf)),
+                version: self.version,
+                _marker_message: PhantomData,
+            }
+        }
+    }
+
+    impl<S: HasSystemId, C: HasComponentId, CC: HasConnConf, V: HasVersion, M: DialectMessage>
+        NodeConfBuilder<S, C, CC, NoDialect, V, M>
+    {
+        /// Sets [`NodeConf::dialect`].
+        pub fn set_dialect<DM: DialectMessage>(
+            self,
+            dialect: &'static dyn DialectImpl<Message = DM>,
+        ) -> NodeConfBuilder<S, C, CC, Dialect<DM>, V, DM> {
+            NodeConfBuilder {
+                system_id: self.system_id,
+                component_id: self.component_id,
+                dialect: Dialect(dialect),
+                conn_conf: self.conn_conf,
+                version: self.version,
+                _marker_message: PhantomData,
+            }
+        }
+    }
+
+    impl<S: HasSystemId, C: HasComponentId, CC: HasConnConf, D: HasDialect, M: DialectMessage>
+        NodeConfBuilder<S, C, CC, D, NotVersioned, M>
+    {
+        /// Sets [`NodeConf::dialect`].
+        pub fn set_version(
+            self,
+            version: MavLinkVersion,
+        ) -> NodeConfBuilder<S, C, CC, D, Versioned, M> {
+            NodeConfBuilder {
+                system_id: self.system_id,
+                component_id: self.component_id,
+                dialect: self.dialect,
+                conn_conf: self.conn_conf,
+                version: Versioned(version),
+                _marker_message: PhantomData,
+            }
+        }
+    }
+
+    impl<M: DialectMessage, D: HasDialect, V: HasVersion>
+        NodeConfBuilder<NoSystemId, NoComponentId, ConnConf, D, V, M>
+    {
+        /// Builds and instance of [`NodeConf`] without defined [`NodeConf::system_id`] and [`NodeConf::component_id`].
+        pub fn build(self) -> NodeConf<NotIdentified, D, V, M> {
+            NodeConf {
+                id: NotIdentified(),
+                dialect: self.dialect,
+                conn_conf: self.conn_conf.0,
+                version: self.version,
+                _marker_message: PhantomData,
+            }
+        }
+    }
+
+    impl<M: DialectMessage, D: HasDialect, V: HasVersion>
+        NodeConfBuilder<SystemId, ComponentId, ConnConf, D, V, M>
+    {
+        /// Builds and instance of [`NodeConf`] with defined [`NodeConf::system_id`] and [`NodeConf::component_id`].
+        pub fn build(self) -> NodeConf<Identified, D, V, M> {
+            NodeConf {
+                id: Identified {
+                    system_id: self.system_id.0,
+                    component_id: self.component_id.0,
+                },
+                dialect: self.dialect,
+                conn_conf: self.conn_conf.0,
+                version: self.version,
+                _marker_message: PhantomData,
+            }
+        }
     }
 }
 

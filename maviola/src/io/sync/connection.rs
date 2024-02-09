@@ -6,7 +6,7 @@ use std::sync::{mpsc, Arc, Mutex};
 
 use mavio::Frame;
 
-use crate::errors::{Error, Result};
+use crate::prelude::*;
 
 /// Connection events.
 pub enum ConnectionEvent {
@@ -16,6 +16,21 @@ pub enum ConnectionEvent {
     Drop(usize, Option<Error>),
     /// Error during connection management.
     Error(Error),
+}
+
+/// Information about a connection configuration.
+#[derive(Clone, Debug)]
+pub enum ConnectionConfInfo {
+    /// TCP server.
+    TcpServer {
+        /// Server address.
+        bind_addr: SocketAddr,
+    },
+    /// TCP client.
+    TcpClient {
+        /// Server address.
+        remote_addr: SocketAddr,
+    },
 }
 
 /// Information about a connection.
@@ -66,10 +81,13 @@ pub trait Receiver: Send + Sync + Debug {
 }
 
 /// Connection builder used to create a [`Connection`].
-pub trait ConnectionBuilder: Debug + Send + Debug {
+pub trait ConnectionBuilder: Debug + Send {
     /// Builds [`Connection`] from provided configuration.
     fn build(&self) -> Result<mpsc::Receiver<ConnectionEvent>>;
 }
 
 /// Connection configuration.
-pub trait ConnectionConf: ConnectionBuilder {}
+pub trait ConnectionConf: ConnectionBuilder {
+    /// Information about connection config.
+    fn info(&self) -> ConnectionConfInfo;
+}

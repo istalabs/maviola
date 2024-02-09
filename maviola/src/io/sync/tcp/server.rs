@@ -5,9 +5,10 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::{atomic, mpsc, Arc, Mutex};
 use std::thread;
 
-use crate::errors::{Error, Result};
+use crate::prelude::*;
+
 use crate::io::sync::connection::{
-    ConnectionBuilder, ConnectionConf, ConnectionEvent, ConnectionInfo,
+    ConnectionBuilder, ConnectionConf, ConnectionConfInfo, ConnectionEvent, ConnectionInfo,
 };
 use crate::io::sync::tcp::connection::{TcpConnection, TcpReceiver, TcpSender};
 use crate::io::utils::resolve_socket_addr;
@@ -42,6 +43,9 @@ impl ConnectionBuilder for TcpServerConf {
         ) = mpsc::channel();
         let server_addr = self.addr;
         let id: AtomicUsize = Default::default();
+        let conn_conf_info = ConnectionConfInfo::TcpServer {
+            bind_addr: server_addr,
+        };
 
         thread::spawn(move || {
             for stream in listener.incoming() {
@@ -51,8 +55,11 @@ impl ConnectionBuilder for TcpServerConf {
                             Ok(reader) => reader,
                             Err(err) => {
                                 let err: Error = err.into();
+                                let conn_conf_info = ConnectionConfInfo::TcpServer {
+                                    bind_addr: server_addr,
+                                };
                                 if tx.send(ConnectionEvent::Error(err.clone())).is_err() {
-                                    log::error!("unable to pass TCP stream cloning error: {err:?}");
+                                    log::error!("{conn_conf_info:?} unable to pass TCP stream cloning error: {err:?}");
                                     return;
                                 }
                                 continue;
@@ -60,36 +67,40 @@ impl ConnectionBuilder for TcpServerConf {
                         };
 
                         let peer_addr = stream.peer_addr().unwrap();
-                        let info = ConnectionInfo::TcpServer {
+                        let conn_info = ConnectionInfo::TcpServer {
                             server_addr,
                             peer_addr,
                         };
                         let id = id.fetch_add(1, atomic::Ordering::Relaxed);
+                        let receiver = TcpReceiver::new(
+                            0,
+                            conn_info.clone(),
+                            tx.clone(),
+                            mavio::Receiver::new(reader),
+                        );
+                        let sender = TcpSender::new(
+                            0,
+                            conn_info.clone(),
+                            tx.clone(),
+                            mavio::Sender::new(stream),
+                        );
                         let conn = TcpConnection {
                             id,
-                            info: info.clone(),
-                            receiver: Arc::new(Mutex::new(Box::new(TcpReceiver {
-                                id,
-                                receiver: mavio::Receiver::new(reader),
-                                event_chan: tx.clone(),
-                            }))),
-                            sender: Arc::new(Mutex::new(Box::new(TcpSender {
-                                id,
-                                sender: mavio::Sender::new(stream),
-                                event_chan: tx.clone(),
-                            }))),
-                            event_chan: tx.clone(),
+                            info: conn_info.clone(),
+                            receiver: Arc::new(Mutex::new(Box::new(receiver))),
+                            sender: Arc::new(Mutex::new(Box::new(sender))),
+                            events_chan: tx.clone(),
                         };
 
-                        if tx.send(ConnectionEvent::New(Box::new(conn))).is_err() {
-                            log::error!("unable to pass connection for: {info:?}");
+                        if let Err(err) = tx.send(ConnectionEvent::New(Box::new(conn))) {
+                            log::error!("{conn_info:?} unable to register connection: {err:?}");
                             return;
                         }
                     }
                     Err(err) => {
                         let err: Error = err.into();
                         if tx.send(ConnectionEvent::Error(err.clone())).is_err() {
-                            log::error!("unable to pass incoming TCP stream error: {err:?}");
+                            log::error!("{conn_conf_info:?}: unable to pass incoming TCP stream error: {err:?}");
                             return;
                         }
                         continue;
@@ -102,4 +113,10 @@ impl ConnectionBuilder for TcpServerConf {
     }
 }
 
-impl ConnectionConf for TcpServerConf {}
+impl ConnectionConf for TcpServerConf {
+    fn info(&self) -> ConnectionConfInfo {
+        ConnectionConfInfo::TcpServer {
+            bind_addr: self.addr,
+        }
+    }
+}
