@@ -83,7 +83,7 @@ impl Receiver for TcpReceiver {
         match self.receiver.recv() {
             Ok(res) => Ok(res),
             Err(err) => match err {
-                mavio::errors::CoreError::Io(_) => {
+                mavio::errors::Error::Io(_) => {
                     self.is_active.store(false, atomic::Ordering::Relaxed);
 
                     let err = Error::from(err);
@@ -141,7 +141,7 @@ impl Sender for TcpSender {
         match self.sender.send(frame) {
             Ok(res) => Ok(res),
             Err(err) => match err {
-                mavio::errors::CoreError::Io(_) => {
+                mavio::errors::Error::Io(_) => {
                     self.is_active.store(false, atomic::Ordering::Relaxed);
 
                     let err = Error::from(err);

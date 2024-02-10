@@ -70,12 +70,12 @@ pub enum FrameBuildError {
     },
 }
 
-impl From<mavio::errors::CoreError> for Error {
-    fn from(value: mavio::errors::CoreError) -> Self {
+impl From<mavio::errors::Error> for Error {
+    fn from(value: mavio::errors::Error) -> Self {
         match value {
-            mavio::errors::CoreError::Io(err) => Self::Io(err),
-            mavio::errors::CoreError::Frame(err) => Self::Frame(err),
-            mavio::errors::CoreError::Message(err) => Self::Message(err),
+            mavio::errors::Error::Io(err) => Self::Io(err),
+            mavio::errors::Error::Frame(err) => Self::Frame(err),
+            mavio::errors::Error::Message(err) => Self::Message(err),
         }
     }
 }
