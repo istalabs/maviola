@@ -1,6 +1,7 @@
 //! MAVLink protocol entities.
 
-pub(crate) mod frame;
+pub mod frame;
+pub mod variants;
 
 #[doc(inline)]
 pub use frame::Frame;
