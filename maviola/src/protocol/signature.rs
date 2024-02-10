@@ -104,7 +104,7 @@ pub mod builder {
         /// # Usage
         ///
         /// ```rust
-        /// use maviola::io::signature::{SignConf, SignStrategy};
+        /// use maviola::protocol::{SignConf, SignStrategy};
         ///
         /// SignConf::builder()
         ///     .key("abcdef")

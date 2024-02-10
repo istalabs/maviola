@@ -5,6 +5,8 @@ use std::sync::{Arc, PoisonError};
 use mavio::errors::{FrameError, MessageError};
 use mavio::protocol::{MavLinkVersion, MessageId};
 
+use crate::protocol::CoreFrame;
+
 /// Maviola result type.
 pub type Result<T> = core::result::Result<T, Error>;
 
@@ -55,12 +57,12 @@ pub enum NodeError {
 pub enum FrameBuildError {
     /// Attempt to use a frame with message ID that can't be recognised by a dialect.
     #[error("provided frame with ID = {1} can't be decoded in current dialect {2}")]
-    NotInDialect(mavio::Frame, MessageId, &'static str),
+    NotInDialect(CoreFrame, MessageId, &'static str),
     /// Attempt to use a frame with message ID that can't be recognised by a dialect.
     #[error("provided frame has incorrect mavlink version {given:?}, expected: {expected:?}")]
     InvalidVersion {
         /// MAVLink frame.
-        frame: mavio::Frame,
+        frame: CoreFrame,
         /// Provided MAVLink protocol version.
         given: MavLinkVersion,
         /// Expected MAVLink protocol version.

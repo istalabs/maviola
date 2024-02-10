@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, AtomicU8};
 use std::sync::{atomic, mpsc, Arc, Mutex, TryLockError};
 use std::thread;
 
-use mavio::protocol::{DialectImpl, DialectMessage, MavLinkVersion};
+use mavio::protocol::{ComponentId, DialectImpl, DialectMessage, MavLinkVersion, SystemId};
 
 use crate::prelude::*;
 
@@ -14,43 +14,44 @@ use crate::io::node_variants::{Identified, IsIdentified};
 use crate::io::sync::connection::{ConnectionConfInfo, ConnectionEvent};
 use crate::io::sync::{Connection, ConnectionConf};
 use crate::protocol::variants::{HasDialect, IsDialect, IsVersioned, NotVersioned, Versioned};
-use crate::protocol::Frame;
+use crate::protocol::{CoreFrame, Frame};
 
-/// Interface for MAVLink communication node which can send and receive [`mavio::Frame`].
+/// Interface for MAVLink communication node which can send and receive [`CoreFrame`].
 pub trait NodeInterface {
     /// Information about this node.
     fn info(&self) -> &NodeInfo;
 
     /// Proxy MAVLink frame.
     ///
-    /// In proxy mode [`mavio::Frame`] is sent with as many fields preserved as possible.
+    /// In proxy mode [`CoreFrame`] is sent with as many fields preserved as possible.
     ///
     /// In particular, the following fields are always preserved:
     ///
-    /// * [`sequence`](mavio::Frame::sequence)
-    /// * [`system_id`](mavio::Frame::system_id)
-    /// * [`component_id`](mavio::Frame::component_id)
+    /// * [`sequence`](CoreFrame::sequence)
+    /// * [`system_id`](CoreFrame::system_id)
+    /// * [`component_id`](CoreFrame::component_id)
     ///
     /// The following properties could be updated based on the node's
     /// [message signing](https://mavlink.io/en/guide/message_signing.html) configuration:
     ///
-    /// * [`signature`](mavio::Frame::signature)
-    /// * [`link_id`](mavio::Frame::link_id)
-    /// * [`timestamp`](mavio::Frame::timestamp)
+    /// * [`signature`](CoreFrame::signature)
+    /// * [`link_id`](CoreFrame::link_id)
+    /// * [`timestamp`](CoreFrame::timestamp)
     ///
     /// # Stateful Sending
     ///
-    /// To send frames with correct auto-incremented [`sequence`](mavio::Frame::sequence) and
+    /// To send frames with correct auto-incremented [`sequence`](Frame::sequence) and
     /// [`system_id`](Node::system_id) / [`component_id`](Node::component_id) bound to a node, you
     /// have to construct an [`Identified`] node and use [`Node::send_frame`].
     ///
     /// To send messages, construct an [`Identified`] node with [`HasDialect`] and
     /// [`Node::send_versioned`]. You can also use [`Node::send`] for [`Versioned`] nodes. In the
-    /// latter case, message will be encoded according to MAVLink protocol version defined by for a node.
-    fn proxy_frame(&self, frame: &mavio::Frame) -> Result<usize>;
+    /// latter case, message will be encoded according to MAVLink protocol version defined by for a
+    /// node.
+    fn proxy_frame(&self, frame: &CoreFrame) -> Result<usize>;
 
     /// Receive MAVLink frame.
-    fn recv_frame(&self) -> Result<mavio::Frame>;
+    fn recv_frame(&self) -> Result<CoreFrame>;
 
     /// Close all connections and stop.
     fn close(&self) -> Result<()>;
@@ -63,16 +64,8 @@ pub struct Node<I: IsIdentified, D: IsDialect, V: IsVersioned> {
     dialect: D,
     version: V,
     connections: AtomicConnections,
-    recv_rx: mpsc::Receiver<Result<mavio::Frame>>,
+    recv_rx: mpsc::Receiver<Result<CoreFrame>>,
     info: NodeInfo,
-}
-
-impl<I: IsIdentified, D: IsDialect, V: IsVersioned> Drop for Node<I, D, V> {
-    fn drop(&mut self) {
-        if let Err(err) = self.close() {
-            log::error!("{:?}: can't close node: {err:?}", &self.info.conn);
-        }
-    }
 }
 
 impl<I: IsIdentified, D: IsDialect, V: IsVersioned> TryFrom<NodeConf<I, D, V>> for Node<I, D, V> {
@@ -96,13 +89,27 @@ impl<I: IsIdentified, D: IsDialect, V: IsVersioned> TryFrom<NodeConf<I, D, V>> f
 
 impl<D: IsDialect, V: IsVersioned> Node<Identified, D, V> {
     /// MAVLink system ID.
-    pub fn system_id(&self) -> u8 {
+    pub fn system_id(&self) -> SystemId {
         self.id.system_id
     }
 
     /// MAVLink component ID.
-    pub fn component_id(&self) -> u8 {
+    pub fn component_id(&self) -> ComponentId {
         self.id.component_id
+    }
+}
+
+impl<M: DialectMessage + 'static, I: IsIdentified, V: IsVersioned> Node<I, HasDialect<M>, V> {
+    /// Dialect specification.
+    pub fn dialect(&self) -> &'static dyn DialectImpl<Message = M> {
+        self.dialect.0
+    }
+}
+
+impl<I: IsIdentified, D: IsDialect, V: Versioned> Node<I, D, V> {
+    /// MAVLink version.
+    pub fn version(&self) -> MavLinkVersion {
+        self.version.mavlink_version()
     }
 }
 
@@ -125,21 +132,21 @@ impl<M: DialectMessage + 'static> Node<Identified, HasDialect<M>, NotVersioned> 
 impl<D: IsDialect, V: IsVersioned> Node<Identified, D, V> {
     /// Send MAVLink frame.
     ///
-    /// Sends [`mavio::Frame`] potentially changing its fields.
+    /// Sends [`CoreFrame`] potentially changing its fields.
     ///
     /// Updated fields:
     ///
-    /// * [`sequence`](mavio::Frame::sequence) - set to the next value
-    /// * [`system_id`](mavio::Frame::system_id) - set to node's default
-    /// * [`component_id`](mavio::Frame::component_id) - set to node's default
+    /// * [`sequence`](CoreFrame::sequence) - set to the next value
+    /// * [`system_id`](CoreFrame::system_id) - set to node's default
+    /// * [`component_id`](CoreFrame::component_id) - set to node's default
     ///
     /// The following properties could be updated based on the node's configuration:
     ///
-    /// * [`signature`](mavio::Frame::signature)
-    /// * [`link_id`](mavio::Frame::link_id)
-    /// * [`timestamp`](mavio::Frame::timestamp)
+    /// * [`signature`](CoreFrame::signature)
+    /// * [`link_id`](CoreFrame::link_id)
+    /// * [`timestamp`](CoreFrame::timestamp)
     #[inline]
-    pub fn send_frame(&self, frame: &mavio::Frame) -> Result<usize> {
+    pub fn send_frame(&self, frame: &CoreFrame) -> Result<usize> {
         self.send_frame_internal(frame)
     }
 
@@ -147,10 +154,10 @@ impl<D: IsDialect, V: IsVersioned> Node<Identified, D, V> {
         &self,
         message: M,
         version: MavLinkVersion,
-    ) -> Result<mavio::Frame> {
+    ) -> Result<CoreFrame> {
         let sequence = self.sequence.fetch_add(1, atomic::Ordering::Relaxed);
         let payload = message.encode(version)?;
-        mavio::Frame::builder()
+        CoreFrame::builder()
             .set_sequence(sequence)
             .set_system_id(self.id.system_id)
             .set_component_id(self.id.component_id)
@@ -161,15 +168,8 @@ impl<D: IsDialect, V: IsVersioned> Node<Identified, D, V> {
     }
 }
 
-impl<M: DialectMessage + 'static, I: IsIdentified, V: IsVersioned> Node<I, HasDialect<M>, V> {
-    /// Dialect specification.
-    pub fn dialect(&self) -> &'static dyn DialectImpl<Message = M> {
-        self.dialect.0
-    }
-}
-
 impl<I: IsIdentified, D: IsDialect, V: IsVersioned> Node<I, D, V> {
-    /// Receive message.
+    /// Receive MAVLink frame.
     pub fn recv(&self) -> Result<Frame<D, V>> {
         let mavio_frame = self.recv_frame()?;
         let frame = Frame::builder()
@@ -180,24 +180,17 @@ impl<I: IsIdentified, D: IsDialect, V: IsVersioned> Node<I, D, V> {
     }
 }
 
-impl<I: IsIdentified, D: IsDialect, V: Versioned> Node<I, D, V> {
-    /// MAVLink version.
-    pub fn version(&self) -> MavLinkVersion {
-        self.version.mavlink_version()
-    }
-}
-
 impl<I: IsIdentified, D: IsDialect, V: IsVersioned> NodeInterface for Node<I, D, V> {
     fn info(&self) -> &NodeInfo {
         &self.info
     }
 
-    fn proxy_frame(&self, frame: &mavio::Frame) -> Result<usize> {
+    fn proxy_frame(&self, frame: &CoreFrame) -> Result<usize> {
         self.send_frame_internal(frame)
     }
 
-    fn recv_frame(&self) -> Result<mavio::Frame> {
-        self.recv_rx.recv().map_err(Error::from)?
+    fn recv_frame(&self) -> Result<CoreFrame> {
+        self.recv_frame_internal()
     }
 
     fn close(&self) -> Result<()> {
@@ -217,7 +210,11 @@ impl<I: IsIdentified, D: IsDialect, V: IsVersioned> NodeInterface for Node<I, D,
 }
 
 impl<I: IsIdentified, D: IsDialect, V: IsVersioned> Node<I, D, V> {
-    fn send_frame_internal(&self, frame: &mavio::Frame) -> Result<usize> {
+    fn recv_frame_internal(&self) -> Result<CoreFrame> {
+        self.recv_rx.recv().map_err(Error::from)?
+    }
+
+    fn send_frame_internal(&self, frame: &CoreFrame) -> Result<usize> {
         let connections = self.connections.lock()?;
         let frame = Arc::new(frame.clone());
 
@@ -253,7 +250,7 @@ impl<I: IsIdentified, D: IsDialect, V: IsVersioned> Node<I, D, V> {
         conn_conf: &dyn ConnectionConf,
     ) -> Result<(
         AtomicConnections,
-        mpsc::Receiver<Result<mavio::Frame>>,
+        mpsc::Receiver<Result<CoreFrame>>,
         NodeInfo,
     )> {
         let connections: AtomicConnections = Default::default();
@@ -284,7 +281,7 @@ impl<I: IsIdentified, D: IsDialect, V: IsVersioned> Node<I, D, V> {
 
     fn handle_conn_events(
         node_info: NodeInfo,
-        recv_tx: mpsc::Sender<Result<mavio::Frame>>,
+        recv_tx: mpsc::Sender<Result<CoreFrame>>,
         connections: AtomicConnections,
         events: mpsc::Receiver<ConnectionEvent>,
     ) -> Result<()> {
@@ -309,7 +306,7 @@ impl<I: IsIdentified, D: IsDialect, V: IsVersioned> Node<I, D, V> {
 
     fn handle_connection_event_new(
         connection: Box<dyn Connection>,
-        recv_tx: mpsc::Sender<Result<mavio::Frame>>,
+        recv_tx: mpsc::Sender<Result<CoreFrame>>,
         connections: &AtomicConnections,
         node_info: &NodeInfo,
     ) -> Result<()> {
@@ -387,7 +384,7 @@ impl<I: IsIdentified, D: IsDialect, V: IsVersioned> Node<I, D, V> {
     fn handle_connection(
         id: usize,
         node_info: NodeInfo,
-        recv_tx: mpsc::Sender<Result<mavio::Frame>>,
+        recv_tx: mpsc::Sender<Result<CoreFrame>>,
         connections: AtomicConnections,
         close_rx: mpsc::Receiver<()>,
     ) {
@@ -432,6 +429,38 @@ impl<I: IsIdentified, D: IsDialect, V: IsVersioned> Node<I, D, V> {
     }
 }
 
+impl<I: IsIdentified, D: IsDialect, V: IsVersioned> Drop for Node<I, D, V> {
+    fn drop(&mut self) {
+        if let Err(err) = self.close() {
+            log::error!("{:?}: can't close node: {err:?}", &self.info.conn);
+        }
+    }
+}
+
+/// Information about node.
+#[derive(Clone, Debug)]
+pub struct NodeInfo {
+    conn: ConnectionConfInfo,
+    n_conn: Arc<Mutex<usize>>,
+}
+
+impl NodeInfo {
+    /// Connection config.
+    pub fn conn(&self) -> &ConnectionConfInfo {
+        &self.conn
+    }
+
+    /// Approximate number of node connections.
+    ///
+    /// Blocks to acquire mutex. You should never rely on exact value returned by this method.
+    pub fn n_conn(&self) -> Result<usize> {
+        Ok(*self
+            .n_conn
+            .lock()
+            .map_err(|err| Error::Node(NodeError::Thread(format!("{err:?}"))))?)
+    }
+}
+
 /// Connection that can be closed.
 struct ManagedConnection {
     connection: Box<dyn Connection>,
@@ -439,7 +468,7 @@ struct ManagedConnection {
     is_active: AtomicBool,
 }
 
-/// Atomic connections.
+/// Atomic connections which can be shared between threads.
 type AtomicConnections = Arc<Mutex<HashMap<usize, ManagedConnection>>>;
 
 impl ManagedConnection {
@@ -470,30 +499,5 @@ impl Drop for ManagedConnection {
                 self.connection.info()
             )
         }
-    }
-}
-
-/// Information about node.
-#[derive(Clone, Debug)]
-pub struct NodeInfo {
-    conn: ConnectionConfInfo,
-    n_conn: Arc<Mutex<usize>>,
-}
-
-impl NodeInfo {
-    /// Connection config.
-    pub fn conn(&self) -> &ConnectionConfInfo {
-        &self.conn
-    }
-
-    /// Approximate number of node connections.
-    ///
-    /// Blocking to acquire mutex. You should never rely on exact value returned by
-    /// this method.
-    pub fn n_conn(&self) -> Result<usize> {
-        Ok(*self
-            .n_conn
-            .lock()
-            .map_err(|err| Error::Node(NodeError::Thread(format!("{err:?}"))))?)
     }
 }

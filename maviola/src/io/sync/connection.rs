@@ -4,9 +4,8 @@ use std::fmt::Debug;
 use std::net::SocketAddr;
 use std::sync::{mpsc, Arc, Mutex};
 
-use mavio::Frame;
-
 use crate::prelude::*;
+use crate::protocol::CoreFrame;
 
 /// Connection events.
 pub enum ConnectionEvent {
@@ -71,13 +70,13 @@ pub trait Connection: Send + Debug {
 /// MAVLink [`Frame`] sender.
 pub trait Sender: Send + Sync + Debug {
     /// Send MAVLink frame.
-    fn send(&mut self, frame: &Frame) -> Result<usize>;
+    fn send(&mut self, frame: &CoreFrame) -> Result<usize>;
 }
 
 /// MAVLink [`Frame`] receiver.
 pub trait Receiver: Send + Sync + Debug {
     /// Receive MAVLink frame.
-    fn recv(&mut self) -> Result<Frame>;
+    fn recv(&mut self) -> Result<CoreFrame>;
 }
 
 /// Connection builder used to create a [`Connection`].

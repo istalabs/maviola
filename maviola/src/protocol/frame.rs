@@ -3,8 +3,8 @@
 use std::fmt::{Debug, Formatter};
 
 use mavio::protocol::{
-    Checksum, DialectImpl, DialectMessage, MavLinkVersion, MavTimestamp, MessageId, Payload,
-    Signature, SignatureLinkId,
+    Checksum, CompatFlags, DialectImpl, DialectMessage, IncompatFlags, MavLinkVersion,
+    MavTimestamp, MessageId, Payload, Signature, SignatureLinkId,
 };
 
 use crate::prelude::*;
@@ -13,14 +13,19 @@ use crate::protocol::variants::{
     HasDialect, IsDialect, IsVersioned, MavLink1, MavLink2, NoDialect, NotVersioned, Versioned,
 };
 
-/// MAVLink frame within a specific dialect.
+/// Basic MAVLink frame.
 ///
-/// This is a wrapper around [`mavio::Frame`] that allows to decode MAVLink message in the context
+/// Currently, this is simply an alias for [`mavio::Frame`].
+pub type CoreFrame = mavio::Frame;
+
+/// MAVLink frame potentially restricted to a specific dialect and MAVLink protocol version.
+///
+/// This is a wrapper around [`CoreFrame`] that allows to decode MAVLink message in the context
 /// of a specific MAVLink dialect.
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Frame<D: IsDialect, V: IsVersioned> {
-    frame: mavio::Frame,
+    frame: CoreFrame,
     dialect: D,
     version: V,
 }
@@ -72,19 +77,28 @@ impl<M: DialectMessage + 'static> Debug for Frame<HasDialect<M>, NotVersioned> {
     }
 }
 
-impl<D: IsDialect, V: IsVersioned> From<Frame<D, V>> for mavio::Frame {
-    /// Converts [`Frame`] into [`mavio::Frame`].
+impl<D: IsDialect, V: IsVersioned> From<Frame<D, V>> for CoreFrame {
+    /// Converts [`Frame`] into [`CoreFrame`].
     fn from(value: Frame<D, V>) -> Self {
         value.frame
     }
 }
+
+impl From<CoreFrame> for Frame<NoDialect, NotVersioned> {
+    /// Converts [`CoreFrame`] into [`Frame`].
+    fn from(value: CoreFrame) -> Self {
+        Self::new(value)
+    }
+}
+
+impl<D: IsDialect, V: IsVersioned> IsVersioned for Frame<D, V> {}
 
 impl Frame<NoDialect, NotVersioned> {
     /// Create an instance of [`Frame`] without neither a specified dialect, nor MAVLink protocol
     /// version.
     ///
     /// Use [`Frame::builder`] to create construct frames with additional restrictions.
-    pub fn new(frame: mavio::Frame) -> Self {
+    pub fn new(frame: CoreFrame) -> Self {
         Self {
             frame,
             dialect: NoDialect(),
@@ -109,14 +123,14 @@ impl<M: DialectMessage + 'static, V: IsVersioned> Frame<HasDialect<M>, V> {
 }
 
 impl<D: IsDialect, V: IsVersioned> Frame<D, V> {
-    /// Returns wrapped [`mavio::Frame`].
-    pub fn frame(&self) -> &mavio::Frame {
+    /// Returns wrapped [`CoreFrame`].
+    pub fn frame(&self) -> &CoreFrame {
         &self.frame
     }
 
     /// MAVLink protocol version.
     ///
-    /// See [`mavio::Frame::mavlink_version`] for details.
+    /// See [`CoreFrame::mavlink_version`] for details.
     #[inline]
     pub fn mavlink_version(&self) -> MavLinkVersion {
         self.frame.mavlink_version()
@@ -124,7 +138,7 @@ impl<D: IsDialect, V: IsVersioned> Frame<D, V> {
 
     /// Payload length.
     ///
-    /// See [`mavio::Frame::payload_length`] for details.
+    /// See [`CoreFrame::payload_length`] for details.
     #[inline]
     pub fn payload_length(&self) -> u8 {
         self.frame.payload_length()
@@ -132,7 +146,7 @@ impl<D: IsDialect, V: IsVersioned> Frame<D, V> {
 
     /// Packet sequence number.
     ///
-    /// See [`mavio::Frame::sequence`] for details.
+    /// See [`CoreFrame::sequence`] for details.
     #[inline]
     pub fn sequence(&self) -> u8 {
         self.frame.sequence()
@@ -140,7 +154,7 @@ impl<D: IsDialect, V: IsVersioned> Frame<D, V> {
 
     /// System `ID`.
     ///
-    /// See [`mavio::Frame::system_id`] for details.
+    /// See [`CoreFrame::system_id`] for details.
     #[inline]
     pub fn system_id(&self) -> u8 {
         self.frame.system_id()
@@ -148,7 +162,7 @@ impl<D: IsDialect, V: IsVersioned> Frame<D, V> {
 
     /// Component `ID`.
     ///
-    /// See [`mavio::Frame::component_id`] for details.
+    /// See [`CoreFrame::component_id`] for details.
     #[inline]
     pub fn component_id(&self) -> u8 {
         self.frame.component_id()
@@ -156,7 +170,7 @@ impl<D: IsDialect, V: IsVersioned> Frame<D, V> {
 
     /// Message `ID`.
     ///
-    /// See [`mavio::Frame::message_id`] for details.
+    /// See [`CoreFrame::message_id`] for details.
     #[inline]
     pub fn message_id(&self) -> MessageId {
         self.frame.message_id()
@@ -164,7 +178,7 @@ impl<D: IsDialect, V: IsVersioned> Frame<D, V> {
 
     /// Payload data.
     ///
-    /// See [`mavio::Frame::payload`] for details.
+    /// See [`CoreFrame::payload`] for details.
     #[inline]
     pub fn payload(&self) -> &Payload {
         self.frame.payload()
@@ -172,19 +186,17 @@ impl<D: IsDialect, V: IsVersioned> Frame<D, V> {
 
     /// MAVLink packet checksum.
     ///
-    /// See [`mavio::Frame::checksum`] for details.
+    /// See [`CoreFrame::checksum`] for details.
     #[inline]
     pub fn checksum(&self) -> Checksum {
         self.frame.checksum()
     }
 }
 
-impl<D: IsDialect, V: IsVersioned> IsVersioned for Frame<D, V> {}
-
 impl<D: IsDialect, V: IsVersioned> Versioned for Frame<D, V> {
     /// MAVLink protocol version.
     ///
-    /// See [`mavio::Frame::mavlink_version`] for details.
+    /// See [`CoreFrame::mavlink_version`] for details.
     #[inline]
     fn mavlink_version(&self) -> MavLinkVersion {
         self.frame.mavlink_version()
@@ -194,23 +206,23 @@ impl<D: IsDialect, V: IsVersioned> Versioned for Frame<D, V> {
 impl<D: IsDialect> Frame<D, MavLink2> {
     /// Incompatibility flags for `MAVLink 2` frames.
     ///
-    /// See [`mavio::Frame::incompat_flags`] for details.
+    /// See [`CoreFrame::incompat_flags`] for details.
     #[inline]
-    pub fn incompat_flags(&self) -> Option<u8> {
-        self.frame.incompat_flags()
+    pub fn incompat_flags(&self) -> IncompatFlags {
+        self.frame.incompat_flags().unwrap()
     }
 
     /// Compatibility flags for `MAVLink 2` frames.
     ///
-    /// See [`mavio::Frame::compat_flags`] for details.
+    /// See [`CoreFrame::compat_flags`] for details.
     #[inline]
-    pub fn compat_flags(&self) -> Option<u8> {
-        self.frame.compat_flags()
+    pub fn compat_flags(&self) -> CompatFlags {
+        self.frame.compat_flags().unwrap()
     }
 
     /// `MAVLink 2` signature.
     ///
-    /// See [`mavio::Frame::signature`] for details.
+    /// See [`CoreFrame::signature`] for details.
     #[inline]
     pub fn signature(&self) -> Option<&Signature> {
         self.frame.signature()
@@ -218,7 +230,7 @@ impl<D: IsDialect> Frame<D, MavLink2> {
 
     /// `MAVLink 2` signature `link_id`, an 8-bit identifier of a MAVLink channel.
     ///
-    /// See [`mavio::Frame::link_id`] for details.
+    /// See [`CoreFrame::link_id`] for details.
     #[inline]
     pub fn link_id(&self) -> Option<SignatureLinkId> {
         self.frame.link_id()
@@ -226,7 +238,7 @@ impl<D: IsDialect> Frame<D, MavLink2> {
 
     /// `MAVLink 2` signature [`MavTimestamp`], a 48-bit value that specifies the moment when message was sent.
     ///
-    /// See [`mavio::Frame::timestamp`] for details.
+    /// See [`CoreFrame::timestamp`] for details.
     #[inline]
     pub fn timestamp(&self) -> Option<MavTimestamp> {
         self.frame.timestamp()
@@ -234,7 +246,7 @@ impl<D: IsDialect> Frame<D, MavLink2> {
 
     /// Whether a frame is signed.
     ///
-    /// See [`mavio::Frame::is_signed`] for details.
+    /// See [`CoreFrame::is_signed`] for details.
     #[inline]
     pub fn is_signed(&self) -> bool {
         self.frame.is_signed()
@@ -310,7 +322,7 @@ impl<D: IsDialect> FrameBuilder<D, NotVersioned> {
 
 impl<D: IsDialect, V: IsVersioned> FrameBuilder<D, V> {
     /// Builds an instance of [`Frame`].
-    pub fn build_for(self, frame: mavio::Frame) -> Result<Frame<D, V>> {
+    pub fn build_for(self, frame: CoreFrame) -> Result<Frame<D, V>> {
         self.version.matches_frame(&frame)?;
         self.dialect.matches_frame(&frame)?;
 
@@ -321,46 +333,3 @@ impl<D: IsDialect, V: IsVersioned> FrameBuilder<D, V> {
         })
     }
 }
-
-// impl FrameBuilder<NoDialect, NotVersioned> {
-//     fn validate(&self) -> Result<()> {
-//         Ok(())
-//     }
-// }
-
-// impl<D: IsDialect, V: Versioned> FrameBuilder<D, V> {
-//     #[inline]
-//     fn matches_version(&self, frame: &mavio::Frame) -> Result<()> {
-//         if self.version.mavlink_version() != frame.mavlink_version() {
-//             return Err(FrameBuildError::InvalidVersion {
-//                 frame: frame.clone(),
-//                 given: frame.mavlink_version(),
-//                 expected: self.version.mavlink_version(),
-//             }
-//             .into());
-//         }
-//         Ok(())
-//     }
-// }
-
-// impl<V: Versioned> FrameBuilder<NoDialect, V> {
-//     fn validate(self, frame: &mavio::Frame) -> Result<()> {
-//         self.matches_version(&frame)?;
-//         Ok(())
-//     }
-// }
-//
-// impl<M: DialectMessage + 'static> FrameBuilder<HasDialect<M>, NotVersioned> {
-//     fn validate(self, frame: &mavio::Frame) -> Result<()> {
-//         self.is_in_dialect(&frame)?;
-//         Ok(())
-//     }
-// }
-//
-// impl<M: DialectMessage + 'static, V: Versioned> FrameBuilder<HasDialect<M>, V> {
-//     fn validate(self, frame: &mavio::Frame) -> Result<()> {
-//         self.is_in_dialect(&frame)?;
-//         self.matches_version(&frame)?;
-//         Ok(())
-//     }
-// }

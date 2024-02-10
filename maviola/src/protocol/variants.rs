@@ -6,10 +6,12 @@ use mavio::protocol::{DialectImpl, DialectMessage, MavLinkVersion};
 
 use crate::prelude::*;
 
+use crate::protocol::CoreFrame;
+
 /// Marks structures which may or may not have MAVLink protocol version.
 pub trait IsVersioned: Clone {
     /// Validates that provided frame matches MAVLink protocol version.
-    fn matches_frame(&self, _: &mavio::Frame) -> Result<()> {
+    fn matches_frame(&self, _: &CoreFrame) -> Result<()> {
         Ok(())
     }
 }
@@ -25,7 +27,7 @@ pub trait Versioned: IsVersioned {
     fn mavlink_version(&self) -> MavLinkVersion;
 
     /// Validates that provided frame matches MAVLink protocol version.
-    fn matches_frame(&self, frame: &mavio::Frame) -> Result<()> {
+    fn matches_frame(&self, frame: &CoreFrame) -> Result<()> {
         if self.mavlink_version() != frame.mavlink_version() {
             return Err(FrameBuildError::InvalidVersion {
                 frame: frame.clone(),
@@ -61,7 +63,7 @@ impl Versioned for MavLink2 {
 /// Marker for entities which depend on whether a particular dialect has been specified..
 pub trait IsDialect: Clone + Debug {
     /// Validates that provided frame exists in the dialect.
-    fn matches_frame(&self, _: &mavio::Frame) -> Result<()> {
+    fn matches_frame(&self, _: &CoreFrame) -> Result<()> {
         Ok(())
     }
 }
@@ -90,7 +92,7 @@ impl<M: DialectMessage + 'static> Debug for HasDialect<M> {
     }
 }
 impl<M: DialectMessage + 'static> IsDialect for HasDialect<M> {
-    fn matches_frame(&self, frame: &mavio::Frame) -> Result<()> {
+    fn matches_frame(&self, frame: &CoreFrame) -> Result<()> {
         if self.0.message_info(frame.message_id()).is_err() {
             return Err(FrameBuildError::NotInDialect(
                 frame.clone(),
