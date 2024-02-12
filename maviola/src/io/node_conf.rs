@@ -291,7 +291,7 @@ pub mod builder {
         /// Builds and instance of [`NodeConf`] without defined [`NodeConf::system_id`] and [`NodeConf::component_id`].
         pub fn build(self) -> NodeConf<NotIdentified, D, V> {
             NodeConf {
-                id: NotIdentified(),
+                id: NotIdentified,
                 dialect: self.dialect,
                 conn_conf: self.conn_conf.0,
                 version: self.version,

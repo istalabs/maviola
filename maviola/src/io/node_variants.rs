@@ -14,7 +14,7 @@ pub trait IsIdentified: Clone {}
 ///
 /// This node can't produce messages and can be used only as a proxy.
 #[derive(Clone)]
-pub struct NotIdentified();
+pub struct NotIdentified;
 impl IsIdentified for NotIdentified {}
 
 /// Variant of [`Node`](super::node::Node) with [`system_id`](super::node::Node::system_id)
