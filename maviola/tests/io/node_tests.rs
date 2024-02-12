@@ -3,14 +3,14 @@ use std::sync::Once;
 use std::thread;
 use std::time::Duration;
 
-use mavio::protocol::MavLinkVersion;
+use mavio::protocol::{MavLinkVersion, V2};
 
 use maviola::dialects::minimal;
-use maviola::io::node::{Node, NodeInterface};
+use maviola::io::node::Node;
 use maviola::io::node_conf::NodeConf;
 use maviola::io::node_variants::Identified;
 use maviola::io::sync::{TcpClientConf, TcpServerConf};
-use maviola::protocol::variants::{HasDialect, MavLink2};
+use maviola::protocol::variants::HasDialect;
 
 static INIT: Once = Once::new();
 const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Info;
@@ -40,9 +40,7 @@ fn initialize() {
     });
 }
 
-fn make_server_node(
-    port: portpicker::Port,
-) -> Node<Identified, HasDialect<minimal::Message>, MavLink2> {
+fn make_server_node(port: portpicker::Port) -> Node<Identified, HasDialect<minimal::Message>, V2> {
     Node::try_from(
         NodeConf::builder()
             .system_id(1)
@@ -58,7 +56,7 @@ fn make_server_node(
 fn make_client_node(
     port: portpicker::Port,
     component_id: u8,
-) -> Node<Identified, HasDialect<minimal::Message>, MavLink2> {
+) -> Node<Identified, HasDialect<minimal::Message>, V2> {
     Node::try_from(
         NodeConf::builder()
             .system_id(2)
@@ -74,7 +72,7 @@ fn make_client_node(
 fn make_client_nodes(
     port: portpicker::Port,
     count: u8,
-) -> HashMap<u8, Node<Identified, HasDialect<minimal::Message>, MavLink2>> {
+) -> HashMap<u8, Node<Identified, HasDialect<minimal::Message>, V2>> {
     (0..count).map(|i| (i, make_client_node(port, i))).collect()
 }
 
@@ -170,11 +168,13 @@ fn node_no_id_no_dialect_no_version() {
     let system_id: u8 = 42;
     let component_id: u8 = 142;
     let frame = mavio::Frame::builder()
-        .set_sequence(sequence)
-        .set_system_id(system_id)
-        .set_component_id(component_id)
-        .build_for(&minimal::messages::Heartbeat::default(), MavLinkVersion::V2)
-        .unwrap();
+        .sequence(sequence)
+        .system_id(system_id)
+        .component_id(component_id)
+        .mavlink_version(V2)
+        .message(&minimal::messages::Heartbeat::default())
+        .unwrap()
+        .build();
 
     for _ in 0..5 {
         client_node.proxy_frame(&frame).unwrap();
@@ -246,6 +246,7 @@ fn node_no_version() {
         NodeConf::builder()
             .system_id(42)
             .component_id(142)
+            .v2()
             .dialect(minimal::dialect())
             .conn_conf(TcpClientConf::new(make_addr(port)).unwrap())
             .build(),
@@ -255,10 +256,7 @@ fn node_no_version() {
     wait();
 
     client_node
-        .send_versioned(
-            minimal::messages::Heartbeat::default().into(),
-            MavLinkVersion::V2,
-        )
+        .send_versioned(minimal::messages::Heartbeat::default().into(), V2)
         .unwrap();
 
     let frame = server_node.recv().unwrap();

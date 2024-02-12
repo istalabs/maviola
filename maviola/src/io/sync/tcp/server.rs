@@ -1,5 +1,6 @@
 //! Synchronous TCP server.
 
+use mavio::protocol::MaybeVersioned;
 use std::net::{SocketAddr, TcpListener, ToSocketAddrs};
 use std::sync::atomic::AtomicUsize;
 use std::sync::{atomic, mpsc, Arc, Mutex};
@@ -31,15 +32,15 @@ impl TcpServerConf {
     }
 }
 
-impl ConnectionBuilder for TcpServerConf {
+impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpServerConf {
     /// Instantiates a TCP server and listens to incoming connections.
     ///
     /// All new connections are sent over [`mpsc::channel`].
-    fn build(&self) -> Result<mpsc::Receiver<ConnectionEvent>> {
+    fn build(&self) -> Result<mpsc::Receiver<ConnectionEvent<V>>> {
         let listener = TcpListener::bind(self.addr)?;
         let (tx, rx): (
-            mpsc::Sender<ConnectionEvent>,
-            mpsc::Receiver<ConnectionEvent>,
+            mpsc::Sender<ConnectionEvent<V>>,
+            mpsc::Receiver<ConnectionEvent<V>>,
         ) = mpsc::channel();
         let server_addr = self.addr;
         let id: AtomicUsize = Default::default();
@@ -113,7 +114,7 @@ impl ConnectionBuilder for TcpServerConf {
     }
 }
 
-impl ConnectionConf for TcpServerConf {
+impl<V: MaybeVersioned + 'static> ConnectionConf<V> for TcpServerConf {
     fn info(&self) -> ConnectionConfInfo {
         ConnectionConfInfo::TcpServer {
             bind_addr: self.addr,

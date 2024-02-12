@@ -1,5 +1,6 @@
 //! Synchronous TCP connection.
 
+use mavio::protocol::MaybeVersioned;
 use std::net::TcpStream;
 use std::sync::atomic::AtomicBool;
 use std::sync::{atomic, mpsc, Arc, Mutex};
@@ -13,15 +14,15 @@ use crate::protocol::CoreFrame;
 
 /// TCP connection.
 #[derive(Debug)]
-pub struct TcpConnection {
+pub struct TcpConnection<V: MaybeVersioned> {
     pub(super) id: usize,
     pub(super) info: ConnectionInfo,
-    pub(super) receiver: Arc<Mutex<Box<dyn Receiver>>>,
-    pub(super) sender: Arc<Mutex<Box<dyn Sender>>>,
-    pub(super) events_chan: mpsc::Sender<ConnectionEvent>,
+    pub(super) receiver: Arc<Mutex<Box<dyn Receiver<V>>>>,
+    pub(super) sender: Arc<Mutex<Box<dyn Sender<V>>>>,
+    pub(super) events_chan: mpsc::Sender<ConnectionEvent<V>>,
 }
 
-impl Connection for TcpConnection {
+impl<V: MaybeVersioned> Connection<V> for TcpConnection<V> {
     #[inline]
     fn id(&self) -> usize {
         self.id
@@ -32,11 +33,11 @@ impl Connection for TcpConnection {
         &self.info
     }
 
-    fn receiver(&self) -> Arc<Mutex<Box<dyn Receiver>>> {
+    fn receiver(&self) -> Arc<Mutex<Box<dyn Receiver<V>>>> {
         self.receiver.clone()
     }
 
-    fn sender(&self) -> Arc<Mutex<Box<dyn Sender>>> {
+    fn sender(&self) -> Arc<Mutex<Box<dyn Sender<V>>>> {
         self.sender.clone()
     }
 
@@ -49,20 +50,20 @@ impl Connection for TcpConnection {
 
 /// TCP [`Frame`] receiver.
 #[derive(Debug)]
-pub struct TcpReceiver {
+pub struct TcpReceiver<V: MaybeVersioned> {
     id: usize,
     conn_info: ConnectionInfo,
-    conn_events_chan: mpsc::Sender<ConnectionEvent>,
-    receiver: mavio::Receiver<TcpStream>,
+    conn_events_chan: mpsc::Sender<ConnectionEvent<V>>,
+    receiver: mavio::Receiver<TcpStream, V>,
     is_active: AtomicBool,
 }
 
-impl TcpReceiver {
+impl<V: MaybeVersioned> TcpReceiver<V> {
     pub(crate) fn new(
         id: usize,
         conn_info: ConnectionInfo,
-        conn_events_chan: mpsc::Sender<ConnectionEvent>,
-        receiver: mavio::Receiver<TcpStream>,
+        conn_events_chan: mpsc::Sender<ConnectionEvent<V>>,
+        receiver: mavio::Receiver<TcpStream, V>,
     ) -> Self {
         Self {
             id,
@@ -74,8 +75,8 @@ impl TcpReceiver {
     }
 }
 
-impl Receiver for TcpReceiver {
-    fn recv(&mut self) -> Result<CoreFrame> {
+impl<V: MaybeVersioned> Receiver<V> for TcpReceiver<V> {
+    fn recv(&mut self) -> Result<CoreFrame<V>> {
         if !self.is_active.load(atomic::Ordering::Relaxed) {
             return Err(NodeError::Inactive.into());
         }
@@ -107,20 +108,20 @@ impl Receiver for TcpReceiver {
 
 /// TCP [`Frame`] sender.
 #[derive(Debug)]
-pub struct TcpSender {
+pub struct TcpSender<V: MaybeVersioned> {
     id: usize,
     conn_info: ConnectionInfo,
-    conn_events_chan: mpsc::Sender<ConnectionEvent>,
-    sender: mavio::Sender<TcpStream>,
+    conn_events_chan: mpsc::Sender<ConnectionEvent<V>>,
+    sender: mavio::Sender<TcpStream, V>,
     is_active: AtomicBool,
 }
 
-impl TcpSender {
+impl<V: MaybeVersioned> TcpSender<V> {
     pub(crate) fn new(
         id: usize,
         conn_info: ConnectionInfo,
-        conn_events_chan: mpsc::Sender<ConnectionEvent>,
-        sender: mavio::Sender<TcpStream>,
+        conn_events_chan: mpsc::Sender<ConnectionEvent<V>>,
+        sender: mavio::Sender<TcpStream, V>,
     ) -> Self {
         Self {
             id,
@@ -132,8 +133,8 @@ impl TcpSender {
     }
 }
 
-impl Sender for TcpSender {
-    fn send(&mut self, frame: &CoreFrame) -> Result<usize> {
+impl<V: MaybeVersioned> Sender<V> for TcpSender<V> {
+    fn send(&mut self, frame: &CoreFrame<V>) -> Result<usize> {
         if !self.is_active.load(atomic::Ordering::Relaxed) {
             return Err(NodeError::Inactive.into());
         }

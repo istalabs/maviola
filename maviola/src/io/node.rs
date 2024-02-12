@@ -5,21 +5,150 @@ use std::sync::atomic::{AtomicBool, AtomicU8};
 use std::sync::{atomic, mpsc, Arc, Mutex, TryLockError};
 use std::thread;
 
-use mavio::protocol::{ComponentId, DialectImpl, DialectMessage, MavLinkVersion, SystemId};
-
-use crate::prelude::*;
+use mavio::protocol::{
+    ComponentId, DialectImpl, DialectMessage, MavLinkVersion, MaybeVersioned, SystemId, Versioned,
+};
 
 use crate::io::node_conf::NodeConf;
 use crate::io::node_variants::{Identified, IsIdentified};
 use crate::io::sync::connection::{ConnectionConfInfo, ConnectionEvent};
 use crate::io::sync::{Connection, ConnectionConf};
-use crate::protocol::variants::{HasDialect, IsDialect, IsVersioned, NotVersioned, Versioned};
+use crate::protocol::variants::{HasDialect, MaybeDialect};
 use crate::protocol::{CoreFrame, Frame};
 
-/// Interface for MAVLink communication node which can send and receive [`CoreFrame`].
-pub trait NodeInterface {
+use crate::prelude::*;
+
+/// MAVLink node.
+pub struct Node<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> {
+    sequence: AtomicU8,
+    id: I,
+    dialect: D,
+    version: V,
+    connections: AtomicConnections<V>,
+    recv_rx: mpsc::Receiver<Result<CoreFrame<V>>>,
+    info: NodeInfo,
+}
+
+impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> TryFrom<NodeConf<I, D, V>>
+    for Node<I, D, V>
+{
+    type Error = Error;
+
+    /// Instantiates [`Node`] from node configuration.
+    fn try_from(value: NodeConf<I, D, V>) -> Result<Self> {
+        let (connections, recv_rx, info) = Self::start_handlers(value.conn_conf())?;
+
+        Ok(Self {
+            sequence: Default::default(),
+            id: value.id,
+            dialect: value.dialect,
+            version: value.version,
+            connections,
+            recv_rx,
+            info,
+        })
+    }
+}
+
+impl<D: MaybeDialect, V: MaybeVersioned> Node<Identified, D, V> {
+    /// MAVLink system ID.
+    pub fn system_id(&self) -> SystemId {
+        self.id.system_id
+    }
+
+    /// MAVLink component ID.
+    pub fn component_id(&self) -> ComponentId {
+        self.id.component_id
+    }
+}
+
+impl<M: DialectMessage + 'static, I: IsIdentified, V: MaybeVersioned> Node<I, HasDialect<M>, V> {
+    /// Dialect specification.
+    pub fn dialect(&self) -> &'static dyn DialectImpl<Message = M> {
+        self.dialect.0
+    }
+}
+
+impl<I: IsIdentified, D: MaybeDialect, V: Versioned> Node<I, D, V> {
+    /// MAVLink version.
+    pub fn version(&self) -> MavLinkVersion {
+        V::mavlink_version()
+    }
+}
+
+impl<M: DialectMessage + 'static, V: Versioned + 'static> Node<Identified, HasDialect<M>, V> {
+    /// Send MAVLink frame.
+    pub fn send(&self, message: M) -> Result<usize> {
+        let frame = self.make_frame_from_message(message, self.version.clone())?;
+        self.send_frame_internal(&frame)
+    }
+}
+
+impl<M: DialectMessage + 'static, V: Versioned + 'static> Node<Identified, HasDialect<M>, V> {
+    /// Send MAVLink frame with specified version.
+    pub fn send_versioned(&self, message: M, version: V) -> Result<usize> {
+        let frame = self.make_frame_from_message(message, version)?;
+        self.send_frame_internal(&frame)
+    }
+}
+
+impl<D: MaybeDialect, V: MaybeVersioned + 'static> Node<Identified, D, V> {
+    /// Send MAVLink frame.
+    ///
+    /// Sends [`CoreFrame`] potentially changing its fields.
+    ///
+    /// Updated fields:
+    ///
+    /// * [`sequence`](CoreFrame::sequence) - set to the next value
+    /// * [`system_id`](CoreFrame::system_id) - set to node's default
+    /// * [`component_id`](CoreFrame::component_id) - set to node's default
+    ///
+    /// The following properties could be updated based on the node's configuration:
+    ///
+    /// * [`signature`](CoreFrame::signature)
+    /// * [`link_id`](CoreFrame::link_id)
+    /// * [`timestamp`](CoreFrame::timestamp)
+    #[inline]
+    pub fn send_frame(&self, frame: &CoreFrame<V>) -> Result<usize> {
+        self.send_frame_internal(frame)
+    }
+
+    fn make_frame_from_message<M: DialectMessage + 'static, Version: Versioned>(
+        &self,
+        message: M,
+        version: Version,
+    ) -> Result<CoreFrame<Version>> {
+        let sequence = self.sequence.fetch_add(1, atomic::Ordering::Relaxed);
+        let payload = message.encode(Version::mavlink_version())?;
+        let frame = CoreFrame::builder()
+            .sequence(sequence)
+            .system_id(self.id.system_id)
+            .component_id(self.id.component_id)
+            .payload(payload)
+            .crc_extra(message.crc_extra())
+            .mavlink_version(version)
+            .versioned();
+        Ok(frame)
+    }
+}
+
+impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V> {
+    /// Receive MAVLink frame.
+    pub fn recv(&self) -> Result<Frame<D, V>> {
+        let core_frame = self.recv_frame()?;
+        let frame = Frame::builder()
+            .version_generic(self.version.clone())
+            .dialect_generic(self.dialect.clone())
+            .build_for(core_frame)?;
+        Ok(frame)
+    }
+}
+
+impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V> {
     /// Information about this node.
-    fn info(&self) -> &NodeInfo;
+    pub fn info(&self) -> &NodeInfo {
+        &self.info
+    }
 
     /// Proxy MAVLink frame.
     ///
@@ -48,152 +177,17 @@ pub trait NodeInterface {
     /// [`Node::send_versioned`]. You can also use [`Node::send`] for [`Versioned`] nodes. In the
     /// latter case, message will be encoded according to MAVLink protocol version defined by for a
     /// node.
-    fn proxy_frame(&self, frame: &CoreFrame) -> Result<usize>;
-
-    /// Receive MAVLink frame.
-    fn recv_frame(&self) -> Result<CoreFrame>;
-
-    /// Close all connections and stop.
-    fn close(&self) -> Result<()>;
-}
-
-/// MAVLink node.
-pub struct Node<I: IsIdentified, D: IsDialect, V: IsVersioned> {
-    sequence: AtomicU8,
-    id: I,
-    dialect: D,
-    version: V,
-    connections: AtomicConnections,
-    recv_rx: mpsc::Receiver<Result<CoreFrame>>,
-    info: NodeInfo,
-}
-
-impl<I: IsIdentified, D: IsDialect, V: IsVersioned> TryFrom<NodeConf<I, D, V>> for Node<I, D, V> {
-    type Error = Error;
-
-    /// Instantiates [`Node`] from node configuration.
-    fn try_from(value: NodeConf<I, D, V>) -> Result<Self> {
-        let (connections, recv_rx, info) = Self::start_handlers(value.conn_conf())?;
-
-        Ok(Self {
-            sequence: Default::default(),
-            id: value.id,
-            dialect: value.dialect,
-            version: value.version,
-            connections,
-            recv_rx,
-            info,
-        })
-    }
-}
-
-impl<D: IsDialect, V: IsVersioned> Node<Identified, D, V> {
-    /// MAVLink system ID.
-    pub fn system_id(&self) -> SystemId {
-        self.id.system_id
-    }
-
-    /// MAVLink component ID.
-    pub fn component_id(&self) -> ComponentId {
-        self.id.component_id
-    }
-}
-
-impl<M: DialectMessage + 'static, I: IsIdentified, V: IsVersioned> Node<I, HasDialect<M>, V> {
-    /// Dialect specification.
-    pub fn dialect(&self) -> &'static dyn DialectImpl<Message = M> {
-        self.dialect.0
-    }
-}
-
-impl<I: IsIdentified, D: IsDialect, V: Versioned> Node<I, D, V> {
-    /// MAVLink version.
-    pub fn version(&self) -> MavLinkVersion {
-        self.version.mavlink_version()
-    }
-}
-
-impl<M: DialectMessage + 'static, V: Versioned> Node<Identified, HasDialect<M>, V> {
-    /// Send MAVLink frame.
-    pub fn send(&self, message: M) -> Result<usize> {
-        let frame = self.make_frame_from_message(message, self.version.mavlink_version())?;
-        self.send_frame_internal(&frame)
-    }
-}
-
-impl<M: DialectMessage + 'static> Node<Identified, HasDialect<M>, NotVersioned> {
-    /// Send MAVLink frame with specified version.
-    pub fn send_versioned(&self, message: M, version: MavLinkVersion) -> Result<usize> {
-        let frame = self.make_frame_from_message(message, version)?;
-        self.send_frame_internal(&frame)
-    }
-}
-
-impl<D: IsDialect, V: IsVersioned> Node<Identified, D, V> {
-    /// Send MAVLink frame.
-    ///
-    /// Sends [`CoreFrame`] potentially changing its fields.
-    ///
-    /// Updated fields:
-    ///
-    /// * [`sequence`](CoreFrame::sequence) - set to the next value
-    /// * [`system_id`](CoreFrame::system_id) - set to node's default
-    /// * [`component_id`](CoreFrame::component_id) - set to node's default
-    ///
-    /// The following properties could be updated based on the node's configuration:
-    ///
-    /// * [`signature`](CoreFrame::signature)
-    /// * [`link_id`](CoreFrame::link_id)
-    /// * [`timestamp`](CoreFrame::timestamp)
-    #[inline]
-    pub fn send_frame(&self, frame: &CoreFrame) -> Result<usize> {
+    pub fn proxy_frame(&self, frame: &CoreFrame<V>) -> Result<usize> {
         self.send_frame_internal(frame)
     }
 
-    fn make_frame_from_message<M: DialectMessage + 'static>(
-        &self,
-        message: M,
-        version: MavLinkVersion,
-    ) -> Result<CoreFrame> {
-        let sequence = self.sequence.fetch_add(1, atomic::Ordering::Relaxed);
-        let payload = message.encode(version)?;
-        CoreFrame::builder()
-            .set_sequence(sequence)
-            .set_system_id(self.id.system_id)
-            .set_component_id(self.id.component_id)
-            .set_payload(payload)
-            .set_crc_extra(message.crc_extra())
-            .build(version)
-            .map_err(Error::from)
-    }
-}
-
-impl<I: IsIdentified, D: IsDialect, V: IsVersioned> Node<I, D, V> {
     /// Receive MAVLink frame.
-    pub fn recv(&self) -> Result<Frame<D, V>> {
-        let mavio_frame = self.recv_frame()?;
-        let frame = Frame::builder()
-            .version_generic(self.version.clone())
-            .dialect_generic(self.dialect.clone())
-            .build_for(mavio_frame)?;
-        Ok(frame)
-    }
-}
-
-impl<I: IsIdentified, D: IsDialect, V: IsVersioned> NodeInterface for Node<I, D, V> {
-    fn info(&self) -> &NodeInfo {
-        &self.info
-    }
-
-    fn proxy_frame(&self, frame: &CoreFrame) -> Result<usize> {
-        self.send_frame_internal(frame)
-    }
-
-    fn recv_frame(&self) -> Result<CoreFrame> {
+    pub fn recv_frame(&self) -> Result<CoreFrame<V>> {
         self.recv_frame_internal()
     }
 
-    fn close(&self) -> Result<()> {
+    /// Close all connections and stop.
+    pub fn close(&self) -> Result<()> {
         let connections = self.connections.lock()?;
         let mut result = Ok(());
 
@@ -209,12 +203,12 @@ impl<I: IsIdentified, D: IsDialect, V: IsVersioned> NodeInterface for Node<I, D,
     }
 }
 
-impl<I: IsIdentified, D: IsDialect, V: IsVersioned> Node<I, D, V> {
-    fn recv_frame_internal(&self) -> Result<CoreFrame> {
+impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V> {
+    fn recv_frame_internal(&self) -> Result<CoreFrame<V>> {
         self.recv_rx.recv().map_err(Error::from)?
     }
 
-    fn send_frame_internal(&self, frame: &CoreFrame) -> Result<usize> {
+    fn send_frame_internal(&self, frame: &CoreFrame<V>) -> Result<usize> {
         let connections = self.connections.lock()?;
         let frame = Arc::new(frame.clone());
 
@@ -247,13 +241,13 @@ impl<I: IsIdentified, D: IsDialect, V: IsVersioned> Node<I, D, V> {
     }
 
     fn start_handlers(
-        conn_conf: &dyn ConnectionConf,
+        conn_conf: &dyn ConnectionConf<V>,
     ) -> Result<(
-        AtomicConnections,
-        mpsc::Receiver<Result<CoreFrame>>,
+        AtomicConnections<V>,
+        mpsc::Receiver<Result<CoreFrame<V>>>,
         NodeInfo,
     )> {
-        let connections: AtomicConnections = Default::default();
+        let connections: AtomicConnections<V> = Default::default();
         let connections_managed = connections.clone();
         let events = conn_conf.build()?;
         let (recv_tx, recv_rx) = mpsc::channel();
@@ -281,9 +275,9 @@ impl<I: IsIdentified, D: IsDialect, V: IsVersioned> Node<I, D, V> {
 
     fn handle_conn_events(
         node_info: NodeInfo,
-        recv_tx: mpsc::Sender<Result<CoreFrame>>,
-        connections: AtomicConnections,
-        events: mpsc::Receiver<ConnectionEvent>,
+        recv_tx: mpsc::Sender<Result<CoreFrame<V>>>,
+        connections: AtomicConnections<V>,
+        events: mpsc::Receiver<ConnectionEvent<V>>,
     ) -> Result<()> {
         for event in events {
             match event {
@@ -305,9 +299,9 @@ impl<I: IsIdentified, D: IsDialect, V: IsVersioned> Node<I, D, V> {
     }
 
     fn handle_connection_event_new(
-        connection: Box<dyn Connection>,
-        recv_tx: mpsc::Sender<Result<CoreFrame>>,
-        connections: &AtomicConnections,
+        connection: Box<dyn Connection<V>>,
+        recv_tx: mpsc::Sender<Result<CoreFrame<V>>>,
+        connections: &AtomicConnections<V>,
         node_info: &NodeInfo,
     ) -> Result<()> {
         let conn_info = &node_info.conn;
@@ -349,7 +343,7 @@ impl<I: IsIdentified, D: IsDialect, V: IsVersioned> Node<I, D, V> {
     fn handle_connection_event_drop(
         id: usize,
         err: &Option<Error>,
-        connections: &AtomicConnections,
+        connections: &AtomicConnections<V>,
         node_info: &NodeInfo,
     ) -> Result<()> {
         let conn_info = &node_info.conn;
@@ -384,8 +378,8 @@ impl<I: IsIdentified, D: IsDialect, V: IsVersioned> Node<I, D, V> {
     fn handle_connection(
         id: usize,
         node_info: NodeInfo,
-        recv_tx: mpsc::Sender<Result<CoreFrame>>,
-        connections: AtomicConnections,
+        recv_tx: mpsc::Sender<Result<CoreFrame<V>>>,
+        connections: AtomicConnections<V>,
         close_rx: mpsc::Receiver<()>,
     ) {
         let conn_info = &node_info.conn;
@@ -429,7 +423,7 @@ impl<I: IsIdentified, D: IsDialect, V: IsVersioned> Node<I, D, V> {
     }
 }
 
-impl<I: IsIdentified, D: IsDialect, V: IsVersioned> Drop for Node<I, D, V> {
+impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Drop for Node<I, D, V> {
     fn drop(&mut self) {
         if let Err(err) = self.close() {
             log::error!("{:?}: can't close node: {err:?}", &self.info.conn);
@@ -462,17 +456,17 @@ impl NodeInfo {
 }
 
 /// Connection that can be closed.
-struct ManagedConnection {
-    connection: Box<dyn Connection>,
+struct ManagedConnection<V: MaybeVersioned> {
+    connection: Box<dyn Connection<V>>,
     close_tx: mpsc::Sender<()>,
     is_active: AtomicBool,
 }
 
 /// Atomic connections which can be shared between threads.
-type AtomicConnections = Arc<Mutex<HashMap<usize, ManagedConnection>>>;
+type AtomicConnections<V> = Arc<Mutex<HashMap<usize, ManagedConnection<V>>>>;
 
-impl ManagedConnection {
-    fn new(connection: Box<dyn Connection>, close_tx: mpsc::Sender<()>) -> Self {
+impl<V: MaybeVersioned> ManagedConnection<V> {
+    fn new(connection: Box<dyn Connection<V>>, close_tx: mpsc::Sender<()>) -> Self {
         Self {
             connection,
             close_tx,
@@ -491,7 +485,7 @@ impl ManagedConnection {
     }
 }
 
-impl Drop for ManagedConnection {
+impl<V: MaybeVersioned> Drop for ManagedConnection<V> {
     fn drop(&mut self) {
         if let Err(err) = self.close() {
             log::trace!(

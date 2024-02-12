@@ -1,5 +1,6 @@
 //! Synchronous TCP client.
 
+use mavio::protocol::MaybeVersioned;
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
@@ -28,16 +29,16 @@ impl TcpClientConf {
     }
 }
 
-impl ConnectionBuilder for TcpClientConf {
+impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpClientConf {
     /// Instantiates a TCP client.
-    fn build(&self) -> crate::errors::Result<mpsc::Receiver<ConnectionEvent>> {
+    fn build(&self) -> crate::errors::Result<mpsc::Receiver<ConnectionEvent<V>>> {
         let server_addr = self.addr;
         let stream = TcpStream::connect(server_addr)?;
         let reader = stream.try_clone()?;
 
         let (tx, rx): (
-            mpsc::Sender<ConnectionEvent>,
-            mpsc::Receiver<ConnectionEvent>,
+            mpsc::Sender<ConnectionEvent<V>>,
+            mpsc::Receiver<ConnectionEvent<V>>,
         ) = mpsc::channel();
 
         thread::spawn(move || {
@@ -71,7 +72,7 @@ impl ConnectionBuilder for TcpClientConf {
     }
 }
 
-impl ConnectionConf for TcpClientConf {
+impl<V: MaybeVersioned + 'static> ConnectionConf<V> for TcpClientConf {
     fn info(&self) -> ConnectionConfInfo {
         ConnectionConfInfo::TcpClient {
             remote_addr: self.addr,

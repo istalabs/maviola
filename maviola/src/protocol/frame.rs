@@ -4,19 +4,18 @@ use std::fmt::{Debug, Formatter};
 
 use mavio::protocol::{
     Checksum, CompatFlags, DialectImpl, DialectMessage, IncompatFlags, MavLinkVersion,
-    MavTimestamp, MessageId, Payload, Signature, SignatureLinkId,
+    MavTimestamp, MaybeVersioned, MessageId, Payload, Signature, SignatureLinkId, Versionless, V1,
+    V2,
 };
 
 use crate::prelude::*;
 
-use crate::protocol::variants::{
-    HasDialect, IsDialect, IsVersioned, MavLink1, MavLink2, NoDialect, NotVersioned, Versioned,
-};
+use crate::protocol::variants::{Dialectless, HasDialect, MaybeDialect};
 
 /// Basic MAVLink frame.
 ///
 /// Currently, this is simply an alias for [`mavio::Frame`].
-pub type CoreFrame = mavio::Frame;
+pub type CoreFrame<V> = mavio::Frame<V>;
 
 /// MAVLink frame potentially restricted to a specific dialect and MAVLink protocol version.
 ///
@@ -24,46 +23,18 @@ pub type CoreFrame = mavio::Frame;
 /// of a specific MAVLink dialect.
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Frame<D: IsDialect, V: IsVersioned> {
-    frame: CoreFrame,
+pub struct Frame<D: MaybeDialect, V: MaybeVersioned> {
+    frame: CoreFrame<V>,
     dialect: D,
-    version: V,
 }
 
-impl Debug for Frame<NoDialect, NotVersioned> {
+impl<V: MaybeVersioned> Debug for Frame<Dialectless, V> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Frame").field("frame", &self.frame).finish()
     }
 }
 
-impl<V: Versioned> Debug for Frame<NoDialect, V> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let dialect = f.debug_struct("NoDialect").finish();
-
-        f.debug_struct("Frame")
-            .field("frame", &self.frame)
-            .field("dialect", &dialect)
-            .field("version", &self.version.mavlink_version())
-            .finish()
-    }
-}
-
-impl<M: DialectMessage + 'static, V: Versioned> Debug for Frame<HasDialect<M>, V> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let dialect = f
-            .debug_struct("Dialect")
-            .field("name", &self.dialect.0.name())
-            .finish_non_exhaustive();
-
-        f.debug_struct("Frame")
-            .field("frame", &self.frame)
-            .field("dialect", &dialect)
-            .field("version", &self.version.mavlink_version())
-            .finish()
-    }
-}
-
-impl<M: DialectMessage + 'static> Debug for Frame<HasDialect<M>, NotVersioned> {
+impl<M: DialectMessage + 'static, V: MaybeVersioned> Debug for Frame<HasDialect<M>, V> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let dialect = f
             .debug_struct("Dialect")
@@ -77,42 +48,41 @@ impl<M: DialectMessage + 'static> Debug for Frame<HasDialect<M>, NotVersioned> {
     }
 }
 
-impl<D: IsDialect, V: IsVersioned> From<Frame<D, V>> for CoreFrame {
+impl<D: MaybeDialect, V: MaybeVersioned> From<Frame<D, V>> for CoreFrame<V> {
     /// Converts [`Frame`] into [`CoreFrame`].
     fn from(value: Frame<D, V>) -> Self {
         value.frame
     }
 }
 
-impl From<CoreFrame> for Frame<NoDialect, NotVersioned> {
+impl<V: MaybeVersioned> From<CoreFrame<V>> for Frame<Dialectless, V> {
     /// Converts [`CoreFrame`] into [`Frame`].
-    fn from(value: CoreFrame) -> Self {
+    fn from(value: CoreFrame<V>) -> Self {
         Self::new(value)
     }
 }
 
-impl<D: IsDialect, V: IsVersioned> IsVersioned for Frame<D, V> {}
-
-impl Frame<NoDialect, NotVersioned> {
+impl<V: MaybeVersioned> Frame<Dialectless, V> {
     /// Create an instance of [`Frame`] without neither a specified dialect, nor MAVLink protocol
     /// version.
     ///
-    /// Use [`Frame::builder`] to create construct frames with additional restrictions.
-    pub fn new(frame: CoreFrame) -> Self {
+    /// Use [`Frame::builder`] to construct frames with additional restrictions.
+    pub fn new(frame: CoreFrame<V>) -> Frame<Dialectless, V> {
         Self {
             frame,
-            dialect: NoDialect(),
-            version: NotVersioned(),
+            dialect: Dialectless,
         }
     }
+}
 
+impl Frame<Dialectless, Versionless> {
     /// Instantiate an empty instance of a [`FrameBuilder`].
-    pub fn builder() -> FrameBuilder<NoDialect, NotVersioned> {
+    pub fn builder() -> FrameBuilder<Dialectless, Versionless> {
         FrameBuilder::new()
     }
 }
 
-impl<M: DialectMessage + 'static, V: IsVersioned> Frame<HasDialect<M>, V> {
+impl<M: DialectMessage + 'static, V: MaybeVersioned> Frame<HasDialect<M>, V> {
     /// Decodes MAVLink frame within a specified dialect.
     pub fn decode(&self) -> Result<M> {
         self.dialect
@@ -122,9 +92,9 @@ impl<M: DialectMessage + 'static, V: IsVersioned> Frame<HasDialect<M>, V> {
     }
 }
 
-impl<D: IsDialect, V: IsVersioned> Frame<D, V> {
+impl<D: MaybeDialect, V: MaybeVersioned> Frame<D, V> {
     /// Returns wrapped [`CoreFrame`].
-    pub fn frame(&self) -> &CoreFrame {
+    pub fn frame(&self) -> &CoreFrame<V> {
         &self.frame
     }
 
@@ -193,23 +163,13 @@ impl<D: IsDialect, V: IsVersioned> Frame<D, V> {
     }
 }
 
-impl<D: IsDialect, V: IsVersioned> Versioned for Frame<D, V> {
-    /// MAVLink protocol version.
-    ///
-    /// See [`CoreFrame::mavlink_version`] for details.
-    #[inline]
-    fn mavlink_version(&self) -> MavLinkVersion {
-        self.frame.mavlink_version()
-    }
-}
-
-impl<D: IsDialect> Frame<D, MavLink2> {
+impl<D: MaybeDialect> Frame<D, V2> {
     /// Incompatibility flags for `MAVLink 2` frames.
     ///
     /// See [`CoreFrame::incompat_flags`] for details.
     #[inline]
     pub fn incompat_flags(&self) -> IncompatFlags {
-        self.frame.incompat_flags().unwrap()
+        self.frame.incompat_flags()
     }
 
     /// Compatibility flags for `MAVLink 2` frames.
@@ -217,7 +177,7 @@ impl<D: IsDialect> Frame<D, MavLink2> {
     /// See [`CoreFrame::compat_flags`] for details.
     #[inline]
     pub fn compat_flags(&self) -> CompatFlags {
-        self.frame.compat_flags().unwrap()
+        self.frame.compat_flags()
     }
 
     /// `MAVLink 2` signature.
@@ -254,28 +214,28 @@ impl<D: IsDialect> Frame<D, MavLink2> {
 }
 
 /// Builder for [`Frame`].
-pub struct FrameBuilder<D: IsDialect, V: IsVersioned> {
+pub struct FrameBuilder<D: MaybeDialect, V: MaybeVersioned> {
     dialect: D,
     version: V,
 }
 
-impl Default for FrameBuilder<NoDialect, NotVersioned> {
+impl Default for FrameBuilder<Dialectless, Versionless> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl FrameBuilder<NoDialect, NotVersioned> {
+impl FrameBuilder<Dialectless, Versionless> {
     /// Create an empty instance of [`FrameBuilder`].
     pub fn new() -> Self {
         Self {
-            dialect: NoDialect(),
-            version: NotVersioned(),
+            dialect: Dialectless,
+            version: Versionless,
         }
     }
 }
 
-impl<V: IsVersioned> FrameBuilder<NoDialect, V> {
+impl<V: MaybeVersioned> FrameBuilder<Dialectless, V> {
     /// Defines a MAVLink dialect.
     pub fn dialect<M: DialectMessage + 'static>(
         self,
@@ -287,7 +247,7 @@ impl<V: IsVersioned> FrameBuilder<NoDialect, V> {
         }
     }
 
-    pub(crate) fn dialect_generic<D: IsDialect>(self, dialect: D) -> FrameBuilder<D, V> {
+    pub(crate) fn dialect_generic<D: MaybeDialect>(self, dialect: D) -> FrameBuilder<D, V> {
         FrameBuilder {
             dialect,
             version: self.version,
@@ -295,24 +255,24 @@ impl<V: IsVersioned> FrameBuilder<NoDialect, V> {
     }
 }
 
-impl<D: IsDialect> FrameBuilder<D, NotVersioned> {
+impl<D: MaybeDialect> FrameBuilder<D, Versionless> {
     /// Restricts this frame to `MAVLink 1` dialect.
-    pub fn v1(self) -> FrameBuilder<D, MavLink1> {
+    pub fn v1(self) -> FrameBuilder<D, V1> {
         FrameBuilder {
             dialect: self.dialect,
-            version: MavLink1(),
+            version: V1,
         }
     }
 
     /// Restricts this frame to `MAVLink 2` dialect.
-    pub fn v2(self) -> FrameBuilder<D, MavLink2> {
+    pub fn v2(self) -> FrameBuilder<D, V2> {
         FrameBuilder {
             dialect: self.dialect,
-            version: MavLink2(),
+            version: V2,
         }
     }
 
-    pub(crate) fn version_generic<V: IsVersioned>(self, version: V) -> FrameBuilder<D, V> {
+    pub(crate) fn version_generic<V: MaybeVersioned>(self, version: V) -> FrameBuilder<D, V> {
         FrameBuilder {
             dialect: self.dialect,
             version,
@@ -320,16 +280,15 @@ impl<D: IsDialect> FrameBuilder<D, NotVersioned> {
     }
 }
 
-impl<D: IsDialect, V: IsVersioned> FrameBuilder<D, V> {
+impl<D: MaybeDialect, V: MaybeVersioned> FrameBuilder<D, V> {
     /// Builds an instance of [`Frame`].
-    pub fn build_for(self, frame: CoreFrame) -> Result<Frame<D, V>> {
-        self.version.matches_frame(&frame)?;
-        self.dialect.matches_frame(&frame)?;
+    pub fn build_for(self, frame: CoreFrame<V>) -> Result<Frame<D, V>> {
+        V::expect(frame.mavlink_version())?;
+        self.dialect.matches_frame(frame.message_id())?;
 
         Ok(Frame {
             frame,
             dialect: self.dialect,
-            version: self.version,
         })
     }
 }

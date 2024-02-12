@@ -103,9 +103,9 @@ checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
 name = "bitflags"
-version = "2.4.1"
+version = "2.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "327762f6e5a765692301e5bb513e0d9fef63be86bbc14528052b1cd3e6f03e07"
+checksum = "ed570934406eb16438a4e976b1b4500774099c13b8cb96eec99f620f05090ddf"
 dependencies = [
  "serde",
 ]
@@ -314,6 +314,7 @@ dependencies = [
 name = "mavio"
 version = "0.2.0-rc2"
 dependencies = [
+ "bitflags",
  "crc-any",
  "mavspec",
  "paste",
@@ -340,7 +341,7 @@ dependencies = [
 
 [[package]]
 name = "mavspec"
-version = "0.2.3"
+version = "0.3.0-rc1"
 dependencies = [
  "mavspec_rust_derive",
  "mavspec_rust_gen",
@@ -349,7 +350,7 @@ dependencies = [
 
 [[package]]
 name = "mavspec_rust_derive"
-version = "0.2.3"
+version = "0.3.0-rc1"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -360,7 +361,7 @@ dependencies = [
 
 [[package]]
 name = "mavspec_rust_gen"
-version = "0.2.3"
+version = "0.3.0-rc1"
 dependencies = [
  "anyhow",
  "base64",
@@ -378,7 +379,7 @@ dependencies = [
 
 [[package]]
 name = "mavspec_rust_spec"
-version = "0.2.3"
+version = "0.3.0-rc1"
 dependencies = [
  "bitflags",
  "serde",

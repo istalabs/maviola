@@ -1,5 +1,6 @@
 //! Maviola synchronous connection and its configuration.
 
+use mavio::protocol::MaybeVersioned;
 use std::fmt::Debug;
 use std::net::SocketAddr;
 use std::sync::{mpsc, Arc, Mutex};
@@ -8,9 +9,9 @@ use crate::prelude::*;
 use crate::protocol::CoreFrame;
 
 /// Connection events.
-pub enum ConnectionEvent {
+pub enum ConnectionEvent<V: MaybeVersioned> {
     /// New connection was established.
-    New(Box<dyn Connection>),
+    New(Box<dyn Connection<V>>),
     /// Connection was dropped.
     Drop(usize, Option<Error>),
     /// Error during connection management.
@@ -50,7 +51,7 @@ pub enum ConnectionInfo {
 }
 
 /// Synchronous connection.
-pub trait Connection: Send + Debug {
+pub trait Connection<V: MaybeVersioned>: Send + Debug {
     /// Connection ID.
     fn id(&self) -> usize;
 
@@ -58,35 +59,35 @@ pub trait Connection: Send + Debug {
     fn info(&self) -> &ConnectionInfo;
 
     /// Receive MAVLink frame.
-    fn receiver(&self) -> Arc<Mutex<Box<dyn Receiver>>>;
+    fn receiver(&self) -> Arc<Mutex<Box<dyn Receiver<V>>>>;
 
     /// Send MAVLink frame.
-    fn sender(&self) -> Arc<Mutex<Box<dyn Sender>>>;
+    fn sender(&self) -> Arc<Mutex<Box<dyn Sender<V>>>>;
 
     /// Close connection.
     fn close(&self) -> Result<()>;
 }
 
 /// MAVLink [`Frame`] sender.
-pub trait Sender: Send + Sync + Debug {
+pub trait Sender<V: MaybeVersioned>: Send + Sync + Debug {
     /// Send MAVLink frame.
-    fn send(&mut self, frame: &CoreFrame) -> Result<usize>;
+    fn send(&mut self, frame: &CoreFrame<V>) -> Result<usize>;
 }
 
 /// MAVLink [`Frame`] receiver.
-pub trait Receiver: Send + Sync + Debug {
+pub trait Receiver<V: MaybeVersioned>: Send + Sync + Debug {
     /// Receive MAVLink frame.
-    fn recv(&mut self) -> Result<CoreFrame>;
+    fn recv(&mut self) -> Result<CoreFrame<V>>;
 }
 
 /// Connection builder used to create a [`Connection`].
-pub trait ConnectionBuilder: Debug + Send {
+pub trait ConnectionBuilder<V: MaybeVersioned>: Debug + Send {
     /// Builds [`Connection`] from provided configuration.
-    fn build(&self) -> Result<mpsc::Receiver<ConnectionEvent>>;
+    fn build(&self) -> Result<mpsc::Receiver<ConnectionEvent<V>>>;
 }
 
 /// Connection configuration.
-pub trait ConnectionConf: ConnectionBuilder {
+pub trait ConnectionConf<V: MaybeVersioned>: ConnectionBuilder<V> {
     /// Information about connection config.
     fn info(&self) -> ConnectionConfInfo;
 }

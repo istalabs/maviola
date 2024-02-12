@@ -3,7 +3,7 @@
 use std::sync::{Arc, PoisonError};
 
 use mavio::errors::{FrameError, MessageError};
-use mavio::protocol::{MavLinkVersion, MessageId};
+use mavio::protocol::{MavLinkVersion, MessageId, Versionless};
 
 use crate::protocol::CoreFrame;
 
@@ -56,13 +56,13 @@ pub enum NodeError {
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum FrameBuildError {
     /// Attempt to use a frame with message ID that can't be recognised by a dialect.
-    #[error("provided frame with ID = {1} can't be decoded in current dialect {2}")]
-    NotInDialect(CoreFrame, MessageId, &'static str),
+    #[error("provided frame with ID = {0} can't be decoded in current dialect {1}")]
+    NotInDialect(MessageId, &'static str),
     /// Attempt to use a frame with message ID that can't be recognised by a dialect.
     #[error("provided frame has incorrect mavlink version {given:?}, expected: {expected:?}")]
     InvalidVersion {
         /// MAVLink frame.
-        frame: CoreFrame,
+        frame: CoreFrame<Versionless>,
         /// Provided MAVLink protocol version.
         given: MavLinkVersion,
         /// Expected MAVLink protocol version.
