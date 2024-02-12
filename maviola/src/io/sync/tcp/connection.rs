@@ -5,12 +5,9 @@ use std::net::TcpStream;
 use std::sync::atomic::AtomicBool;
 use std::sync::{atomic, mpsc, Arc, Mutex};
 
-use crate::errors::NodeError;
+use crate::io::sync::connection::{Connection, ConnectionEvent, ConnectionInfo, Receiver, Sender};
 
 use crate::prelude::*;
-
-use crate::io::sync::connection::{Connection, ConnectionEvent, ConnectionInfo, Receiver, Sender};
-use crate::protocol::CoreFrame;
 
 /// TCP connection.
 #[derive(Debug)]
@@ -76,7 +73,7 @@ impl<V: MaybeVersioned> TcpReceiver<V> {
 }
 
 impl<V: MaybeVersioned> Receiver<V> for TcpReceiver<V> {
-    fn recv(&mut self) -> Result<CoreFrame<V>> {
+    fn recv(&mut self) -> Result<mavio::Frame<V>> {
         if !self.is_active.load(atomic::Ordering::Relaxed) {
             return Err(NodeError::Inactive.into());
         }
@@ -134,7 +131,7 @@ impl<V: MaybeVersioned> TcpSender<V> {
 }
 
 impl<V: MaybeVersioned> Sender<V> for TcpSender<V> {
-    fn send(&mut self, frame: &CoreFrame<V>) -> Result<usize> {
+    fn send(&mut self, frame: &mavio::Frame<V>) -> Result<usize> {
         if !self.is_active.load(atomic::Ordering::Relaxed) {
             return Err(NodeError::Inactive.into());
         }

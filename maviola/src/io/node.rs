@@ -6,7 +6,8 @@ use std::sync::{atomic, mpsc, Arc, Mutex, TryLockError};
 use std::thread;
 
 use mavio::protocol::{
-    ComponentId, DialectImpl, DialectMessage, MavLinkVersion, MaybeVersioned, SystemId, Versioned,
+    ComponentId, DialectImpl, DialectMessage, Frame, MavLinkVersion, MaybeVersioned, SystemId,
+    Versioned,
 };
 
 use crate::io::node_conf::NodeConf;
@@ -14,7 +15,6 @@ use crate::io::node_variants::{Identified, IsIdentified};
 use crate::io::sync::connection::{ConnectionConfInfo, ConnectionEvent};
 use crate::io::sync::{Connection, ConnectionConf};
 use crate::protocol::variants::{HasDialect, MaybeDialect};
-use crate::protocol::{CoreFrame, Frame};
 
 use crate::prelude::*;
 
@@ -25,7 +25,7 @@ pub struct Node<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> {
     dialect: D,
     version: V,
     connections: AtomicConnections<V>,
-    recv_rx: mpsc::Receiver<Result<CoreFrame<V>>>,
+    recv_rx: mpsc::Receiver<Result<Frame<V>>>,
     info: NodeInfo,
 }
 
@@ -95,21 +95,21 @@ impl<M: DialectMessage + 'static, V: Versioned + 'static> Node<Identified, HasDi
 impl<D: MaybeDialect, V: MaybeVersioned + 'static> Node<Identified, D, V> {
     /// Send MAVLink frame.
     ///
-    /// Sends [`CoreFrame`] potentially changing its fields.
+    /// Sends [`Frame`] potentially changing its fields.
     ///
     /// Updated fields:
     ///
-    /// * [`sequence`](CoreFrame::sequence) - set to the next value
-    /// * [`system_id`](CoreFrame::system_id) - set to node's default
-    /// * [`component_id`](CoreFrame::component_id) - set to node's default
+    /// * [`sequence`](Frame::sequence) - set to the next value
+    /// * [`system_id`](Frame::system_id) - set to node's default
+    /// * [`component_id`](Frame::component_id) - set to node's default
     ///
     /// The following properties could be updated based on the node's configuration:
     ///
-    /// * [`signature`](CoreFrame::signature)
-    /// * [`link_id`](CoreFrame::link_id)
-    /// * [`timestamp`](CoreFrame::timestamp)
+    /// * [`signature`](Frame::signature)
+    /// * [`link_id`](Frame::link_id)
+    /// * [`timestamp`](Frame::timestamp)
     #[inline]
-    pub fn send_frame(&self, frame: &CoreFrame<V>) -> Result<usize> {
+    pub fn send_frame(&self, frame: &Frame<V>) -> Result<usize> {
         self.send_frame_internal(frame)
     }
 
@@ -117,10 +117,10 @@ impl<D: MaybeDialect, V: MaybeVersioned + 'static> Node<Identified, D, V> {
         &self,
         message: M,
         version: Version,
-    ) -> Result<CoreFrame<Version>> {
+    ) -> Result<Frame<Version>> {
         let sequence = self.sequence.fetch_add(1, atomic::Ordering::Relaxed);
         let payload = message.encode(Version::mavlink_version())?;
-        let frame = CoreFrame::builder()
+        let frame = Frame::builder()
             .sequence(sequence)
             .system_id(self.id.system_id)
             .component_id(self.id.component_id)
@@ -134,13 +134,8 @@ impl<D: MaybeDialect, V: MaybeVersioned + 'static> Node<Identified, D, V> {
 
 impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V> {
     /// Receive MAVLink frame.
-    pub fn recv(&self) -> Result<Frame<D, V>> {
-        let core_frame = self.recv_frame()?;
-        let frame = Frame::builder()
-            .version_generic(self.version.clone())
-            .dialect_generic(self.dialect.clone())
-            .build_for(core_frame)?;
-        Ok(frame)
+    pub fn recv(&self) -> Result<Frame<V>> {
+        self.recv_frame_internal()
     }
 }
 
@@ -152,20 +147,20 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
 
     /// Proxy MAVLink frame.
     ///
-    /// In proxy mode [`CoreFrame`] is sent with as many fields preserved as possible.
+    /// In proxy mode [`Frame`] is sent with as many fields preserved as possible.
     ///
     /// In particular, the following fields are always preserved:
     ///
-    /// * [`sequence`](CoreFrame::sequence)
-    /// * [`system_id`](CoreFrame::system_id)
-    /// * [`component_id`](CoreFrame::component_id)
+    /// * [`sequence`](Frame::sequence)
+    /// * [`system_id`](Frame::system_id)
+    /// * [`component_id`](Frame::component_id)
     ///
     /// The following properties could be updated based on the node's
     /// [message signing](https://mavlink.io/en/guide/message_signing.html) configuration:
     ///
-    /// * [`signature`](CoreFrame::signature)
-    /// * [`link_id`](CoreFrame::link_id)
-    /// * [`timestamp`](CoreFrame::timestamp)
+    /// * [`signature`](Frame::signature)
+    /// * [`link_id`](Frame::link_id)
+    /// * [`timestamp`](Frame::timestamp)
     ///
     /// # Stateful Sending
     ///
@@ -177,12 +172,12 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
     /// [`Node::send_versioned`]. You can also use [`Node::send`] for [`Versioned`] nodes. In the
     /// latter case, message will be encoded according to MAVLink protocol version defined by for a
     /// node.
-    pub fn proxy_frame(&self, frame: &CoreFrame<V>) -> Result<usize> {
+    pub fn proxy_frame(&self, frame: &Frame<V>) -> Result<usize> {
         self.send_frame_internal(frame)
     }
 
     /// Receive MAVLink frame.
-    pub fn recv_frame(&self) -> Result<CoreFrame<V>> {
+    pub fn recv_frame(&self) -> Result<Frame<V>> {
         self.recv_frame_internal()
     }
 
@@ -204,11 +199,11 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
 }
 
 impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V> {
-    fn recv_frame_internal(&self) -> Result<CoreFrame<V>> {
+    fn recv_frame_internal(&self) -> Result<Frame<V>> {
         self.recv_rx.recv().map_err(Error::from)?
     }
 
-    fn send_frame_internal(&self, frame: &CoreFrame<V>) -> Result<usize> {
+    fn send_frame_internal(&self, frame: &Frame<V>) -> Result<usize> {
         let connections = self.connections.lock()?;
         let frame = Arc::new(frame.clone());
 
@@ -244,7 +239,7 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
         conn_conf: &dyn ConnectionConf<V>,
     ) -> Result<(
         AtomicConnections<V>,
-        mpsc::Receiver<Result<CoreFrame<V>>>,
+        mpsc::Receiver<Result<Frame<V>>>,
         NodeInfo,
     )> {
         let connections: AtomicConnections<V> = Default::default();
@@ -275,7 +270,7 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
 
     fn handle_conn_events(
         node_info: NodeInfo,
-        recv_tx: mpsc::Sender<Result<CoreFrame<V>>>,
+        recv_tx: mpsc::Sender<Result<Frame<V>>>,
         connections: AtomicConnections<V>,
         events: mpsc::Receiver<ConnectionEvent<V>>,
     ) -> Result<()> {
@@ -300,7 +295,7 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
 
     fn handle_connection_event_new(
         connection: Box<dyn Connection<V>>,
-        recv_tx: mpsc::Sender<Result<CoreFrame<V>>>,
+        recv_tx: mpsc::Sender<Result<Frame<V>>>,
         connections: &AtomicConnections<V>,
         node_info: &NodeInfo,
     ) -> Result<()> {
@@ -378,7 +373,7 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
     fn handle_connection(
         id: usize,
         node_info: NodeInfo,
-        recv_tx: mpsc::Sender<Result<CoreFrame<V>>>,
+        recv_tx: mpsc::Sender<Result<Frame<V>>>,
         connections: AtomicConnections<V>,
         close_rx: mpsc::Receiver<()>,
     ) {

@@ -232,7 +232,11 @@ fn node_no_id() {
     server_node
         .send(minimal::messages::Heartbeat::default().into())
         .unwrap();
-    client_node.recv().unwrap().decode().unwrap();
+    client_node
+        .recv()
+        .unwrap()
+        .decode::<minimal::Message>()
+        .unwrap();
 }
 
 #[test]

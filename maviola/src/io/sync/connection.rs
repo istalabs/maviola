@@ -6,7 +6,6 @@ use std::net::SocketAddr;
 use std::sync::{mpsc, Arc, Mutex};
 
 use crate::prelude::*;
-use crate::protocol::CoreFrame;
 
 /// Connection events.
 pub enum ConnectionEvent<V: MaybeVersioned> {
@@ -71,13 +70,13 @@ pub trait Connection<V: MaybeVersioned>: Send + Debug {
 /// MAVLink [`Frame`] sender.
 pub trait Sender<V: MaybeVersioned>: Send + Sync + Debug {
     /// Send MAVLink frame.
-    fn send(&mut self, frame: &CoreFrame<V>) -> Result<usize>;
+    fn send(&mut self, frame: &mavio::Frame<V>) -> Result<usize>;
 }
 
 /// MAVLink [`Frame`] receiver.
 pub trait Receiver<V: MaybeVersioned>: Send + Sync + Debug {
     /// Receive MAVLink frame.
-    fn recv(&mut self) -> Result<CoreFrame<V>>;
+    fn recv(&mut self) -> Result<mavio::Frame<V>>;
 }
 
 /// Connection builder used to create a [`Connection`].
