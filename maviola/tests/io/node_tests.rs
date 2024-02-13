@@ -10,7 +10,7 @@ use maviola::io::node::Node;
 use maviola::io::node_conf::NodeConf;
 use maviola::io::node_variants::Identified;
 use maviola::io::sync::{TcpClientConf, TcpServerConf};
-use maviola::protocol::variants::HasDialect;
+use maviola::protocol::marker::HasDialect;
 
 static INIT: Once = Once::new();
 const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Info;
@@ -40,13 +40,13 @@ fn initialize() {
     });
 }
 
-fn make_server_node(port: portpicker::Port) -> Node<Identified, HasDialect<minimal::Message>, V2> {
+fn make_server_node(port: portpicker::Port) -> Node<Identified, HasDialect<minimal::Minimal>, V2> {
     Node::try_from(
         NodeConf::builder()
             .system_id(1)
             .component_id(1)
             .dialect(minimal::dialect())
-            .v2()
+            .version(V2)
             .conn_conf(TcpServerConf::new(make_addr(port)).unwrap())
             .build(),
     )
@@ -56,13 +56,13 @@ fn make_server_node(port: portpicker::Port) -> Node<Identified, HasDialect<minim
 fn make_client_node(
     port: portpicker::Port,
     component_id: u8,
-) -> Node<Identified, HasDialect<minimal::Message>, V2> {
+) -> Node<Identified, HasDialect<minimal::Minimal>, V2> {
     Node::try_from(
         NodeConf::builder()
             .system_id(2)
             .component_id(component_id)
             .dialect(minimal::dialect())
-            .v2()
+            .version(V2)
             .conn_conf(TcpClientConf::new(make_addr(port)).unwrap())
             .build(),
     )
@@ -72,7 +72,7 @@ fn make_client_node(
 fn make_client_nodes(
     port: portpicker::Port,
     count: u8,
-) -> HashMap<u8, Node<Identified, HasDialect<minimal::Message>, V2>> {
+) -> HashMap<u8, Node<Identified, HasDialect<minimal::Minimal>, V2>> {
     (0..count).map(|i| (i, make_client_node(port, i))).collect()
 }
 
@@ -111,9 +111,9 @@ fn messages_are_sent_and_received() {
     server_node.send(message.into()).unwrap();
 
     for client_node in client_nodes.values() {
-        let frame = client_node.recv().unwrap();
+        let frame = client_node.recv_frame().unwrap();
         log::info!("{frame:#?}");
-        if let minimal::Message::Heartbeat(recv_message) = frame.decode().unwrap() {
+        if let minimal::Minimal::Heartbeat(recv_message) = frame.decode().unwrap() {
             log::info!("{recv_message:#?}");
         } else {
             panic!("invalid message")
@@ -171,17 +171,17 @@ fn node_no_id_no_dialect_no_version() {
         .sequence(sequence)
         .system_id(system_id)
         .component_id(component_id)
-        .mavlink_version(V2)
+        .version(V2)
         .message(&minimal::messages::Heartbeat::default())
         .unwrap()
-        .build();
+        .versionless();
 
     for _ in 0..5 {
         client_node.proxy_frame(&frame).unwrap();
     }
 
     for _ in 0..5 {
-        let frame = server_node.recv().unwrap();
+        let frame = server_node.recv_frame().unwrap();
         assert_eq!(frame.sequence(), sequence);
         assert_eq!(frame.system_id(), system_id);
         assert_eq!(frame.component_id(), component_id);
@@ -208,7 +208,7 @@ fn node_no_id_no_version() {
     server_node
         .send(minimal::messages::Heartbeat::default().into())
         .unwrap();
-    client_node.recv().unwrap();
+    client_node.recv_frame().unwrap();
 }
 
 #[test]
@@ -221,7 +221,7 @@ fn node_no_id() {
     let client_node = Node::try_from(
         NodeConf::builder()
             .dialect(minimal::dialect())
-            .v2()
+            .version(V2)
             .conn_conf(TcpClientConf::new(make_addr(port)).unwrap())
             .build(),
     )
@@ -233,9 +233,9 @@ fn node_no_id() {
         .send(minimal::messages::Heartbeat::default().into())
         .unwrap();
     client_node
-        .recv()
+        .recv_frame()
         .unwrap()
-        .decode::<minimal::Message>()
+        .decode::<minimal::Minimal>()
         .unwrap();
 }
 
@@ -250,7 +250,6 @@ fn node_no_version() {
         NodeConf::builder()
             .system_id(42)
             .component_id(142)
-            .v2()
             .dialect(minimal::dialect())
             .conn_conf(TcpClientConf::new(make_addr(port)).unwrap())
             .build(),
@@ -263,13 +262,13 @@ fn node_no_version() {
         .send_versioned(minimal::messages::Heartbeat::default().into(), V2)
         .unwrap();
 
-    let frame = server_node.recv().unwrap();
+    let frame = server_node.recv_frame().unwrap();
     assert_eq!(frame.system_id(), 42);
     assert_eq!(frame.component_id(), 142);
-    assert!(matches!(frame.mavlink_version(), MavLinkVersion::V2));
+    assert!(matches!(frame.version(), MavLinkVersion::V2));
 
     let message = frame.decode().unwrap();
-    if let minimal::Message::Heartbeat(_) = message {
+    if let minimal::Minimal::Heartbeat(_) = message {
         // message is fine
     } else {
         panic!("Invalid message!")

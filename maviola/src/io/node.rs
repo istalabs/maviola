@@ -7,16 +7,16 @@ use std::thread;
 
 use mavio::protocol::{
     ComponentId, DialectImpl, DialectMessage, Frame, MavLinkVersion, MaybeVersioned, SystemId,
-    Versioned,
+    Versioned, Versionless,
 };
 
 use crate::io::node_conf::NodeConf;
 use crate::io::node_variants::{Identified, IsIdentified};
 use crate::io::sync::connection::{ConnectionConfInfo, ConnectionEvent};
 use crate::io::sync::{Connection, ConnectionConf};
-use crate::protocol::variants::{HasDialect, MaybeDialect};
 
 use crate::prelude::*;
+use crate::protocol::marker::{HasDialect, MaybeDialect};
 
 /// MAVLink node.
 pub struct Node<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> {
@@ -72,70 +72,65 @@ impl<M: DialectMessage + 'static, I: IsIdentified, V: MaybeVersioned> Node<I, Ha
 impl<I: IsIdentified, D: MaybeDialect, V: Versioned> Node<I, D, V> {
     /// MAVLink version.
     pub fn version(&self) -> MavLinkVersion {
-        V::mavlink_version()
+        V::version()
     }
 }
 
 impl<M: DialectMessage + 'static, V: Versioned + 'static> Node<Identified, HasDialect<M>, V> {
-    /// Send MAVLink frame.
+    /// Send MAVLink message.
+    ///
+    /// The message will be encoded according to the node's dialect specification and MAVLink
+    /// protocol version.
+    ///
+    /// If you want to send messages within different MAVLink protocols simultaneously, you have
+    /// to construct a [`Versionless`] node and use [`Node::send_versioned`]
     pub fn send(&self, message: M) -> Result<usize> {
         let frame = self.make_frame_from_message(message, self.version.clone())?;
         self.send_frame_internal(&frame)
     }
 }
 
-impl<M: DialectMessage + 'static, V: Versioned + 'static> Node<Identified, HasDialect<M>, V> {
-    /// Send MAVLink frame with specified version.
-    pub fn send_versioned(&self, message: M, version: V) -> Result<usize> {
-        let frame = self.make_frame_from_message(message, version)?;
+impl<M: DialectMessage + 'static> Node<Identified, HasDialect<M>, Versionless> {
+    /// Send MAVLink frame with a specified MAVLink protocol version.
+    ///
+    /// If you want to restrict MAVLink protocol to a particular version, construct a [`Versioned`]
+    /// node and simply send messages by calling [`Node::send`].
+    pub fn send_versioned<V: Versioned>(&self, message: M, version: V) -> Result<usize> {
+        let frame = self
+            .make_frame_from_message(message, version)?
+            .versionless();
         self.send_frame_internal(&frame)
     }
 }
 
-impl<D: MaybeDialect, V: MaybeVersioned + 'static> Node<Identified, D, V> {
-    /// Send MAVLink frame.
-    ///
-    /// Sends [`Frame`] potentially changing its fields.
-    ///
-    /// Updated fields:
-    ///
-    /// * [`sequence`](Frame::sequence) - set to the next value
-    /// * [`system_id`](Frame::system_id) - set to node's default
-    /// * [`component_id`](Frame::component_id) - set to node's default
-    ///
-    /// The following properties could be updated based on the node's configuration:
-    ///
-    /// * [`signature`](Frame::signature)
-    /// * [`link_id`](Frame::link_id)
-    /// * [`timestamp`](Frame::timestamp)
-    #[inline]
-    pub fn send_frame(&self, frame: &Frame<V>) -> Result<usize> {
-        self.send_frame_internal(frame)
-    }
-
-    fn make_frame_from_message<M: DialectMessage + 'static, Version: Versioned>(
+impl<M: DialectMessage + 'static, V: MaybeVersioned + 'static> Node<Identified, HasDialect<M>, V> {
+    fn make_frame_from_message<Version: Versioned>(
         &self,
         message: M,
         version: Version,
     ) -> Result<Frame<Version>> {
         let sequence = self.sequence.fetch_add(1, atomic::Ordering::Relaxed);
-        let payload = message.encode(Version::mavlink_version())?;
+        let payload = message.encode(Version::version())?;
         let frame = Frame::builder()
             .sequence(sequence)
             .system_id(self.id.system_id)
             .component_id(self.id.component_id)
             .payload(payload)
             .crc_extra(message.crc_extra())
-            .mavlink_version(version)
-            .versioned();
+            .version(version)
+            .build();
         Ok(frame)
     }
 }
 
-impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V> {
-    /// Receive MAVLink frame.
-    pub fn recv(&self) -> Result<Frame<V>> {
-        self.recv_frame_internal()
+impl<M: DialectMessage + 'static, I: IsIdentified, V: MaybeVersioned + 'static>
+    Node<I, HasDialect<M>, V>
+{
+    /// Receive MAVLink message.
+    pub fn recv(&self) -> Result<M> {
+        // let frame = self.recv_frame_internal();
+        // self.dialect.0.decode(f)
+        todo!()
     }
 }
 
@@ -147,31 +142,19 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
 
     /// Proxy MAVLink frame.
     ///
-    /// In proxy mode [`Frame`] is sent with as many fields preserved as possible.
-    ///
-    /// In particular, the following fields are always preserved:
-    ///
-    /// * [`sequence`](Frame::sequence)
-    /// * [`system_id`](Frame::system_id)
-    /// * [`component_id`](Frame::component_id)
-    ///
-    /// The following properties could be updated based on the node's
-    /// [message signing](https://mavlink.io/en/guide/message_signing.html) configuration:
+    /// In proxy mode [`Frame`] is sent with as many fields preserved as possible. However, the
+    /// following properties could be updated based on the node's
+    /// [message signing](https://mavlink.io/en/guide/message_signing.html) configuration
+    /// (`MAVLink 2` [`Versioned`] nodes only):
     ///
     /// * [`signature`](Frame::signature)
     /// * [`link_id`](Frame::link_id)
     /// * [`timestamp`](Frame::timestamp)
     ///
-    /// # Stateful Sending
-    ///
-    /// To send frames with correct auto-incremented [`sequence`](Frame::sequence) and
-    /// [`system_id`](Node::system_id) / [`component_id`](Node::component_id) bound to a node, you
-    /// have to construct an [`Identified`] node and use [`Node::send_frame`].
-    ///
-    /// To send messages, construct an [`Identified`] node with [`HasDialect`] and
-    /// [`Node::send_versioned`]. You can also use [`Node::send`] for [`Versioned`] nodes. In the
-    /// latter case, message will be encoded according to MAVLink protocol version defined by for a
-    /// node.
+    /// To send messages, construct an [`Identified`] node with [`HasDialect`] and send messages via
+    /// [`Node::send_versioned`]. You can also use generic [`Node::send`] for [`Versioned`] nodes.
+    /// In the latter case, message will be encoded according to MAVLink protocol version defined
+    /// by for a node.
     pub fn proxy_frame(&self, frame: &Frame<V>) -> Result<usize> {
         self.send_frame_internal(frame)
     }

@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, PoisonError};
 
-use mavio::errors::{FrameError, MessageError};
+pub use mavio::errors::{FrameError, MessageError};
 use mavio::protocol::MessageId;
 
 /// Maviola result type.
@@ -48,6 +48,9 @@ pub enum NodeError {
     /// Failed due to poisoned mutex.
     #[error("poisoned mutex: {0}")]
     Poisoned(String),
+    /// Attempt to use a frame with message ID that can't be recognised by a dialect.
+    #[error("provided frame with ID = {0} can't be decoded in current dialect {1}")]
+    NotInDialect(MessageId, &'static str),
 }
 
 /// Frame building errors.

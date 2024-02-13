@@ -7,7 +7,7 @@ use mavio::protocol::{
 
 use crate::io::node_variants::{Identified, IsIdentified, NotIdentified};
 use crate::io::sync::ConnectionConf;
-use crate::protocol::variants::{Dialectless, HasDialect, MaybeDialect};
+use crate::protocol::marker::{Dialectless, HasDialect, MaybeDialect};
 
 /// MAVLink node configuration.
 ///
@@ -109,20 +109,21 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned> NodeConf<I, D, V> {
 impl<I: IsIdentified, D: MaybeDialect, V: Versioned> NodeConf<I, D, V> {
     /// MAVLink version.
     pub fn version(&self) -> MavLinkVersion {
-        V::mavlink_version()
+        V::version()
     }
 }
 
 /// Builder for [`NodeConf`].
 pub mod builder {
     use mavio::protocol::{
-        ComponentId, DialectImpl, DialectMessage, MaybeVersioned, SystemId, Versionless, V1, V2,
+        ComponentId, DialectImpl, DialectMessage, MaybeVersioned, SystemId, Versioned, Versionless,
     };
 
     use crate::io::sync::ConnectionConf;
+    use crate::protocol::marker::{Dialectless, HasDialect};
 
     use super::NodeConf;
-    use super::{Dialectless, HasDialect, Identified, MaybeDialect, NotIdentified};
+    use super::{Identified, MaybeDialect, NotIdentified};
 
     /// Marker trait for [`NodeConfBuilder`] with or without [`NodeConf::system_id`].
     pub trait IsSystemId {}
@@ -174,7 +175,7 @@ pub mod builder {
     }
 
     impl NodeConfBuilder<NoSystemId, NoComponentId, NoConnConf, Dialectless, Versionless> {
-        /// Instantiates an empty [`NodeConfBuilder`].
+        /// Instantiate an empty [`NodeConfBuilder`].
         pub fn new() -> Self {
             Self {
                 system_id: NoSystemId(),
@@ -189,7 +190,7 @@ pub mod builder {
     impl<C: IsComponentId, CC: IsConnConf, D: MaybeDialect, V: MaybeVersioned>
         NodeConfBuilder<NoSystemId, C, CC, D, V>
     {
-        /// Sets [`NodeConf::system_id`].
+        /// Set [`NodeConf::system_id`].
         pub fn system_id(self, system_id: SystemId) -> NodeConfBuilder<HasSystemId, C, CC, D, V> {
             NodeConfBuilder {
                 system_id: HasSystemId(system_id),
@@ -204,7 +205,7 @@ pub mod builder {
     impl<S: IsSystemId, T: IsConnConf, D: MaybeDialect, V: MaybeVersioned>
         NodeConfBuilder<S, NoComponentId, T, D, V>
     {
-        /// Sets [`NodeConf::component_id`].
+        /// Set [`NodeConf::component_id`].
         pub fn component_id(
             self,
             component_id: ComponentId,
@@ -222,7 +223,7 @@ pub mod builder {
     impl<S: IsSystemId, C: IsComponentId, D: MaybeDialect, V: MaybeVersioned>
         NodeConfBuilder<S, C, NoConnConf, D, V>
     {
-        /// Sets [`NodeConf::component_id`].
+        /// Set [`NodeConf::component_id`].
         pub fn conn_conf(
             self,
             conn_conf: impl ConnectionConf<V> + 'static,
@@ -240,7 +241,7 @@ pub mod builder {
     impl<S: IsSystemId, C: IsComponentId, CC: IsConnConf, V: MaybeVersioned>
         NodeConfBuilder<S, C, CC, Dialectless, V>
     {
-        /// Sets [`NodeConf::dialect`].
+        /// Set [`NodeConf::dialect`].
         pub fn dialect<M: DialectMessage>(
             self,
             dialect: &'static dyn DialectImpl<Message = M>,
@@ -258,29 +259,17 @@ pub mod builder {
     impl<S: IsSystemId, C: IsComponentId, CC: IsConnConf, D: MaybeDialect>
         NodeConfBuilder<S, C, CC, D, Versionless>
     {
-        /// Sets [`NodeConf::dialect`].
-        pub fn v1(self) -> NodeConfBuilder<S, C, CC, D, V1> {
+        /// Set [`NodeConf::dialect`].
+        pub fn version<Version: Versioned>(
+            self,
+            version: Version,
+        ) -> NodeConfBuilder<S, C, CC, D, Version> {
             NodeConfBuilder {
                 system_id: self.system_id,
                 component_id: self.component_id,
                 dialect: self.dialect,
                 conn_conf: self.conn_conf,
-                version: V1,
-            }
-        }
-    }
-
-    impl<S: IsSystemId, C: IsComponentId, CC: IsConnConf, D: MaybeDialect>
-        NodeConfBuilder<S, C, CC, D, Versionless>
-    {
-        /// Sets [`NodeConf::dialect`].
-        pub fn v2(self) -> NodeConfBuilder<S, C, CC, D, V2> {
-            NodeConfBuilder {
-                system_id: self.system_id,
-                component_id: self.component_id,
-                dialect: self.dialect,
-                conn_conf: self.conn_conf,
-                version: V2,
+                version,
             }
         }
     }
@@ -288,7 +277,8 @@ pub mod builder {
     impl<D: MaybeDialect, V: MaybeVersioned>
         NodeConfBuilder<NoSystemId, NoComponentId, ConnConf<V>, D, V>
     {
-        /// Builds and instance of [`NodeConf`] without defined [`NodeConf::system_id`] and [`NodeConf::component_id`].
+        /// Build and instance of [`NodeConf`] without defined [`NodeConf::system_id`] and
+        /// [`NodeConf::component_id`].
         pub fn build(self) -> NodeConf<NotIdentified, D, V> {
             NodeConf {
                 id: NotIdentified,
@@ -302,7 +292,8 @@ pub mod builder {
     impl<D: MaybeDialect, V: MaybeVersioned>
         NodeConfBuilder<HasSystemId, HasComponentId, ConnConf<V>, D, V>
     {
-        /// Builds and instance of [`NodeConf`] with defined [`NodeConf::system_id`] and [`NodeConf::component_id`].
+        /// Build and instance of [`NodeConf`] with defined [`NodeConf::system_id`] and
+        /// [`NodeConf::component_id`].
         pub fn build(self) -> NodeConf<Identified, D, V> {
             NodeConf {
                 id: Identified {
@@ -376,7 +367,7 @@ mod tests {
             .unwrap();
 
         let decoded_message = node.dialect().decode(&payload).unwrap();
-        if let minimal::Message::Heartbeat(_) = decoded_message {
+        if let minimal::Minimal::Heartbeat(_) = decoded_message {
             // Message was correctly decoded back from payload
         } else {
             panic!("Invalid decoded message: {decoded_message:#?}");
