@@ -1,4 +1,4 @@
-use maviola::protocol::signature::{SignConf, SignStrategy};
+use maviola::protocol::{SignConf, SignStrategy};
 
 #[test]
 fn define_signing_config() {

@@ -1,8 +1,8 @@
 //! Maviola errors.
 
-use std::sync::{Arc, PoisonError};
+use std::sync::{mpsc, Arc, PoisonError};
 
-pub use mavio::errors::{FrameError, MessageError};
+pub use mavio::errors::{FrameError, SpecError};
 use mavio::protocol::MessageId;
 
 /// Maviola result type.
@@ -21,19 +21,39 @@ pub enum Error {
 
     /// Message encoding/decoding and specification discovery error.
     #[error("message decoding/encoding error: {0:?}")]
-    Message(MessageError),
+    Spec(SpecError),
 
     /// Node errors.
     #[error("node error: {0:?}")]
     Node(#[from] NodeError),
 
-    /// Frame building errors.
-    #[error("frame building error: {0:?}")]
-    FrameBuild(#[from] FrameBuildError),
+    /// Multi-threading errors.
+    #[error("multi-threading error: {0:?}")]
+    Sync(#[from] SyncError),
 
     /// Other errors.
     #[error("error: {0}")]
     Other(String),
+}
+
+/// Multi-threading errors.
+#[derive(Clone, Debug, thiserror::Error)]
+pub enum SyncError {
+    /// Error while joining threads.
+    #[error("error during thread join: {0:?}")]
+    ThreadJoin(String),
+
+    /// Failed due to poisoned mutex.
+    #[error("poisoned mutex: {0}")]
+    PoisonedMutex(String),
+
+    /// Attempt to read or write into a closed MPSC/MPMC channel.
+    #[error("channel error: {0}")]
+    ChannelClosed(String),
+
+    /// Error during non-blocking read in MPSC/MPMC channels.
+    #[error("channel error: {0}")]
+    TryRecv(mpsc::TryRecvError),
 }
 
 /// Node errors.
@@ -42,20 +62,7 @@ pub enum NodeError {
     /// Transport no longer active error.
     #[error("transport is no longer active")]
     Inactive,
-    /// Error within a thread.
-    #[error("thread error: {0}")]
-    Thread(String),
-    /// Failed due to poisoned mutex.
-    #[error("poisoned mutex: {0}")]
-    Poisoned(String),
-    /// Attempt to use a frame with message ID that can't be recognised by a dialect.
-    #[error("provided frame with ID = {0} can't be decoded in current dialect {1}")]
-    NotInDialect(MessageId, &'static str),
-}
 
-/// Frame building errors.
-#[derive(Clone, Debug, thiserror::Error)]
-pub enum FrameBuildError {
     /// Attempt to use a frame with message ID that can't be recognised by a dialect.
     #[error("provided frame with ID = {0} can't be decoded in current dialect {1}")]
     NotInDialect(MessageId, &'static str),
@@ -66,20 +73,22 @@ impl From<mavio::errors::Error> for Error {
         match value {
             mavio::errors::Error::Io(err) => Self::Io(err),
             mavio::errors::Error::Frame(err) => Self::Frame(err),
-            mavio::errors::Error::Message(err) => Self::Message(err),
+            mavio::errors::Error::Spec(err) => Self::Spec(err),
+            #[allow(deprecated)]
+            mavio::errors::Error::Buffer(err) => Self::Other(format!("{err:?}")),
         }
     }
 }
 
-impl From<MessageError> for Error {
-    fn from(value: MessageError) -> Self {
-        Error::Message(value)
+impl From<SpecError> for Error {
+    fn from(value: SpecError) -> Self {
+        Error::Spec(value)
     }
 }
 
 impl<Guard> From<PoisonError<Guard>> for Error {
     fn from(value: PoisonError<Guard>) -> Self {
-        Error::Node(NodeError::Poisoned(format!("{:?}", value)))
+        Error::Sync(SyncError::PoisonedMutex(format!("{:?}", value)))
     }
 }
 
@@ -89,14 +98,20 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl<T> From<std::sync::mpsc::SendError<T>> for Error {
-    fn from(value: std::sync::mpsc::SendError<T>) -> Self {
-        Error::Other(format!("MPSC send error: {value:?}"))
+impl<T> From<mpsc::SendError<T>> for Error {
+    fn from(value: mpsc::SendError<T>) -> Self {
+        SyncError::ChannelClosed(format!("MPSC send: {value:?}")).into()
     }
 }
 
-impl From<std::sync::mpsc::RecvError> for Error {
-    fn from(value: std::sync::mpsc::RecvError) -> Self {
-        Error::Other(format!("MPSC recv error: {value:?}"))
+impl From<mpsc::TryRecvError> for Error {
+    fn from(value: mpsc::TryRecvError) -> Self {
+        SyncError::TryRecv(value).into()
+    }
+}
+
+impl From<mpsc::RecvError> for Error {
+    fn from(value: mpsc::RecvError) -> Self {
+        SyncError::ChannelClosed(format!("MPSC recv: {value:?}")).into()
     }
 }

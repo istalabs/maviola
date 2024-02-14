@@ -1,13 +1,16 @@
 //! MAVLink node configuration.
 
+use std::time::Duration;
+
 use mavio::protocol::{
     ComponentId, DialectImpl, DialectMessage, MavLinkVersion, MaybeVersioned, SystemId, Versioned,
     Versionless,
 };
 
-use crate::io::node_variants::{Identified, IsIdentified, NotIdentified};
-use crate::io::sync::ConnectionConf;
-use crate::protocol::marker::{Dialectless, HasDialect, MaybeDialect};
+use crate::io::sync::connection::ConnectionConf;
+use crate::marker::{
+    Dialectless, HasDialect, Identified, IsIdentified, MaybeDialect, NotIdentified,
+};
 
 /// MAVLink node configuration.
 ///
@@ -18,6 +21,7 @@ pub struct NodeConf<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned> {
     pub(crate) dialect: D,
     pub(crate) version: V,
     conn_conf: Box<dyn ConnectionConf<V>>,
+    pub(crate) timeout: Duration,
 }
 
 impl<D: MaybeDialect, V: MaybeVersioned> NodeConf<Identified, D, V> {
@@ -40,7 +44,7 @@ impl NodeConf<NotIdentified, Dialectless, Versionless> {
     /// Create node configuration that speaks `minimal` dialect.
     ///
     /// ```rust
-    /// use maviola::io::node_conf::NodeConf;
+    /// use maviola::io::NodeConf;
     /// use maviola::io::sync::TcpClientConf;
     /// use maviola::dialects::minimal;
     ///
@@ -58,7 +62,7 @@ impl NodeConf<NotIdentified, Dialectless, Versionless> {
     /// Create node configuration without any dialect.
     ///
     /// ```rust
-    /// use maviola::io::node_conf::NodeConf;
+    /// use maviola::io::NodeConf;
     /// use maviola::io::sync::TcpClientConf;
     ///
     /// let node = NodeConf::builder()
@@ -74,7 +78,7 @@ impl NodeConf<NotIdentified, Dialectless, Versionless> {
     /// Create a configuration for unidentified node without a specific dialect.
     ///
     /// ```rust
-    /// use maviola::io::node_conf::NodeConf;
+    /// use maviola::io::NodeConf;
     /// use maviola::io::sync::TcpClientConf;
     ///
     /// let node = NodeConf::builder()
@@ -113,14 +117,29 @@ impl<I: IsIdentified, D: MaybeDialect, V: Versioned> NodeConf<I, D, V> {
     }
 }
 
+impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned> NodeConf<I, D, V> {
+    /// Timeout for MAVLink heartbeats.
+    ///
+    /// If peer hasn't been sent heartbeats for as long as specified duration, it will be considered
+    /// inactive.
+    ///
+    /// Default timeout is [`DEFAULT_HEARTBEAT_TIMEOUT`](crate::consts::DEFAULT_HEARTBEAT_TIMEOUT).
+    pub fn timeout(&self) -> Duration {
+        self.timeout
+    }
+}
+
 /// Builder for [`NodeConf`].
 pub mod builder {
+    use std::time::Duration;
+
     use mavio::protocol::{
         ComponentId, DialectImpl, DialectMessage, MaybeVersioned, SystemId, Versioned, Versionless,
     };
 
-    use crate::io::sync::ConnectionConf;
-    use crate::protocol::marker::{Dialectless, HasDialect};
+    use crate::consts::DEFAULT_HEARTBEAT_TIMEOUT;
+    use crate::io::sync::connection::ConnectionConf;
+    use crate::marker::{Dialectless, HasDialect};
 
     use super::NodeConf;
     use super::{Identified, MaybeDialect, NotIdentified};
@@ -172,6 +191,7 @@ pub mod builder {
         dialect: D,
         conn_conf: CC,
         version: V,
+        timeout: Duration,
     }
 
     impl NodeConfBuilder<NoSystemId, NoComponentId, NoConnConf, Dialectless, Versionless> {
@@ -183,6 +203,7 @@ pub mod builder {
                 dialect: Dialectless,
                 conn_conf: NoConnConf(),
                 version: Versionless,
+                timeout: DEFAULT_HEARTBEAT_TIMEOUT,
             }
         }
     }
@@ -198,6 +219,23 @@ pub mod builder {
                 dialect: self.dialect,
                 conn_conf: self.conn_conf,
                 version: self.version,
+                timeout: self.timeout,
+            }
+        }
+    }
+
+    impl<S: IsSystemId, C: IsComponentId, CC: IsConnConf, D: MaybeDialect, V: MaybeVersioned>
+        NodeConfBuilder<S, C, CC, D, V>
+    {
+        /// Set [`NodeConf::timeout`].
+        pub fn timeout(self, timeout: Duration) -> NodeConfBuilder<S, C, CC, D, V> {
+            NodeConfBuilder {
+                system_id: self.system_id,
+                component_id: self.component_id,
+                dialect: self.dialect,
+                conn_conf: self.conn_conf,
+                version: self.version,
+                timeout,
             }
         }
     }
@@ -216,6 +254,7 @@ pub mod builder {
                 dialect: self.dialect,
                 conn_conf: self.conn_conf,
                 version: self.version,
+                timeout: self.timeout,
             }
         }
     }
@@ -234,6 +273,7 @@ pub mod builder {
                 dialect: self.dialect,
                 conn_conf: ConnConf(Box::new(conn_conf)),
                 version: self.version,
+                timeout: self.timeout,
             }
         }
     }
@@ -252,6 +292,7 @@ pub mod builder {
                 dialect: HasDialect(dialect),
                 conn_conf: self.conn_conf,
                 version: self.version,
+                timeout: self.timeout,
             }
         }
     }
@@ -270,6 +311,7 @@ pub mod builder {
                 dialect: self.dialect,
                 conn_conf: self.conn_conf,
                 version,
+                timeout: self.timeout,
             }
         }
     }
@@ -285,6 +327,7 @@ pub mod builder {
                 dialect: self.dialect,
                 conn_conf: self.conn_conf.0,
                 version: self.version,
+                timeout: self.timeout,
             }
         }
     }
@@ -303,6 +346,7 @@ pub mod builder {
                 dialect: self.dialect,
                 conn_conf: self.conn_conf.0,
                 version: self.version,
+                timeout: self.timeout,
             }
         }
     }

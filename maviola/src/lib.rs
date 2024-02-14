@@ -26,11 +26,13 @@
     html_favicon_url = "https://gitlab.com/mavka/libs/maviola/-/raw/main/avatar.png?ref_type=heads"
 )]
 
+pub mod consts;
 pub mod errors;
 pub mod io;
+pub mod marker;
 pub mod prelude;
 pub mod protocol;
-pub(crate) mod utils;
+pub mod utils;
 
 #[doc(inline = true)]
 pub extern crate mavio;

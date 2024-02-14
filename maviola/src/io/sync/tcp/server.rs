@@ -1,23 +1,21 @@
-//! Synchronous TCP server.
-
-use mavio::protocol::MaybeVersioned;
 use std::net::{SocketAddr, TcpListener, ToSocketAddrs};
-use std::sync::atomic::AtomicUsize;
-use std::sync::{atomic, mpsc, Arc, Mutex};
 use std::thread;
 
-use crate::prelude::*;
+use mavio::protocol::MaybeVersioned;
 
 use crate::io::sync::connection::{
-    ConnectionBuilder, ConnectionConf, ConnectionConfInfo, ConnectionEvent, ConnectionInfo,
+    Connection, ConnectionBuilder, ConnectionConf, ConnectionInfo, PeerConnection,
+    PeerConnectionInfo,
 };
-use crate::io::sync::tcp::connection::{TcpConnection, TcpReceiver, TcpSender};
 use crate::io::utils::resolve_socket_addr;
+
+use crate::prelude::*;
 
 /// TCP server configuration.
 #[derive(Clone, Debug)]
 pub struct TcpServerConf {
     addr: SocketAddr,
+    info: ConnectionInfo,
 }
 
 impl TcpServerConf {
@@ -26,98 +24,72 @@ impl TcpServerConf {
     /// Accepts as `addr` anything that implements [`ToSocketAddrs`], prefers IPv4 addresses if
     /// available.
     pub fn new(addr: impl ToSocketAddrs) -> Result<Self> {
-        Ok(Self {
-            addr: resolve_socket_addr(addr)?,
-        })
+        let addr = resolve_socket_addr(addr)?;
+        let info = ConnectionInfo::TcpServer {
+            bind_addr: addr.clone(),
+        };
+        Ok(Self { addr, info })
     }
 }
 
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpServerConf {
-    /// Instantiates a TCP server and listens to incoming connections.
-    ///
-    /// All new connections are sent over [`mpsc::channel`].
-    fn build(&self) -> Result<mpsc::Receiver<ConnectionEvent<V>>> {
+    fn build(&self) -> Result<Connection<V>> {
         let listener = TcpListener::bind(self.addr)?;
-        let (tx, rx): (
-            mpsc::Sender<ConnectionEvent<V>>,
-            mpsc::Receiver<ConnectionEvent<V>>,
-        ) = mpsc::channel();
         let server_addr = self.addr;
-        let id: AtomicUsize = Default::default();
-        let conn_conf_info = ConnectionConfInfo::TcpServer {
-            bind_addr: server_addr,
+
+        let (send_tx, send_rx) = mpmc::channel();
+        let (recv_tx, recv_rx) = mpmc::channel();
+
+        let conn_info = ConnectionInfo::TcpServer {
+            bind_addr: server_addr.clone(),
         };
+        let connection = Connection::new(conn_info.clone(), send_tx.clone(), recv_rx);
 
         thread::spawn(move || {
             for stream in listener.incoming() {
+                let send_tx = send_tx.clone();
+                let send_rx = send_rx.clone();
+                let recv_tx = recv_tx.clone();
+
                 match stream {
                     Ok(stream) => {
-                        let reader = match stream.try_clone() {
+                        let peer_addr = stream.peer_addr().unwrap();
+                        let writer = stream;
+                        let reader = match writer.try_clone() {
                             Ok(reader) => reader,
                             Err(err) => {
-                                let err: Error = err.into();
-                                let conn_conf_info = ConnectionConfInfo::TcpServer {
-                                    bind_addr: server_addr,
-                                };
-                                if tx.send(ConnectionEvent::Error(err.clone())).is_err() {
-                                    log::error!("{conn_conf_info:?} unable to pass TCP stream cloning error: {err:?}");
-                                    return;
-                                }
-                                continue;
+                                log::error!("[{conn_info:?}] broken incoming stream: {err:?}");
+                                break;
                             }
                         };
 
-                        let peer_addr = stream.peer_addr().unwrap();
-                        let conn_info = ConnectionInfo::TcpServer {
-                            server_addr,
-                            peer_addr,
-                        };
-                        let id = id.fetch_add(1, atomic::Ordering::Relaxed);
-                        let receiver = TcpReceiver::new(
-                            0,
-                            conn_info.clone(),
-                            tx.clone(),
-                            mavio::Receiver::new(reader),
-                        );
-                        let sender = TcpSender::new(
-                            0,
-                            conn_info.clone(),
-                            tx.clone(),
-                            mavio::Sender::new(stream),
-                        );
-                        let conn = TcpConnection {
-                            id,
-                            info: conn_info.clone(),
-                            receiver: Arc::new(Mutex::new(Box::new(receiver))),
-                            sender: Arc::new(Mutex::new(Box::new(sender))),
-                            events_chan: tx.clone(),
-                        };
-
-                        if let Err(err) = tx.send(ConnectionEvent::New(Box::new(conn))) {
-                            log::error!("{conn_info:?} unable to register connection: {err:?}");
-                            return;
+                        PeerConnection {
+                            info: PeerConnectionInfo::TcpServer {
+                                server_addr,
+                                peer_addr,
+                            },
+                            reader,
+                            writer,
+                            send_tx,
+                            send_rx,
+                            recv_tx,
                         }
+                        .start();
                     }
                     Err(err) => {
-                        let err: Error = err.into();
-                        if tx.send(ConnectionEvent::Error(err.clone())).is_err() {
-                            log::error!("{conn_conf_info:?}: unable to pass incoming TCP stream error: {err:?}");
-                            return;
-                        }
-                        continue;
+                        log::error!("[{conn_info:?}] server failure: {err:?}");
+                        break;
                     }
                 };
             }
         });
 
-        Ok(rx)
+        Ok(connection)
     }
 }
 
 impl<V: MaybeVersioned + 'static> ConnectionConf<V> for TcpServerConf {
-    fn info(&self) -> ConnectionConfInfo {
-        ConnectionConfInfo::TcpServer {
-            bind_addr: self.addr,
-        }
+    fn info(&self) -> &ConnectionInfo {
+        &self.info
     }
 }

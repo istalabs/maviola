@@ -1,0 +1,47 @@
+[package]
+name = "maviola_benchmarks"
+description = "Benchmarks for Mavliola."
+version = "0.0.0"
+edition = "2021"
+authors = ["Mykhailo Ziatin <ziatin@mathwithoutend.org>"]
+readme = "README.md"
+resolver = "2"
+publish = false
+
+[lib]
+name = "maviola_benchmarks"
+path = "src/lib.rs"
+
+[[bin]]
+name = "maviola_benchmarks"
+path = "src/bin/maviola_benchmarks.rs"
+test = true
+
+###########################################################
+# Dependencies
+###########################################################
+[dependencies]
+env_logger = "0.11.1"
+log = "0.4.20"
+maviola = {version = "0.1.0-alpha2", path = "../maviola"}
+portpicker = "0.1.1"
+
+###########################################################
+# Features
+###########################################################
+[features]
+## Default features.
+default = []
+
+## All benchmarks.
+all = ["mpmc"]
+
+## MPMC benchmarks.
+mpmc = []
+
+###########################################################
+# Metadata
+###########################################################
+[package.metadata.docs.rs]
+# Features to include into `docs.rs` documentation
+features = ["all"]

@@ -1,7 +1,9 @@
 //! MAVLink protocol entities.
 
-pub mod marker;
-pub mod signature;
+mod peer;
+mod signature;
 
-#[doc(inline)]
+pub use peer::Peer;
 pub use signature::{SignConf, SignStrategy};
+
+pub(crate) use peer::PeerId;

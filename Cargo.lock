@@ -327,7 +327,7 @@ dependencies = [
 
 [[package]]
 name = "maviola"
-version = "0.1.0-alpha1"
+version = "0.1.0-alpha2"
 dependencies = [
  "env_logger",
  "log",
@@ -337,6 +337,16 @@ dependencies = [
  "serde_arrays",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "maviola_benchmarks"
+version = "0.0.0"
+dependencies = [
+ "env_logger",
+ "log",
+ "maviola",
+ "portpicker",
 ]
 
 [[package]]

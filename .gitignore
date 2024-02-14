@@ -13,6 +13,8 @@
 !/maviola/**
 !/examples/
 !/examples/**
+!/benchmarks/
+!/benchmarks/**
 
 # MAVLink
 !/mavlink

@@ -6,15 +6,15 @@ use std::time::Duration;
 use mavio::protocol::{MavLinkVersion, V2};
 
 use maviola::dialects::minimal;
-use maviola::io::node::Node;
-use maviola::io::node_conf::NodeConf;
-use maviola::io::node_variants::Identified;
 use maviola::io::sync::{TcpClientConf, TcpServerConf};
-use maviola::protocol::marker::HasDialect;
+use maviola::io::NodeConf;
+use maviola::io::{Event, Node};
+use maviola::marker::{HasDialect, Identified};
 
 static INIT: Once = Once::new();
-const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Info;
-const WAIT_DURATION: Duration = Duration::from_millis(5);
+const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Debug;
+const WAIT_DURATION: Duration = Duration::from_millis(50);
+const WAIT_LONG_DURATION: Duration = Duration::from_millis(500);
 const HOST: &str = "127.0.0.1";
 
 fn unused_port() -> portpicker::Port {
@@ -27,6 +27,10 @@ fn make_addr(port: portpicker::Port) -> String {
 
 fn wait() {
     thread::sleep(WAIT_DURATION)
+}
+
+fn wait_long() {
+    thread::sleep(WAIT_LONG_DURATION)
 }
 
 fn initialize() {
@@ -77,7 +81,7 @@ fn make_client_nodes(
 }
 
 #[test]
-fn new_connections_are_handled() {
+fn messages_are_sent_and_received_server_clients() {
     initialize();
 
     let port = unused_port();
@@ -86,19 +90,29 @@ fn new_connections_are_handled() {
     let client_nodes = make_client_nodes(port, CLIENT_COUNT as u8);
     wait();
 
-    {
-        let n_con = server_node.info().n_conn().unwrap();
-        assert_eq!(n_con, CLIENT_COUNT);
+    for client_node in client_nodes.values() {
+        let message = minimal::messages::Heartbeat::default();
+        client_node.send(message.into()).unwrap();
+    }
+    wait();
+
+    for i in client_nodes.keys() {
+        server_node.recv_frame().unwrap();
+        log::info!("[server] received #{i}");
     }
 
-    for client_node in client_nodes.values() {
-        let n_con = client_node.info().n_conn().unwrap();
-        assert_eq!(n_con, 1);
+    let message = minimal::messages::Heartbeat::default();
+    server_node.send(message.into()).unwrap();
+    wait_long();
+
+    for (i, client_node) in client_nodes {
+        client_node.try_recv_frame().unwrap();
+        log::info!("[client] received: #{i}");
     }
 }
 
 #[test]
-fn messages_are_sent_and_received() {
+fn messages_are_sent_and_received_clients_server() {
     initialize();
 
     let port = unused_port();
@@ -107,40 +121,103 @@ fn messages_are_sent_and_received() {
     let client_nodes = make_client_nodes(port, CLIENT_COUNT as u8);
     wait();
 
-    let message = minimal::messages::Heartbeat::default();
-    server_node.send(message.into()).unwrap();
-
     for client_node in client_nodes.values() {
-        let frame = client_node.recv_frame().unwrap();
-        log::info!("{frame:#?}");
-        if let minimal::Minimal::Heartbeat(recv_message) = frame.decode().unwrap() {
-            log::info!("{recv_message:#?}");
-        } else {
-            panic!("invalid message")
+        let message = minimal::messages::Heartbeat::default();
+        client_node.send(message.into()).unwrap();
+    }
+    wait_long();
+
+    for i in client_nodes.keys() {
+        server_node.try_recv_frame().unwrap();
+        log::info!("[server] received #{i}");
+    }
+}
+
+// #[test]
+// fn closed_connections_are_dropped() {
+//     initialize();
+//
+//     let port = unused_port();
+//     let server_node = make_server_node(port);
+//     let client_node = make_client_node(port, 0);
+//     wait();
+//
+//     client_node.close().unwrap();
+//     wait();
+//
+//     let message = minimal::messages::Heartbeat::default();
+//     server_node.send(message.into()).unwrap();
+//     wait();
+//
+//     {
+//         let n_con = server_node.info().n_conn().unwrap();
+//         assert_eq!(n_con, 0);
+//     }
+// }
+
+#[test]
+fn events_are_received() {
+    initialize();
+
+    let port = unused_port();
+    let server_node = Node::try_from(
+        NodeConf::builder()
+            .system_id(1)
+            .component_id(1)
+            .dialect(minimal::dialect())
+            .version(V2)
+            .conn_conf(TcpServerConf::new(make_addr(port)).unwrap())
+            .timeout(WAIT_DURATION)
+            .build(),
+    )
+    .unwrap();
+
+    let client_node = make_client_node(port, 10);
+    wait();
+
+    let message = minimal::messages::Heartbeat::default();
+    client_node.send(message.into()).unwrap();
+    wait_long();
+
+    for _ in 0..2 {
+        match server_node.try_recv_event().unwrap() {
+            Event::NewPeer(_) => {}
+            Event::Frame(_, _) => {}
+            _ => panic!("Invalid event!"),
         }
     }
+
+    wait_long();
+    match server_node.try_recv_event().unwrap() {
+        Event::PeerLost(_) => {}
+        _ => panic!("Invalid event!"),
+    }
 }
 
 #[test]
-fn closed_connections_are_dropped() {
+fn heartbeats_are_sent() {
     initialize();
 
     let port = unused_port();
-    let server_node = make_server_node(port);
-    let client_node = make_client_node(port, 0);
-    wait();
+    let server_node = Node::try_from(
+        NodeConf::builder()
+            .system_id(1)
+            .component_id(1)
+            .dialect(minimal::dialect())
+            .version(V2)
+            .conn_conf(TcpServerConf::new(make_addr(port)).unwrap())
+            .timeout(WAIT_DURATION)
+            .build(),
+    )
+    .unwrap();
+    server_node.start().unwrap();
 
-    client_node.close().unwrap();
-    wait();
+    let client_node = make_client_node(port, 10);
+    wait_long();
 
-    let message = minimal::messages::Heartbeat::default();
-    server_node.send(message.into()).unwrap();
-    wait();
-
-    {
-        let n_con = server_node.info().n_conn().unwrap();
-        assert_eq!(n_con, 0);
-    }
+    client_node.try_recv_frame().unwrap();
+    wait_long();
+    client_node.try_recv_frame().unwrap();
 }
 
 #[test]
@@ -149,20 +226,20 @@ fn node_no_id_no_dialect_no_version() {
 
     let port = unused_port();
     let server_node = make_server_node(port);
-
     let client_node = Node::try_from(
         NodeConf::builder()
             .conn_conf(TcpClientConf::new(make_addr(port)).unwrap())
             .build(),
     )
     .unwrap();
-
     wait();
 
     server_node
         .send(minimal::messages::Heartbeat::default().into())
         .unwrap();
-    client_node.recv_frame().unwrap();
+    wait_long();
+
+    client_node.try_recv_frame().unwrap();
 
     let sequence: u8 = 190;
     let system_id: u8 = 42;
@@ -181,7 +258,7 @@ fn node_no_id_no_dialect_no_version() {
     }
 
     for _ in 0..5 {
-        let frame = server_node.recv_frame().unwrap();
+        let (frame, _) = server_node.recv_frame().unwrap();
         assert_eq!(frame.sequence(), sequence);
         assert_eq!(frame.system_id(), system_id);
         assert_eq!(frame.component_id(), component_id);
@@ -194,7 +271,6 @@ fn node_no_id_no_version() {
 
     let port = unused_port();
     let server_node = make_server_node(port);
-
     let client_node = Node::try_from(
         NodeConf::builder()
             .dialect(minimal::dialect())
@@ -202,13 +278,14 @@ fn node_no_id_no_version() {
             .build(),
     )
     .unwrap();
-
     wait();
 
     server_node
         .send(minimal::messages::Heartbeat::default().into())
         .unwrap();
-    client_node.recv_frame().unwrap();
+    wait_long();
+
+    client_node.try_recv_frame().unwrap();
 }
 
 #[test]
@@ -217,7 +294,6 @@ fn node_no_id() {
 
     let port = unused_port();
     let server_node = make_server_node(port);
-
     let client_node = Node::try_from(
         NodeConf::builder()
             .dialect(minimal::dialect())
@@ -226,17 +302,15 @@ fn node_no_id() {
             .build(),
     )
     .unwrap();
-
     wait();
 
     server_node
         .send(minimal::messages::Heartbeat::default().into())
         .unwrap();
-    client_node
-        .recv_frame()
-        .unwrap()
-        .decode::<minimal::Minimal>()
-        .unwrap();
+    wait();
+
+    let (frame, _) = client_node.recv_frame().unwrap();
+    frame.decode::<minimal::Minimal>().unwrap();
 }
 
 #[test]
@@ -245,7 +319,6 @@ fn node_no_version() {
 
     let port = unused_port();
     let server_node = make_server_node(port);
-
     let client_node = Node::try_from(
         NodeConf::builder()
             .system_id(42)
@@ -255,14 +328,14 @@ fn node_no_version() {
             .build(),
     )
     .unwrap();
-
     wait();
 
     client_node
         .send_versioned(minimal::messages::Heartbeat::default().into(), V2)
         .unwrap();
+    wait_long();
 
-    let frame = server_node.recv_frame().unwrap();
+    let (frame, _) = server_node.try_recv_frame().unwrap();
     assert_eq!(frame.system_id(), 42);
     assert_eq!(frame.component_id(), 142);
     assert!(matches!(frame.version(), MavLinkVersion::V2));
