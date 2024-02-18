@@ -7,7 +7,6 @@ use std::sync::{atomic, Arc, RwLock};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
-use crate::consts::HEARTBEAT_TIMEOUT_TOLERANCE;
 use crate::io::event::EventsIterator;
 use crate::io::Event;
 use mavio::protocol::{
@@ -28,11 +27,12 @@ pub struct Node<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> {
     dialect: D,
     version: V,
     sequence: Arc<AtomicU8>,
+    is_connected: Arc<AtomicBool>,
     is_active: Arc<AtomicBool>,
-    is_started: Arc<AtomicBool>,
     connection: Connection<V>,
     peers: Arc<RwLock<HashMap<PeerId, Peer>>>,
-    timeout: Duration,
+    heartbeat_timeout: Duration,
+    heartbeat_interval: Duration,
     events_tx: mpmc::Sender<Event<V>>,
     events_rx: mpmc::Receiver<Event<V>>,
 }
@@ -51,12 +51,13 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> TryFrom<Node
             id: value.id,
             dialect: value.dialect,
             version: value.version,
-            is_active: Arc::new(AtomicBool::new(true)),
-            is_started: Arc::new(AtomicBool::new(false)),
+            is_connected: Arc::new(AtomicBool::new(true)),
+            is_active: Arc::new(AtomicBool::new(false)),
             sequence: Arc::new(AtomicU8::new(0)),
             connection,
             peers: Default::default(),
-            timeout: value.timeout,
+            heartbeat_timeout: value.heartbeat_timeout,
+            heartbeat_interval: value.heartbeat_interval,
             events_tx,
             events_rx,
         };
@@ -71,6 +72,49 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
     /// Information about this node's connection.
     pub fn info(&self) -> &ConnectionInfo {
         self.connection.info()
+    }
+
+    /// Heartbeat timeout.
+    ///
+    /// For peers that overdue to send the next heartbeat within this interval will be considered
+    /// inactive. An [`Event::PeerLost`] will be dispatched via [`events`](Node::events),
+    /// [`recv_event`](Node::recv_event), and [`try_recv_event`](Node::try_recv_event).
+    ///
+    /// Default value is [`DEFAULT_HEARTBEAT_TIMEOUT`](crate::consts::DEFAULT_HEARTBEAT_TIMEOUT).
+    pub fn heartbeat_timeout(&self) -> Duration {
+        self.heartbeat_timeout
+    }
+
+    /// Returns `true` if node is connected.
+    ///
+    /// All nodes are connected by default. If node wasn't disconnected by [`Node::close`], then it
+    /// can become disconnected only when underlying I/O transport failed or exhausted.
+    pub fn is_connected(&self) -> bool {
+        self.is_connected.load(atomic::Ordering::Relaxed)
+    }
+
+    /// Returns an iterator over current peers.
+    ///
+    /// This method will return a snapshot of the current peers relevant to the time when it was
+    /// called. A more reliable approach to peer management is to use [`Node::events`] and track
+    /// [`Event::NewPeer`] / [`Event::PeerLost`] events.
+    pub fn peers(&self) -> impl Iterator<Item = Peer> {
+        let peers: Vec<Peer> = match self.peers.read() {
+            Ok(peers) => peers.values().cloned().collect(),
+            Err(_) => Vec::new(),
+        };
+
+        peers.into_iter()
+    }
+
+    /// Returns `true` if node has connected MAVLink peers.
+    ///
+    /// Disconnected node will always return `false`.
+    pub fn has_peers(&self) -> bool {
+        match self.peers.read() {
+            Ok(peers) => !peers.is_empty(),
+            Err(_) => false,
+        }
     }
 
     /// Proxy MAVLink [`Frame`].
@@ -127,8 +171,8 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
 
     /// Close all connections and stop.
     pub fn close(&mut self) -> Result<()> {
+        self.is_connected.store(false, atomic::Ordering::Relaxed);
         self.is_active.store(false, atomic::Ordering::Relaxed);
-        self.is_started.store(false, atomic::Ordering::Relaxed);
         self.connection.close();
 
         self.peers
@@ -149,10 +193,10 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
         let connection = self.connection.clone();
         let peers = self.peers.clone();
         let events_tx = self.events_tx.clone();
-        let is_active = self.is_active.clone();
+        let is_connected = self.is_connected.clone();
 
         thread::spawn(move || loop {
-            if !is_active.load(atomic::Ordering::Relaxed) {
+            if !is_connected.load(atomic::Ordering::Relaxed) {
                 log::trace!(
                     "[{info:?}] closing incoming frames handler since node is no longer active"
                 );
@@ -207,26 +251,26 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
     fn handle_inactive_peers(&self) {
         let info = self.info().clone();
         let peers = self.peers.clone();
-        let timeout = self.timeout.mul_f64(HEARTBEAT_TIMEOUT_TOLERANCE);
+        let heartbeat_timeout = self.heartbeat_timeout;
         let events_tx = self.events_tx.clone();
-        let is_active = self.is_active.clone();
+        let is_connected = self.is_connected.clone();
 
         thread::spawn(move || loop {
-            if !is_active.load(atomic::Ordering::Relaxed) {
+            if !is_connected.load(atomic::Ordering::Relaxed) {
                 log::trace!(
                     "[{info:?}] closing inactive peers handler since node is no longer active"
                 );
                 return;
             }
 
-            thread::sleep(timeout);
+            thread::sleep(heartbeat_timeout);
             let now = SystemTime::now();
 
             let inactive_peers = match peers.read() {
                 Ok(peers) => {
                     let mut inactive_peers = HashSet::new();
                     for peer in peers.values() {
-                        if now.duration_since(peer.last_active).unwrap() > timeout {
+                        if now.duration_since(peer.last_active).unwrap() > heartbeat_timeout {
                             inactive_peers.insert(peer.id);
                         }
                     }
@@ -346,21 +390,77 @@ impl<M: DialectMessage + 'static> Node<Identified, HasDialect<M>, Versionless> {
 }
 
 impl<M: DialectMessage + 'static, V: Versioned + 'static> Node<Identified, HasDialect<M>, V> {
-    /// Starts node handlers.
+    /// Returns `true`, if node is active.
+    ///
+    /// All nodes are inactive by default and have to be activated using [`Node::activate`].
+    ///
+    /// Active nodes will send heartbeats and perform other automated operations which do not
+    /// require direct initiative from the user.
+    ///
+    /// Inactive nodes will neither send heartbeats, nor perform other operations which are not
+    /// directly requested by user. They will still receive incoming frames and emit corresponding
+    /// events.
+    ///
+    /// Active nodes are also connected and [`Node::is_connected`] will return `true`.
+    ///
+    /// Node transitions into inactive state when it becomes disconnected or when
+    /// [`Node::deactivate`] called.
+    pub fn is_active(&self) -> bool {
+        self.is_active.load(atomic::Ordering::Relaxed)
+    }
+
+    /// Heartbeat interval.
+    ///
+    /// Once node is started using [`Node::activate`], it will emit heartbeats with this interval.
+    ///
+    /// Default value is [`DEFAULT_HEARTBEAT_INTERVAL`](crate::consts::DEFAULT_HEARTBEAT_INTERVAL).
+    pub fn heartbeat_interval(&self) -> Duration {
+        self.heartbeat_interval
+    }
+
+    /// Activates the node.
+    ///
+    /// Active nodes emit heartbeats and perform other operations which do not depend on user
+    /// initiative directly.
     ///
     /// This method is available only for nodes which are at the same time [`Identified`],
     /// [`Versioned`], and [`HasDialect`].
-    pub fn start(&self) -> Result<()> {
-        if !self.is_active.load(atomic::Ordering::Relaxed) {
+    ///
+    /// [`Node::activate`] is idempotent while node is connected. Otherwise, it will return
+    /// [`NodeError::Inactive`] variant of [`Error::Node`].
+    pub fn activate(&self) -> Result<()> {
+        if !self.is_connected.load(atomic::Ordering::Relaxed) {
             return Err(Error::Node(NodeError::Inactive));
         }
 
-        if self.is_started.load(atomic::Ordering::Relaxed) {
+        if self.is_active.load(atomic::Ordering::Relaxed) {
             return Ok(());
         }
 
-        self.is_started.store(true, atomic::Ordering::Relaxed);
-        self.start_heartbeat_handler();
+        self.is_active.store(true, atomic::Ordering::Relaxed);
+        self.start_sending_heartbeats();
+
+        Ok(())
+    }
+
+    /// Deactivates the node.
+    ///
+    /// Inactive nodes will neither send heartbeats, nor perform other operations which are not
+    /// directly requested by user. They will still receive incoming frames and emit corresponding
+    /// events.
+    ///
+    /// [`Node::deactivate`] is idempotent while node is connected. Otherwise, it will return
+    /// [`NodeError::Inactive`] variant of [`Error::Node`].
+    pub fn deactivate(&self) -> Result<()> {
+        if !self.is_connected.load(atomic::Ordering::Relaxed) {
+            return Err(Error::Node(NodeError::Inactive));
+        }
+
+        if !self.is_active.load(atomic::Ordering::Relaxed) {
+            return Ok(());
+        }
+
+        self.is_active.store(false, atomic::Ordering::Relaxed);
 
         Ok(())
     }
@@ -377,29 +477,29 @@ impl<M: DialectMessage + 'static, V: Versioned + 'static> Node<Identified, HasDi
         self.send_frame_internal(&frame)
     }
 
-    fn start_heartbeat_handler(&self) {
-        use mavio::dialects::minimal as dialect;
-
+    fn start_sending_heartbeats(&self) {
+        let is_connected = self.is_connected.clone();
         let is_active = self.is_active.clone();
         let info = self.info().clone();
+        let heartbeat_interval = self.heartbeat_interval;
+        let version = self.version.clone();
+        let connection = self.connection.clone();
+
         let sequence = self.sequence.clone();
         let system_id = self.system_id();
         let component_id = self.component_id();
-        let timeout = self.timeout;
-        let version = self.version.clone();
-        let heartbeat = dialect::messages::Heartbeat {
-            type_: Default::default(),
-            autopilot: dialect::enums::MavAutopilot::Generic,
-            base_mode: Default::default(),
-            custom_mode: 0,
-            system_status: dialect::enums::MavState::Active,
-            mavlink_version: self.dialect.0.version().unwrap_or_default(),
-        };
-        let connection = self.connection.clone();
+
+        let heartbeat_message = self.make_heartbeat_message();
 
         thread::spawn(move || loop {
+            if !is_connected.load(atomic::Ordering::Relaxed) {
+                log::trace!(
+                    "[{info:?}] closing heartbeat emitter since node is no longer connected"
+                );
+                return;
+            }
             if !is_active.load(atomic::Ordering::Relaxed) {
-                log::trace!("[{info:?}] closing heartbeat sender since node is no longer active");
+                log::trace!("[{info:?}] closing heartbeat emitter since node is no longer active");
                 return;
             }
 
@@ -409,18 +509,31 @@ impl<M: DialectMessage + 'static, V: Versioned + 'static> Node<Identified, HasDi
                 .system_id(system_id)
                 .component_id(component_id)
                 .version(version.clone())
-                .message(&heartbeat)
+                .message(&heartbeat_message)
                 .unwrap()
                 .build();
 
             log::trace!("[{info:?}] broadcasting heartbeat");
             if let Err(err) = connection.send(&frame) {
-                log::error!("[{info:?}] heartbeat can't be sent: {err:?}");
+                log::error!("[{info:?}] heartbeat can't be broadcast: {err:?}");
                 return;
             }
 
-            thread::sleep(timeout);
+            thread::sleep(heartbeat_interval);
         });
+    }
+
+    fn make_heartbeat_message(&self) -> mavio::dialects::minimal::messages::Heartbeat {
+        use mavio::dialects::minimal as dialect;
+
+        dialect::messages::Heartbeat {
+            type_: Default::default(),
+            autopilot: dialect::enums::MavAutopilot::Generic,
+            base_mode: Default::default(),
+            custom_mode: 0,
+            system_status: dialect::enums::MavState::Active,
+            mavlink_version: self.dialect.0.version().unwrap_or_default(),
+        }
     }
 }
 

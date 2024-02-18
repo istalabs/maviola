@@ -1,7 +1,7 @@
 //! Markers for MAVLink [`Node`](super::node::Node).
 
-/// Marker for [`Node`](super::node::Node) with or without
-/// [`system_id`](super::node::Node::system_id) and [`component_id`](super::node::Node::component_id).
+/// Marker for [`Node`](crate::io::Node) with or without
+/// [`system_id`](crate::io::Node::system_id) and [`component_id`](crate::io::Node::component_id).
 ///
 /// Variants:
 ///
@@ -9,16 +9,16 @@
 /// * [`Identified`]
 pub trait IsIdentified: Clone {}
 
-/// Variant of [`Node`](super::node::Node) without [`system_id`](super::node::Node::system_id)
-/// and [`component_id`](super::node::Node::component_id).
+/// Variant of [`Node`](crate::io::Node) without [`system_id`](crate::io::Node::system_id)
+/// and [`component_id`](crate::io::Node::component_id).
 ///
 /// This node can't produce messages and can be used only as a proxy.
 #[derive(Clone)]
 pub struct NotIdentified;
 impl IsIdentified for NotIdentified {}
 
-/// Variant of [`Node`](super::node::Node) with [`system_id`](super::node::Node::system_id)
-/// and [`component_id`](super::node::Node::component_id) being defined.
+/// Variant of [`Node`](crate::io::Node) with [`system_id`](crate::io::Node::system_id)
+/// and [`component_id`](crate::io::Node::component_id) being defined.
 ///
 /// This node can produce messages.
 #[derive(Clone)]

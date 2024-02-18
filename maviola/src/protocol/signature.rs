@@ -2,7 +2,8 @@
 
 use mavio::protocol::SecretKey;
 
-use builder::{HasSecretKey, NoSecretKey, SignConfBuilder};
+pub use builder::SignConfBuilder;
+use builder::{HasSecretKey, NoSecretKey};
 
 /// MAVLink message signing configuration.
 #[derive(Clone, Debug)]

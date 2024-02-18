@@ -9,7 +9,8 @@ use maviola::dialects::minimal as dialect;
 use maviola::io::sync::{TcpClientConf, TcpServerConf};
 use maviola::io::{Event, Node, NodeConf};
 
-const HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(100);
+const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(50);
+const HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(75);
 const HOST: &str = "127.0.0.1";
 const N_ITER: usize = 10;
 const N_CLIENTS: ComponentId = 5;
@@ -41,13 +42,14 @@ fn spawn_client(addr: &str, component_id: ComponentId) {
                 .system_id(31)
                 .component_id(component_id)
                 .version(V2)
-                .timeout(HEARTBEAT_TIMEOUT)
                 .dialect(dialect::dialect())
+                .heartbeat_interval(HEARTBEAT_INTERVAL)
+                .heartbeat_timeout(HEARTBEAT_TIMEOUT)
                 .conn_conf(TcpClientConf::new(client_addr).unwrap())
                 .build(),
         )
         .unwrap();
-        client.start().unwrap();
+        client.activate().unwrap();
 
         let mut n_iter = 0;
         for event in client.events() {
@@ -76,13 +78,14 @@ fn run(addr: &str) {
             .system_id(17)
             .component_id(42)
             .version(V2)
-            .timeout(HEARTBEAT_TIMEOUT)
             .dialect(dialect::dialect())
+            .heartbeat_interval(HEARTBEAT_INTERVAL)
+            .heartbeat_timeout(HEARTBEAT_TIMEOUT)
             .conn_conf(TcpServerConf::new(server_addr).unwrap())
             .build(),
     )
     .unwrap();
-    server.start().unwrap();
+    server.activate().unwrap();
 
     for i in 0..N_CLIENTS {
         spawn_client(addr, i);
@@ -91,11 +94,14 @@ fn run(addr: &str) {
     for event in server.events() {
         match event {
             Event::NewPeer(peer) => log::warn!("[server] new peer: {peer:?}"),
-            Event::PeerLost(peer) => {
-                log::warn!("[server] peer disconnected: {peer:?}");
-                break;
-            }
             Event::Frame(frame, _) => report_frame("server", &frame),
+            Event::PeerLost(peer) => {
+                log::warn!("[server] disconnected: {peer:?}");
+                if !server.has_peers() {
+                    log::warn!("[server] all peers disconnected, exiting");
+                    break;
+                }
+            }
         }
     }
 }

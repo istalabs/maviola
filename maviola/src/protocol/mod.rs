@@ -4,6 +4,6 @@ mod peer;
 mod signature;
 
 pub use peer::Peer;
-pub use signature::{SignConf, SignStrategy};
+pub use signature::{SignConf, SignConfBuilder, SignStrategy};
 
 pub(crate) use peer::PeerId;

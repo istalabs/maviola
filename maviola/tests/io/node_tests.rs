@@ -167,7 +167,7 @@ fn events_are_received() {
             .dialect(minimal::dialect())
             .version(V2)
             .conn_conf(TcpServerConf::new(make_addr(port)).unwrap())
-            .timeout(WAIT_DURATION)
+            .heartbeat_timeout(WAIT_DURATION)
             .build(),
     )
     .unwrap();
@@ -206,11 +206,11 @@ fn heartbeats_are_sent() {
             .dialect(minimal::dialect())
             .version(V2)
             .conn_conf(TcpServerConf::new(make_addr(port)).unwrap())
-            .timeout(WAIT_DURATION)
+            .heartbeat_timeout(WAIT_DURATION)
             .build(),
     )
     .unwrap();
-    server_node.start().unwrap();
+    server_node.activate().unwrap();
 
     let client_node = make_client_node(port, 10);
     wait_long();

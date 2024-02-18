@@ -21,7 +21,8 @@ pub struct NodeConf<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned> {
     pub(crate) dialect: D,
     pub(crate) version: V,
     conn_conf: Box<dyn ConnectionConf<V>>,
-    pub(crate) timeout: Duration,
+    pub(crate) heartbeat_timeout: Duration,
+    pub(crate) heartbeat_interval: Duration,
 }
 
 impl<D: MaybeDialect, V: MaybeVersioned> NodeConf<Identified, D, V> {
@@ -124,8 +125,19 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned> NodeConf<I, D, V> {
     /// inactive.
     ///
     /// Default timeout is [`DEFAULT_HEARTBEAT_TIMEOUT`](crate::consts::DEFAULT_HEARTBEAT_TIMEOUT).
-    pub fn timeout(&self) -> Duration {
-        self.timeout
+    pub fn heartbeat_timeout(&self) -> Duration {
+        self.heartbeat_timeout
+    }
+}
+
+impl<V: Versioned, M: DialectMessage> NodeConf<Identified, HasDialect<M>, V> {
+    /// Interval for MAVLink heartbeats.
+    ///
+    /// Node will send heartbeats within this interval.
+    ///
+    /// Default interval is [`DEFAULT_HEARTBEAT_INTERVAL`](crate::consts::DEFAULT_HEARTBEAT_INTERVAL).
+    pub fn heartbeat_interval(&self) -> Duration {
+        self.heartbeat_interval
     }
 }
 
@@ -137,7 +149,7 @@ pub mod builder {
         ComponentId, DialectImpl, DialectMessage, MaybeVersioned, SystemId, Versioned, Versionless,
     };
 
-    use crate::consts::DEFAULT_HEARTBEAT_TIMEOUT;
+    use crate::consts::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_TIMEOUT};
     use crate::io::sync::connection::ConnectionConf;
     use crate::marker::{Dialectless, HasDialect};
 
@@ -191,7 +203,8 @@ pub mod builder {
         dialect: D,
         conn_conf: CC,
         version: V,
-        timeout: Duration,
+        heartbeat_timeout: Duration,
+        heartbeat_interval: Duration,
     }
 
     impl NodeConfBuilder<NoSystemId, NoComponentId, NoConnConf, Dialectless, Versionless> {
@@ -203,7 +216,8 @@ pub mod builder {
                 dialect: Dialectless,
                 conn_conf: NoConnConf(),
                 version: Versionless,
-                timeout: DEFAULT_HEARTBEAT_TIMEOUT,
+                heartbeat_timeout: DEFAULT_HEARTBEAT_TIMEOUT,
+                heartbeat_interval: DEFAULT_HEARTBEAT_INTERVAL,
             }
         }
     }
@@ -219,23 +233,8 @@ pub mod builder {
                 dialect: self.dialect,
                 conn_conf: self.conn_conf,
                 version: self.version,
-                timeout: self.timeout,
-            }
-        }
-    }
-
-    impl<S: IsSystemId, C: IsComponentId, CC: IsConnConf, D: MaybeDialect, V: MaybeVersioned>
-        NodeConfBuilder<S, C, CC, D, V>
-    {
-        /// Set [`NodeConf::timeout`].
-        pub fn timeout(self, timeout: Duration) -> NodeConfBuilder<S, C, CC, D, V> {
-            NodeConfBuilder {
-                system_id: self.system_id,
-                component_id: self.component_id,
-                dialect: self.dialect,
-                conn_conf: self.conn_conf,
-                version: self.version,
-                timeout,
+                heartbeat_timeout: self.heartbeat_timeout,
+                heartbeat_interval: self.heartbeat_interval,
             }
         }
     }
@@ -254,7 +253,28 @@ pub mod builder {
                 dialect: self.dialect,
                 conn_conf: self.conn_conf,
                 version: self.version,
-                timeout: self.timeout,
+                heartbeat_timeout: self.heartbeat_timeout,
+                heartbeat_interval: self.heartbeat_interval,
+            }
+        }
+    }
+
+    impl<S: IsSystemId, C: IsComponentId, CC: IsConnConf, D: MaybeDialect, V: MaybeVersioned>
+        NodeConfBuilder<S, C, CC, D, V>
+    {
+        /// Set [`NodeConf::heartbeat_timeout`].
+        pub fn heartbeat_timeout(
+            self,
+            heartbeat_timeout: Duration,
+        ) -> NodeConfBuilder<S, C, CC, D, V> {
+            NodeConfBuilder {
+                system_id: self.system_id,
+                component_id: self.component_id,
+                dialect: self.dialect,
+                conn_conf: self.conn_conf,
+                version: self.version,
+                heartbeat_timeout,
+                heartbeat_interval: self.heartbeat_interval,
             }
         }
     }
@@ -273,7 +293,8 @@ pub mod builder {
                 dialect: self.dialect,
                 conn_conf: ConnConf(Box::new(conn_conf)),
                 version: self.version,
-                timeout: self.timeout,
+                heartbeat_timeout: self.heartbeat_timeout,
+                heartbeat_interval: self.heartbeat_interval,
             }
         }
     }
@@ -292,7 +313,8 @@ pub mod builder {
                 dialect: HasDialect(dialect),
                 conn_conf: self.conn_conf,
                 version: self.version,
-                timeout: self.timeout,
+                heartbeat_timeout: self.heartbeat_timeout,
+                heartbeat_interval: self.heartbeat_interval,
             }
         }
     }
@@ -311,7 +333,37 @@ pub mod builder {
                 dialect: self.dialect,
                 conn_conf: self.conn_conf,
                 version,
-                timeout: self.timeout,
+                heartbeat_timeout: self.heartbeat_timeout,
+                heartbeat_interval: self.heartbeat_interval,
+            }
+        }
+    }
+
+    impl<CC: IsConnConf, V: Versioned, M: DialectMessage>
+        NodeConfBuilder<HasSystemId, HasComponentId, CC, HasDialect<M>, V>
+    {
+        /// Set [`NodeConf::heartbeat_interval`].
+        ///
+        /// This parameter makes sense only for nodes that are identified, has a specified dialect
+        /// and MAVLink protocol version. Therefore, the method is available only when the following
+        /// parameters have been already set:
+        ///
+        /// * [`system_id`](NodeConfBuilder::system_id)
+        /// * [`component_id`](NodeConfBuilder::component_id)
+        /// * [`dialect`](NodeConfBuilder::dialect)
+        /// * [`version`](NodeConfBuilder::version)
+        pub fn heartbeat_interval(
+            self,
+            heartbeat_interval: Duration,
+        ) -> NodeConfBuilder<HasSystemId, HasComponentId, CC, HasDialect<M>, V> {
+            NodeConfBuilder {
+                system_id: self.system_id,
+                component_id: self.component_id,
+                dialect: self.dialect,
+                conn_conf: self.conn_conf,
+                version: self.version,
+                heartbeat_timeout: self.heartbeat_timeout,
+                heartbeat_interval,
             }
         }
     }
@@ -327,7 +379,8 @@ pub mod builder {
                 dialect: self.dialect,
                 conn_conf: self.conn_conf.0,
                 version: self.version,
-                timeout: self.timeout,
+                heartbeat_timeout: self.heartbeat_timeout,
+                heartbeat_interval: self.heartbeat_interval,
             }
         }
     }
@@ -346,7 +399,8 @@ pub mod builder {
                 dialect: self.dialect,
                 conn_conf: self.conn_conf.0,
                 version: self.version,
-                timeout: self.timeout,
+                heartbeat_timeout: self.heartbeat_timeout,
+                heartbeat_interval: self.heartbeat_interval,
             }
         }
     }
