@@ -1,4 +1,3 @@
-use std::io::ErrorKind;
 use std::net::{SocketAddr, ToSocketAddrs};
 
 use crate::errors::{Error, Result};
@@ -20,7 +19,13 @@ pub(crate) fn resolve_socket_addr(addr: impl ToSocketAddrs) -> Result<SocketAddr
     }
 
     Err(Error::from(std::io::Error::new(
-        ErrorKind::InvalidInput,
+        std::io::ErrorKind::InvalidInput,
         "cant's resolve provided socket address",
     )))
+}
+
+pub(crate) fn pick_unused_port() -> Result<portpicker::Port> {
+    portpicker::pick_unused_port().ok_or(
+        std::io::Error::new(std::io::ErrorKind::NotFound, "can't find an unused port").into(),
+    )
 }

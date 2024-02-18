@@ -51,7 +51,7 @@ fn make_server_node(port: portpicker::Port) -> Node<Identified, HasDialect<minim
             .component_id(1)
             .dialect(minimal::dialect())
             .version(V2)
-            .conn_conf(TcpServerConf::new(make_addr(port)).unwrap())
+            .connection(TcpServerConf::new(make_addr(port)).unwrap())
             .build(),
     )
     .unwrap()
@@ -67,7 +67,7 @@ fn make_client_node(
             .component_id(component_id)
             .dialect(minimal::dialect())
             .version(V2)
-            .conn_conf(TcpClientConf::new(make_addr(port)).unwrap())
+            .connection(TcpClientConf::new(make_addr(port)).unwrap())
             .build(),
     )
     .unwrap()
@@ -166,7 +166,7 @@ fn events_are_received() {
             .component_id(1)
             .dialect(minimal::dialect())
             .version(V2)
-            .conn_conf(TcpServerConf::new(make_addr(port)).unwrap())
+            .connection(TcpServerConf::new(make_addr(port)).unwrap())
             .heartbeat_timeout(WAIT_DURATION)
             .build(),
     )
@@ -205,7 +205,7 @@ fn heartbeats_are_sent() {
             .component_id(1)
             .dialect(minimal::dialect())
             .version(V2)
-            .conn_conf(TcpServerConf::new(make_addr(port)).unwrap())
+            .connection(TcpServerConf::new(make_addr(port)).unwrap())
             .heartbeat_timeout(WAIT_DURATION.mul_f32(2.0))
             .heartbeat_interval(WAIT_DURATION)
             .build(),
@@ -229,7 +229,7 @@ fn node_no_id_no_dialect_no_version() {
     let server_node = make_server_node(port);
     let client_node = Node::try_from(
         NodeConf::builder()
-            .conn_conf(TcpClientConf::new(make_addr(port)).unwrap())
+            .connection(TcpClientConf::new(make_addr(port)).unwrap())
             .build(),
     )
     .unwrap();
@@ -275,7 +275,7 @@ fn node_no_id_no_version() {
     let client_node = Node::try_from(
         NodeConf::builder()
             .dialect(minimal::dialect())
-            .conn_conf(TcpClientConf::new(make_addr(port)).unwrap())
+            .connection(TcpClientConf::new(make_addr(port)).unwrap())
             .build(),
     )
     .unwrap();
@@ -299,7 +299,7 @@ fn node_no_id() {
         NodeConf::builder()
             .dialect(minimal::dialect())
             .version(V2)
-            .conn_conf(TcpClientConf::new(make_addr(port)).unwrap())
+            .connection(TcpClientConf::new(make_addr(port)).unwrap())
             .build(),
     )
     .unwrap();
@@ -325,7 +325,7 @@ fn node_no_version() {
             .system_id(42)
             .component_id(142)
             .dialect(minimal::dialect())
-            .conn_conf(TcpClientConf::new(make_addr(port)).unwrap())
+            .connection(TcpClientConf::new(make_addr(port)).unwrap())
             .build(),
     )
     .unwrap();

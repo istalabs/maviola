@@ -1,3 +1,4 @@
+#[cfg(feature = "mpmc")]
 pub mod mpmc;
 
 #[doc(hidden)]

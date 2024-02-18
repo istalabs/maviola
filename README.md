@@ -24,6 +24,25 @@ looking for a solution for embedded devices, then Mavio would be a better option
 > 
 > We intentionally do not publish early versions of API to avoid confusion and massive breaking changes.
 
+Examples
+--------
+
+### TCP Ping-Pong
+
+An example of TCP server and clients sending heartbeats to each other.
+
+```shell
+cargo run --package maviola --example tcp_ping_pong
+```
+
+### UDP Ping-Pong
+
+An example of UDP server and clients sending heartbeats to each other.
+
+```shell
+cargo run --package maviola --example udp_ping_pong
+```
+
 License
 -------
 

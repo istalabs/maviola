@@ -8,21 +8,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Identifier which is guaranteed to be unique during the program run. It is intentionally kept
 /// opaque. This identifier can't be serialized or deserialized and dedicated for comparison of
 /// runtime entities like nodes or connections.
-///
-/// # Usage
-///
-/// Identifiers can be constructed, ordered, and tested for equality.
-///
-/// ```rust
-/// use maviola::utils::UniqueId;
-///
-/// let id_1 = UniqueId::new();
-/// let id_2 = UniqueId::new();
-///
-/// assert_eq!(id_1, id_1);
-/// assert!(id_1 < id_2);
-/// assert_ne!(id_1, id_2);
-/// ```
 #[derive(Copy, Clone, Eq, Ord, Hash)]
 pub struct UniqueId {
     timestamp: u64,

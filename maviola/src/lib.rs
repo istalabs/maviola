@@ -32,7 +32,7 @@ pub mod io;
 pub mod marker;
 pub mod prelude;
 pub mod protocol;
-pub mod utils;
+pub(crate) mod utils;
 
 #[doc(inline = true)]
 pub extern crate mavio;

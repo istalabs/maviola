@@ -6,7 +6,7 @@ use mavio::protocol::{ComponentId, MaybeVersioned, V2};
 use portpicker::{pick_unused_port, Port};
 
 use maviola::dialects::minimal as dialect;
-use maviola::io::sync::{TcpClientConf, TcpServerConf};
+use maviola::io::sync::{UdpClientConf, UdpServerConf};
 use maviola::io::{Event, Node, NodeConf};
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(50);
@@ -45,7 +45,7 @@ fn spawn_client(addr: &str, component_id: ComponentId) {
                 .dialect(dialect::dialect())
                 .heartbeat_interval(HEARTBEAT_INTERVAL)
                 .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-                .connection(TcpClientConf::new(client_addr).unwrap())
+                .connection(UdpClientConf::new(client_addr).unwrap())
                 .build(),
         )
         .unwrap();
@@ -83,7 +83,7 @@ fn run(addr: &str) {
             .dialect(dialect::dialect())
             .heartbeat_interval(HEARTBEAT_INTERVAL)
             .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-            .connection(TcpServerConf::new(server_addr).unwrap())
+            .connection(UdpServerConf::new(server_addr).unwrap())
             .build(),
     )
     .unwrap();
@@ -121,7 +121,7 @@ fn main() {
 
 #[cfg(test)]
 #[test]
-fn tcp_ping_pong() {
+fn udp_ping_pong() {
     let addr = addr(port());
     let handler = thread::spawn(move || {
         run(addr.as_str());
@@ -129,6 +129,6 @@ fn tcp_ping_pong() {
 
     thread::sleep(Duration::from_secs(5));
     if !handler.is_finished() {
-        panic!("[tcp_ping_pong] test took too long")
+        panic!("[udp_ping_pong] test took too long")
     }
 }

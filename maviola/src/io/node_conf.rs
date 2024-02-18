@@ -7,37 +7,29 @@ use mavio::protocol::{
     Versionless,
 };
 
+#[cfg(feature = "sync")]
 use crate::io::sync::connection::ConnectionConf;
+#[cfg(feature = "sync")]
+use crate::marker::SyncConnConf;
 use crate::marker::{
-    Dialectless, HasDialect, Identified, IsIdentified, MaybeDialect, NotIdentified,
+    ConnConf, Dialectless, HasDialect, Identified, IsIdentified, MaybeConnConf, MaybeDialect,
+    NoConnConf, NotIdentified,
 };
 
 /// MAVLink node configuration.
 ///
 /// Node configuration can be instantiated only through [`NodeConfBuilder`](builder::NodeConfBuilder).
 #[derive(Debug)]
-pub struct NodeConf<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned> {
+pub struct NodeConf<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned, C: MaybeConnConf> {
     pub(crate) id: I,
     pub(crate) dialect: D,
     pub(crate) version: V,
-    conn_conf: Box<dyn ConnectionConf<V>>,
+    pub(crate) connection_conf: C,
     pub(crate) heartbeat_timeout: Duration,
     pub(crate) heartbeat_interval: Duration,
 }
 
-impl<D: MaybeDialect, V: MaybeVersioned> NodeConf<Identified, D, V> {
-    /// MAVLink system ID.
-    pub fn system_id(&self) -> SystemId {
-        self.id.system_id
-    }
-
-    /// MAVLink component ID.
-    pub fn component_id(&self) -> ComponentId {
-        self.id.component_id
-    }
-}
-
-impl NodeConf<NotIdentified, Dialectless, Versionless> {
+impl NodeConf<NotIdentified, Dialectless, Versionless, NoConnConf> {
     /// Creates an empty [`NodeBuilder`](builder::NodeConfBuilder).
     ///
     /// # Usage
@@ -52,7 +44,7 @@ impl NodeConf<NotIdentified, Dialectless, Versionless> {
     /// let node = NodeConf::builder()
     ///     .system_id(10)
     ///     .component_id(42)
-    ///     .conn_conf(TcpClientConf::new("localhost:5600").unwrap())
+    ///     .connection(TcpClientConf::new("localhost:5600").unwrap())
     ///     .dialect(minimal::dialect()).build();
     ///
     /// assert_eq!(node.system_id(), 10);
@@ -69,7 +61,7 @@ impl NodeConf<NotIdentified, Dialectless, Versionless> {
     /// let node = NodeConf::builder()
     ///     .system_id(10)
     ///     .component_id(42)
-    ///     .conn_conf(TcpClientConf::new("localhost:5600").unwrap())
+    ///     .connection(TcpClientConf::new("localhost:5600").unwrap())
     ///     .build();
     ///
     /// assert_eq!(node.system_id(), 10);
@@ -83,13 +75,13 @@ impl NodeConf<NotIdentified, Dialectless, Versionless> {
     /// use maviola::io::sync::TcpClientConf;
     ///
     /// let node = NodeConf::builder()
-    ///     .conn_conf(TcpClientConf::new("localhost:5600").unwrap())
+    ///     .connection(TcpClientConf::new("localhost:5600").unwrap())
     ///     .build();
     /// ```
     pub fn builder() -> builder::NodeConfBuilder<
         builder::NoSystemId,
         builder::NoComponentId,
-        builder::NoConnConf,
+        NoConnConf,
         Dialectless,
         Versionless,
     > {
@@ -97,28 +89,43 @@ impl NodeConf<NotIdentified, Dialectless, Versionless> {
     }
 }
 
-impl<I: IsIdentified, V: MaybeVersioned, M: DialectMessage> NodeConf<I, HasDialect<M>, V> {
+impl<D: MaybeDialect, V: MaybeVersioned, C: ConnConf> NodeConf<Identified, D, V, C> {
+    /// MAVLink system ID.
+    pub fn system_id(&self) -> SystemId {
+        self.id.system_id
+    }
+
+    /// MAVLink component ID.
+    pub fn component_id(&self) -> ComponentId {
+        self.id.component_id
+    }
+}
+
+impl<I: IsIdentified, V: MaybeVersioned, M: DialectMessage, C: ConnConf>
+    NodeConf<I, HasDialect<M>, V, C>
+{
     /// MAVLink dialect.
     pub fn dialect(&self) -> &'static dyn DialectImpl<Message = M> {
         self.dialect.0
     }
 }
 
-impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned> NodeConf<I, D, V> {
-    /// Connection configuration.
-    pub fn conn_conf(&self) -> &dyn ConnectionConf<V> {
-        self.conn_conf.as_ref()
+#[cfg(feature = "sync")]
+impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned> NodeConf<I, D, V, SyncConnConf<V>> {
+    /// Synchronous connection configuration.
+    pub fn connection(&self) -> &dyn ConnectionConf<V> {
+        self.connection_conf.0.as_ref()
     }
 }
 
-impl<I: IsIdentified, D: MaybeDialect, V: Versioned> NodeConf<I, D, V> {
+impl<I: IsIdentified, D: MaybeDialect, V: Versioned, C: ConnConf> NodeConf<I, D, V, C> {
     /// MAVLink version.
     pub fn version(&self) -> MavLinkVersion {
         V::version()
     }
 }
 
-impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned> NodeConf<I, D, V> {
+impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned, C: ConnConf> NodeConf<I, D, V, C> {
     /// Timeout for MAVLink heartbeats.
     ///
     /// If peer hasn't been sent heartbeats for as long as specified duration, it will be considered
@@ -130,7 +137,7 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned> NodeConf<I, D, V> {
     }
 }
 
-impl<V: Versioned, M: DialectMessage> NodeConf<Identified, HasDialect<M>, V> {
+impl<V: Versioned, M: DialectMessage, C: ConnConf> NodeConf<Identified, HasDialect<M>, V, C> {
     /// Interval for MAVLink heartbeats.
     ///
     /// Node will send heartbeats within this interval.
@@ -150,8 +157,11 @@ pub mod builder {
     };
 
     use crate::consts::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_TIMEOUT};
+    #[cfg(feature = "sync")]
     use crate::io::sync::connection::ConnectionConf;
-    use crate::marker::{Dialectless, HasDialect};
+    #[cfg(feature = "sync")]
+    use crate::marker::SyncConnConf;
+    use crate::marker::{ConnConf, Dialectless, HasDialect, MaybeConnConf, NoConnConf};
 
     use super::NodeConf;
     use super::{Identified, MaybeDialect, NotIdentified};
@@ -178,23 +188,12 @@ pub mod builder {
     pub struct HasComponentId(u8);
     impl IsComponentId for HasComponentId {}
 
-    /// Marker trait for [`NodeConfBuilder`] with or without [`NodeConf::conn_conf`].
-    pub trait IsConnConf {}
-
-    /// Marker for [`NodeConfBuilder`] without [`NodeConf::conn_conf`].
-    pub struct NoConnConf();
-    impl IsConnConf for NoConnConf {}
-
-    /// Marker for [`NodeConfBuilder`] with [`NodeConf::conn_conf`] set.
-    pub struct ConnConf<V: MaybeVersioned>(Box<dyn ConnectionConf<V>>);
-    impl<V: MaybeVersioned> IsConnConf for ConnConf<V> {}
-
     /// Builder for [`NodeConf`].
     #[derive(Clone, Debug, Default)]
     pub struct NodeConfBuilder<
         S: IsSystemId,
         C: IsComponentId,
-        CC: IsConnConf,
+        CC: MaybeConnConf,
         D: MaybeDialect,
         V: MaybeVersioned,
     > {
@@ -214,7 +213,7 @@ pub mod builder {
                 system_id: NoSystemId(),
                 component_id: NoComponentId(),
                 dialect: Dialectless,
-                conn_conf: NoConnConf(),
+                conn_conf: NoConnConf,
                 version: Versionless,
                 heartbeat_timeout: DEFAULT_HEARTBEAT_TIMEOUT,
                 heartbeat_interval: DEFAULT_HEARTBEAT_INTERVAL,
@@ -222,7 +221,7 @@ pub mod builder {
         }
     }
 
-    impl<C: IsComponentId, CC: IsConnConf, D: MaybeDialect, V: MaybeVersioned>
+    impl<C: IsComponentId, CC: MaybeConnConf, D: MaybeDialect, V: MaybeVersioned>
         NodeConfBuilder<NoSystemId, C, CC, D, V>
     {
         /// Set [`NodeConf::system_id`].
@@ -239,7 +238,7 @@ pub mod builder {
         }
     }
 
-    impl<S: IsSystemId, T: IsConnConf, D: MaybeDialect, V: MaybeVersioned>
+    impl<S: IsSystemId, T: MaybeConnConf, D: MaybeDialect, V: MaybeVersioned>
         NodeConfBuilder<S, NoComponentId, T, D, V>
     {
         /// Set [`NodeConf::component_id`].
@@ -259,8 +258,13 @@ pub mod builder {
         }
     }
 
-    impl<S: IsSystemId, C: IsComponentId, CC: IsConnConf, D: MaybeDialect, V: MaybeVersioned>
-        NodeConfBuilder<S, C, CC, D, V>
+    impl<
+            S: IsSystemId,
+            C: IsComponentId,
+            CC: MaybeConnConf,
+            D: MaybeDialect,
+            V: MaybeVersioned,
+        > NodeConfBuilder<S, C, CC, D, V>
     {
         /// Set [`NodeConf::heartbeat_timeout`].
         pub fn heartbeat_timeout(
@@ -279,19 +283,20 @@ pub mod builder {
         }
     }
 
+    #[cfg(feature = "sync")]
     impl<S: IsSystemId, C: IsComponentId, D: MaybeDialect, V: MaybeVersioned>
         NodeConfBuilder<S, C, NoConnConf, D, V>
     {
-        /// Set [`NodeConf::component_id`].
-        pub fn conn_conf(
+        /// Set synchronous [`NodeConf::connection`].
+        pub fn connection(
             self,
             conn_conf: impl ConnectionConf<V> + 'static,
-        ) -> NodeConfBuilder<S, C, ConnConf<V>, D, V> {
+        ) -> NodeConfBuilder<S, C, SyncConnConf<V>, D, V> {
             NodeConfBuilder {
                 system_id: self.system_id,
                 component_id: self.component_id,
                 dialect: self.dialect,
-                conn_conf: ConnConf(Box::new(conn_conf)),
+                conn_conf: SyncConnConf(Box::new(conn_conf)),
                 version: self.version,
                 heartbeat_timeout: self.heartbeat_timeout,
                 heartbeat_interval: self.heartbeat_interval,
@@ -299,7 +304,7 @@ pub mod builder {
         }
     }
 
-    impl<S: IsSystemId, C: IsComponentId, CC: IsConnConf, V: MaybeVersioned>
+    impl<S: IsSystemId, C: IsComponentId, CC: MaybeConnConf, V: MaybeVersioned>
         NodeConfBuilder<S, C, CC, Dialectless, V>
     {
         /// Set [`NodeConf::dialect`].
@@ -319,7 +324,7 @@ pub mod builder {
         }
     }
 
-    impl<S: IsSystemId, C: IsComponentId, CC: IsConnConf, D: MaybeDialect>
+    impl<S: IsSystemId, C: IsComponentId, CC: MaybeConnConf, D: MaybeDialect>
         NodeConfBuilder<S, C, CC, D, Versionless>
     {
         /// Set [`NodeConf::dialect`].
@@ -339,7 +344,7 @@ pub mod builder {
         }
     }
 
-    impl<CC: IsConnConf, V: Versioned, M: DialectMessage>
+    impl<CC: MaybeConnConf, V: Versioned, M: DialectMessage>
         NodeConfBuilder<HasSystemId, HasComponentId, CC, HasDialect<M>, V>
     {
         /// Set [`NodeConf::heartbeat_interval`].
@@ -368,16 +373,16 @@ pub mod builder {
         }
     }
 
-    impl<D: MaybeDialect, V: MaybeVersioned>
-        NodeConfBuilder<NoSystemId, NoComponentId, ConnConf<V>, D, V>
+    impl<CC: ConnConf, D: MaybeDialect, V: MaybeVersioned>
+        NodeConfBuilder<NoSystemId, NoComponentId, CC, D, V>
     {
         /// Build and instance of [`NodeConf`] without defined [`NodeConf::system_id`] and
         /// [`NodeConf::component_id`].
-        pub fn build(self) -> NodeConf<NotIdentified, D, V> {
+        pub fn build(self) -> NodeConf<NotIdentified, D, V, CC> {
             NodeConf {
                 id: NotIdentified,
                 dialect: self.dialect,
-                conn_conf: self.conn_conf.0,
+                connection_conf: self.conn_conf,
                 version: self.version,
                 heartbeat_timeout: self.heartbeat_timeout,
                 heartbeat_interval: self.heartbeat_interval,
@@ -385,19 +390,19 @@ pub mod builder {
         }
     }
 
-    impl<D: MaybeDialect, V: MaybeVersioned>
-        NodeConfBuilder<HasSystemId, HasComponentId, ConnConf<V>, D, V>
+    impl<CC: ConnConf, D: MaybeDialect, V: MaybeVersioned>
+        NodeConfBuilder<HasSystemId, HasComponentId, CC, D, V>
     {
         /// Build and instance of [`NodeConf`] with defined [`NodeConf::system_id`] and
         /// [`NodeConf::component_id`].
-        pub fn build(self) -> NodeConf<Identified, D, V> {
+        pub fn build(self) -> NodeConf<Identified, D, V, CC> {
             NodeConf {
                 id: Identified {
                     system_id: self.system_id.0,
                     component_id: self.component_id.0,
                 },
                 dialect: self.dialect,
-                conn_conf: self.conn_conf.0,
+                connection_conf: self.conn_conf,
                 version: self.version,
                 heartbeat_timeout: self.heartbeat_timeout,
                 heartbeat_interval: self.heartbeat_interval,
@@ -420,7 +425,7 @@ mod tests {
         let node = NodeConf::builder()
             .system_id(10)
             .component_id(42)
-            .conn_conf(TcpClientConf::new("localhost:5600").unwrap())
+            .connection(TcpClientConf::new("localhost:5600").unwrap())
             .build();
 
         assert_eq!(node.system_id(), 10);
@@ -430,7 +435,7 @@ mod tests {
     #[test]
     fn node_conf_no_dialect_no_id_builder_workflow() {
         NodeConf::builder()
-            .conn_conf(TcpClientConf::new("localhost:5600").unwrap())
+            .connection(TcpClientConf::new("localhost:5600").unwrap())
             .build();
     }
 
@@ -440,7 +445,7 @@ mod tests {
             .system_id(10)
             .component_id(42)
             .dialect(minimal::dialect())
-            .conn_conf(TcpClientConf::new("localhost:5600").unwrap())
+            .connection(TcpClientConf::new("localhost:5600").unwrap())
             .build();
 
         assert_eq!(node.system_id(), 10);
@@ -454,7 +459,7 @@ mod tests {
             .system_id(10)
             .component_id(42)
             .dialect(minimal::dialect())
-            .conn_conf(TcpClientConf::new("localhost:5600").unwrap())
+            .connection(TcpClientConf::new("localhost:5600").unwrap())
             .build();
 
         let message = minimal::messages::Heartbeat::default();

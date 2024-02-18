@@ -3,12 +3,12 @@ use std::sync::Arc;
 use mavio::protocol::MaybeVersioned;
 use mavio::Frame;
 
-use crate::io::sync::connection::PeerConnectionInfo;
+use crate::io::PeerConnectionInfo;
 use crate::utils::UniqueId;
 
 use crate::prelude::*;
 
-/// Response object which caller receives upon each incoming frame.
+/// Synchronous response object which caller receives upon each incoming frame.
 #[derive(Clone, Debug)]
 pub struct Response<V: MaybeVersioned> {
     pub(crate) sender_id: UniqueId,

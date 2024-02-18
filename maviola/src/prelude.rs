@@ -3,4 +3,5 @@
 pub use crate::errors::{Error, Result};
 pub use crate::errors::{NodeError, SyncError};
 
-pub(crate) use crate::utils::sync::mpmc;
+#[cfg(feature = "sync")]
+pub(crate) use crate::io::sync::mpmc;

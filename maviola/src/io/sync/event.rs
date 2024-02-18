@@ -1,11 +1,12 @@
-use crate::io::sync::Response;
-use crate::protocol::Peer;
-
-use crate::prelude::mpmc;
 use mavio::protocol::MaybeVersioned;
 use mavio::Frame;
 
-/// Events.
+use crate::io::sync::Response;
+use crate::protocol::Peer;
+
+use crate::prelude::*;
+
+/// Synchronous events.
 #[derive(Clone, Debug)]
 pub enum Event<V: MaybeVersioned> {
     /// New [`Peer`] appeared in the network.

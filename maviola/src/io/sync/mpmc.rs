@@ -259,10 +259,15 @@ mod mpmc_test {
     use super::*;
     use std::time::Duration;
 
-    const WAIT_DURATION: Duration = Duration::from_micros(500);
+    const WAIT_DURATION: Duration = Duration::from_micros(100);
+    const WAIT_LONG_DURATION: Duration = Duration::from_micros(1000);
 
     fn wait() {
         thread::sleep(WAIT_DURATION)
+    }
+
+    fn wait_long() {
+        thread::sleep(WAIT_LONG_DURATION)
     }
 
     #[test]
@@ -300,7 +305,7 @@ mod mpmc_test {
         let rx_2 = rx_1.clone();
         drop(rx_1);
         drop(rx_2);
-        wait();
+        wait_long();
 
         assert!(tx.send(1).is_err());
     }

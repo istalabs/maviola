@@ -7,7 +7,7 @@ use std::sync::{atomic, Arc, RwLock};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
-use crate::io::event::EventsIterator;
+use crate::io::sync::event::EventsIterator;
 use crate::io::Event;
 use mavio::protocol::{
     ComponentId, DialectImpl, DialectMessage, Frame, MavLinkVersion, MaybeVersioned, SystemId,
@@ -15,13 +15,14 @@ use mavio::protocol::{
 };
 
 use crate::io::node_conf::NodeConf;
-use crate::io::sync::{Connection, ConnectionInfo, Response};
-use crate::marker::{HasDialect, Identified, IsIdentified, MaybeDialect};
+use crate::io::sync::{Connection, Response};
+use crate::io::ConnectionInfo;
+use crate::marker::{HasDialect, Identified, IsIdentified, MaybeDialect, SyncConnConf};
 
 use crate::prelude::*;
 use crate::protocol::{Peer, PeerId};
 
-/// MAVLink node.
+/// Synchronous MAVLink node.
 pub struct Node<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> {
     id: I,
     dialect: D,
@@ -37,14 +38,14 @@ pub struct Node<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> {
     events_rx: mpmc::Receiver<Event<V>>,
 }
 
-impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> TryFrom<NodeConf<I, D, V>>
-    for Node<I, D, V>
+impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static>
+    TryFrom<NodeConf<I, D, V, SyncConnConf<V>>> for Node<I, D, V>
 {
     type Error = Error;
 
     /// Instantiates [`Node`] from node configuration.
-    fn try_from(value: NodeConf<I, D, V>) -> Result<Self> {
-        let connection = value.conn_conf().build()?;
+    fn try_from(value: NodeConf<I, D, V, SyncConnConf<V>>) -> Result<Self> {
+        let connection = value.connection().build()?;
         let (events_tx, events_rx) = mpmc::channel();
 
         let node = Self {

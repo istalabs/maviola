@@ -26,13 +26,13 @@ path = "src/lib.rs"
 [dependencies]
 log = "0.4.20"
 mavio = { version = "0.2.0-rc2", path = "../../mavio/mavio" }
+portpicker = "0.1.1"
 serde = { version = "1.0.193", default-features = false, features = ["derive"], optional = true }
 serde_arrays = { version = "0.1.0", default-features = false, optional = true }
 thiserror = "1.0.56"
 
 [dev-dependencies]
 env_logger = "0.11.1"
-portpicker = "0.1.1"
 
 ###########################################################
 # Features
@@ -40,14 +40,16 @@ portpicker = "0.1.1"
 [features]
 ## Default features.
 default = ["minimal"]
-## Enables unstable API features.
-unstable = []
+## Enables synchromous API.
+sync = []
 ## Enables serde support.
 serde = [
     "dep:serde",
     "mavio/serde",
     "dep:serde_arrays",
 ]
+## Enables unstable API features.
+unstable = []
 
 ###########################################################
 # Dialects
@@ -105,10 +107,16 @@ all = [
 [[example]]
 name = "tcp_ping_pong"
 test = true
+required-features = ["sync"]
+
+[[example]]
+name = "udp_ping_pong"
+test = true
+required-features = ["sync"]
 
 ###########################################################
 # Metadata
 ###########################################################
 [package.metadata.docs.rs]
 # Features to include into `docs.rs` documentation
-features = ["serde", "all", "unstable"]
+features = ["serde", "all", "unstable", "sync"]

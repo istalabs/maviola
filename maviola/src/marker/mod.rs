@@ -6,4 +6,6 @@ mod dialect;
 mod node;
 
 pub use dialect::{Dialectless, HasDialect, MaybeDialect};
-pub use node::{Identified, IsIdentified, NotIdentified};
+#[cfg(feature = "sync")]
+pub use node::SyncConnConf;
+pub use node::{ConnConf, Identified, IsIdentified, MaybeConnConf, NoConnConf, NotIdentified};

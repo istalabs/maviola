@@ -3,15 +3,13 @@ use std::thread;
 
 use mavio::protocol::MaybeVersioned;
 
-use crate::io::sync::connection::{
-    Connection, ConnectionBuilder, ConnectionConf, ConnectionInfo, PeerConnection,
-    PeerConnectionInfo,
-};
+use crate::io::sync::connection::{Connection, ConnectionBuilder, ConnectionConf, PeerConnection};
 use crate::io::utils::resolve_socket_addr;
+use crate::io::{ConnectionInfo, PeerConnectionInfo};
 
 use crate::prelude::*;
 
-/// TCP server configuration.
+/// Synchronous TCP server configuration.
 #[derive(Clone, Debug)]
 pub struct TcpServerConf {
     addr: SocketAddr,
