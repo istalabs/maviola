@@ -14,7 +14,7 @@ use maviola::marker::{HasDialect, Identified};
 static INIT: Once = Once::new();
 const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Debug;
 const WAIT_DURATION: Duration = Duration::from_millis(50);
-const WAIT_LONG_DURATION: Duration = Duration::from_millis(500);
+const WAIT_LONG_DURATION: Duration = Duration::from_millis(200);
 const HOST: &str = "127.0.0.1";
 
 fn unused_port() -> portpicker::Port {
@@ -206,7 +206,8 @@ fn heartbeats_are_sent() {
             .dialect(minimal::dialect())
             .version(V2)
             .conn_conf(TcpServerConf::new(make_addr(port)).unwrap())
-            .heartbeat_timeout(WAIT_DURATION)
+            .heartbeat_timeout(WAIT_DURATION.mul_f32(2.0))
+            .heartbeat_interval(WAIT_DURATION)
             .build(),
     )
     .unwrap();

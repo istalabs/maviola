@@ -28,7 +28,6 @@ log = "0.4.20"
 mavio = { version = "0.2.0-rc2", path = "../../mavio/mavio" }
 serde = { version = "1.0.193", default-features = false, features = ["derive"], optional = true }
 serde_arrays = { version = "0.1.0", default-features = false, optional = true }
-tokio = { version = "1.35.1", features = ["io-util"], optional = true }
 thiserror = "1.0.56"
 
 [dev-dependencies]
@@ -49,8 +48,6 @@ serde = [
     "mavio/serde",
     "dep:serde_arrays",
 ]
-## Enables tokio (async) support
-tokio = ["dep:tokio"]
 
 ###########################################################
 # Dialects
