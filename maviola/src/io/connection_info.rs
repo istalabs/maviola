@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::path::PathBuf;
 
 /// Information about a connection.
 #[derive(Clone, Debug)]
@@ -22,6 +23,20 @@ pub enum ConnectionInfo {
     UdpClient {
         /// Server address.
         remote_addr: SocketAddr,
+    },
+    /// <sup>`unix`</sup>
+    /// Unix socket server.
+    #[cfg(unix)]
+    SockServer {
+        /// Socket path.
+        path: PathBuf,
+    },
+    /// <sup>`unix`</sup>
+    /// Unix socket client.
+    #[cfg(unix)]
+    SockClient {
+        /// Server address.
+        path: PathBuf,
     },
 }
 
@@ -56,5 +71,19 @@ pub enum PeerConnectionInfo {
         server_addr: SocketAddr,
         /// Bind address.
         bind_addr: SocketAddr,
+    },
+    /// <sup>`unix`</sup>
+    /// Unix socket server.
+    #[cfg(unix)]
+    SockServer {
+        /// Socket path.
+        path: PathBuf,
+    },
+    /// <sup>`unix`</sup>
+    /// Unix socket client.
+    #[cfg(unix)]
+    SockClient {
+        /// Server address.
+        path: PathBuf,
     },
 }

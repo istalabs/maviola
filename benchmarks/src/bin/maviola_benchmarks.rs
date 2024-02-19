@@ -4,6 +4,8 @@ use std::time::Duration;
 
 #[cfg(feature = "mpmc")]
 use maviola_benchmarks::mpmc::{benchmark_mpmc_broadcast, benchmark_mpmc_collect};
+#[cfg(feature = "sync")]
+use maviola_benchmarks::sync::benchmark_unix_sockets;
 
 #[global_allocator]
 static GLOBAL: maviola_benchmarks::trallocator::Trallocator<System> =
@@ -13,10 +15,10 @@ static GLOBAL: maviola_benchmarks::trallocator::Trallocator<System> =
 fn debug_memory(name: &str, before: u64) {
     let immediate = GLOBAL.get() - before;
 
-    thread::sleep(Duration::from_millis(1));
+    thread::sleep(Duration::from_millis(10));
     let soon = GLOBAL.get() - before;
 
-    log::info!("[{name}] memory used: {immediate} bytes, after 1ms: {soon} bytes",);
+    log::info!("[{name}] memory used: {immediate} bytes, after 10ms: {soon} bytes",);
 }
 
 fn main() {
@@ -42,6 +44,13 @@ fn main() {
             debug_memory("benchmark_mpmc_collect", base_mem);
         }
     }
+
+    #[cfg(feature = "sync")]
+    {
+        let base_mem = GLOBAL.get();
+        benchmark_unix_sockets(100, 10_000);
+        debug_memory("benchmark_unix_sockets", base_mem);
+    }
 }
 
 #[cfg(test)]
@@ -56,5 +65,11 @@ mod benchmark_tests {
     #[cfg(feature = "mpmc")]
     fn run_benchmark_mpmc_broadcast() {
         super::benchmark_mpmc_broadcast(100, 100);
+    }
+
+    #[test]
+    #[cfg(feature = "sync")]
+    fn run_benchmark_unix_sockets() {
+        super::benchmark_unix_sockets(10, 10);
     }
 }

@@ -10,7 +10,7 @@ use maviola::dialects::minimal;
 use maviola::io::sync::{TcpClientConf, TcpServerConf};
 use maviola::io::NodeConf;
 use maviola::io::{Event, Node};
-use maviola::marker::{HasDialect, Identified};
+use maviola::protocol::{HasDialect, Identified};
 
 static INIT: Once = Once::new();
 static INIT_LOGGER: Once = Once::new();

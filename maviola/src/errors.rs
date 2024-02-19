@@ -12,11 +12,11 @@ use std::sync::{mpsc, Arc, PoisonError};
 
 use mavio::protocol::MessageId;
 
-/// <sup>From [`mavio`](https://docs.rs/mavio/0.2.0-rc2/mavio/errors/)</sup>
+/// <sup>[`mavio`](https://docs.rs/mavio/0.2.0-rc2/mavio/errors/)</sup>
 #[doc(inline)]
 pub use mavio::errors::{FrameError, SpecError};
 
-/// <sup>From [`mavio`](https://docs.rs/mavio/latest/mavio/errors/)</sup>
+/// <sup>[`mavio`](https://docs.rs/mavio/latest/mavio/errors/)</sup>
 /// Re-exported from [`mavio::errors::Error`](https://docs.rs/mavio/0.2.0-rc2/mavio/errors/enum.Error.html).
 /// Maviola wraps all variants of [`CoreError`] with its own [`Error`] and provides a proper
 /// conversion.

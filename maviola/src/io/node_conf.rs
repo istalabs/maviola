@@ -10,8 +10,8 @@ use mavio::protocol::{
 #[cfg(feature = "sync")]
 use crate::io::sync::connection::ConnectionConf;
 #[cfg(feature = "sync")]
-use crate::marker::SyncConnConf;
-use crate::marker::{
+use crate::protocol::SyncConnConf;
+use crate::protocol::{
     ConnConf, Dialectless, HasDialect, Identified, IsIdentified, MaybeConnConf, MaybeDialect,
     NoConnConf, NotIdentified,
 };
@@ -160,8 +160,8 @@ pub mod builder {
     #[cfg(feature = "sync")]
     use crate::io::sync::connection::ConnectionConf;
     #[cfg(feature = "sync")]
-    use crate::marker::SyncConnConf;
-    use crate::marker::{ConnConf, Dialectless, HasDialect, MaybeConnConf, NoConnConf};
+    use crate::protocol::SyncConnConf;
+    use crate::protocol::{ConnConf, Dialectless, HasDialect, MaybeConnConf, NoConnConf};
 
     use super::NodeConf;
     use super::{Identified, MaybeDialect, NotIdentified};

@@ -114,6 +114,11 @@ name = "udp_ping_pong"
 test = true
 required-features = ["sync"]
 
+[[example]]
+name = "sock_ping_pong"
+test = true
+required-features = ["sync"]
+
 ###########################################################
 # Metadata
 ###########################################################

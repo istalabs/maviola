@@ -72,8 +72,8 @@ pub fn benchmark_mpmc_broadcast(n_receivers: usize, n_iter: usize) {
     }
 
     let end = SystemTime::now();
-
     let duration = end.duration_since(start).unwrap();
+
     log::info!(
         "[benchmark_mpmc_broadcast] send {n_iter} of {:?} to {n_receivers} receivers: {}",
         Payload::default(),
@@ -117,8 +117,8 @@ pub fn benchmark_mpmc_collect(n_threads: usize, n_senders: usize) {
     }
 
     let end = SystemTime::now();
-
     let duration = end.duration_since(start).unwrap();
+
     log::info!(
         "[benchmark_mpmc_collect] {n_senders} per {n_threads} sending {:?} to a single MPMC receiver: {}s",
         Payload::default(),

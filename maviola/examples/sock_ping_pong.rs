@@ -1,25 +1,20 @@
+use std::fs::remove_file;
+use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 
-use portpicker::{pick_unused_port, Port};
-
 use maviola::dialects::minimal as dialect;
-use maviola::io::sync::{TcpClientConf, TcpServerConf};
 use maviola::io::{Event, Node, NodeConf};
 use maviola::protocol::{ComponentId, Frame, MaybeVersioned, V2};
+use maviola::{SockClientConf, SockServerConf};
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(50);
 const HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(75);
-const HOST: &str = "127.0.0.1";
 const N_ITER: usize = 10;
 const N_CLIENTS: ComponentId = 5;
 
-fn port() -> Port {
-    pick_unused_port().unwrap()
-}
-
-fn addr(port: Port) -> String {
-    format!("{HOST}:{}", port)
+fn wait() {
+    thread::sleep(Duration::from_millis(100));
 }
 
 fn report_frame<V: MaybeVersioned>(whoami: &str, frame: &Frame<V>) {
@@ -31,8 +26,7 @@ fn report_frame<V: MaybeVersioned>(whoami: &str, frame: &Frame<V>) {
     )
 }
 
-fn spawn_client(addr: &str, component_id: ComponentId) {
-    let client_addr = addr.to_string();
+fn spawn_client(path: PathBuf, component_id: ComponentId) {
     let whoami = format!("client #{component_id}");
 
     thread::spawn(move || {
@@ -44,7 +38,7 @@ fn spawn_client(addr: &str, component_id: ComponentId) {
                 .dialect(dialect::dialect())
                 .heartbeat_interval(HEARTBEAT_INTERVAL)
                 .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-                .connection(TcpClientConf::new(client_addr).unwrap())
+                .connection(SockClientConf::new(path).unwrap())
                 .build(),
         )
         .unwrap();
@@ -72,8 +66,7 @@ fn spawn_client(addr: &str, component_id: ComponentId) {
     });
 }
 
-fn run(addr: &str) {
-    let server_addr = addr.to_string();
+fn run(path: PathBuf) {
     let server = Node::try_from(
         NodeConf::builder()
             .system_id(17)
@@ -82,14 +75,16 @@ fn run(addr: &str) {
             .dialect(dialect::dialect())
             .heartbeat_interval(HEARTBEAT_INTERVAL)
             .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-            .connection(TcpServerConf::new(server_addr).unwrap())
+            .connection(SockServerConf::new(path.as_path()).unwrap())
             .build(),
     )
     .unwrap();
     server.activate().unwrap();
+    wait();
 
     for i in 0..N_CLIENTS {
-        spawn_client(addr, i);
+        let path = path.clone();
+        spawn_client(path, i);
     }
 
     for event in server.events() {
@@ -114,20 +109,26 @@ fn main() {
         .filter_module(env!("CARGO_PKG_NAME"), log::LevelFilter::Info) // Allow everything from current package
         .init();
 
-    let addr = addr(port());
-    run(addr.as_str());
+    let path = PathBuf::from("/tmp/maviola.sock");
+    if path.exists() {
+        remove_file(path.as_path()).unwrap();
+    }
+    run(path);
 }
 
 #[cfg(test)]
 #[test]
 fn tcp_ping_pong() {
-    let addr = addr(port());
+    let path = PathBuf::from("/tmp/maviola_sock_ping_pong.sock");
+    if path.exists() {
+        remove_file(path.as_path()).unwrap();
+    }
     let handler = thread::spawn(move || {
-        run(addr.as_str());
+        run(path);
     });
 
     thread::sleep(Duration::from_secs(5));
     if !handler.is_finished() {
-        panic!("[tcp_ping_pong] test took too long")
+        panic!("[sock_ping_pong] test took too long")
     }
 }

@@ -34,10 +34,12 @@ portpicker = "0.1.1"
 default = []
 
 ## All benchmarks.
-all = ["mpmc"]
+all = ["mpmc", "sync"]
 
 ## MPMC benchmarks.
 mpmc = []
+## Benchmarks for synchronous API
+sync = []
 
 ###########################################################
 # Metadata

@@ -14,7 +14,7 @@ use crate::io::{Connection, ConnectionInfo, PeerConnectionInfo, Response};
 
 use crate::prelude::*;
 
-/// Synchronous TCP server configuration.
+/// TCP server configuration.
 ///
 /// Provides connection configuration for a node that binds to a UDP port and communicates with
 /// remote UDP connections.
@@ -94,10 +94,8 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServerConf {
                     let (bytes_read, peer_addr) = match received {
                         Ok((bytes_read, peer_addr)) => (bytes_read, peer_addr),
                         Err(err) => {
-                            log::error!(
-                                "[{conn_info:?}] unable to receive from UDP socket: {err:?}"
-                            );
-                            break;
+                            log::error!("[{conn_info:?}] unable to receive from socket: {err:?}");
+                            return;
                         }
                     };
 
@@ -105,8 +103,8 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServerConf {
                         let udp_socket = match udp_socket.try_clone() {
                             Ok(udp_socket) => udp_socket,
                             Err(err) => {
-                                log::error!("[{conn_info:?}] unable to clone UDP socket: {err:?}");
-                                break;
+                                log::error!("[{conn_info:?}] unable to clone socket: {err:?}");
+                                return;
                             }
                         };
 
@@ -128,7 +126,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServerConf {
                         log::error!(
                             "[{conn_info:?}] unable to pass incoming UDP datagram: {err:?}"
                         );
-                        break;
+                        return;
                     }
                 }
             }

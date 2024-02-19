@@ -6,7 +6,7 @@ use crate::protocol::Peer;
 
 use crate::prelude::*;
 
-/// Synchronous events.
+/// Events.
 #[derive(Clone, Debug)]
 pub enum Event<V: MaybeVersioned> {
     /// New [`Peer`] appeared in the network.

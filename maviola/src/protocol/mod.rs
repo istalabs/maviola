@@ -5,13 +5,22 @@
 //! MAVLink abstractions.
 
 pub mod consts;
+mod marker;
 mod peer;
 mod signature;
 
 pub use peer::Peer;
 pub use signature::{SignConf, SignConfBuilder, SignStrategy};
 
-/// <sup>From [`mavio`](https://docs.rs/mavio/0.2.0-rc2/mavio/protocol/)</sup>
+#[cfg(feature = "sync")]
+/// <sup>[`sync`](crate::io::sync)</sup>
+pub use marker::SyncConnConf;
+pub use marker::{
+    ConnConf, Dialectless, HasDialect, Identified, IsIdentified, MaybeConnConf, MaybeDialect,
+    NoConnConf, NotIdentified,
+};
+
+/// <sup>[`mavio`](https://docs.rs/mavio/0.2.0-rc2/mavio/protocol/)</sup>
 #[doc(inline)]
 pub use mavio::protocol::*;
 

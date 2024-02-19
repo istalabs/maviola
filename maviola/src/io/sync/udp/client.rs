@@ -11,7 +11,7 @@ use crate::io::{Connection, ConnectionInfo, PeerConnectionInfo};
 
 use crate::prelude::*;
 
-/// Synchronous UDP client configuration.
+/// UDP client configuration.
 ///
 /// Provides connection configuration for a node that communicates with a specified UDP port.
 ///

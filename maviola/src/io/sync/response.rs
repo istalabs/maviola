@@ -8,12 +8,12 @@ use crate::utils::UniqueId;
 
 use crate::prelude::*;
 
-/// Synchronous response object which caller receives upon each incoming frame.
+/// Response object which caller receives upon each incoming frame.
 #[derive(Clone, Debug)]
 pub struct Response<V: MaybeVersioned> {
-    pub(crate) sender_id: UniqueId,
-    pub(crate) sender_info: Arc<PeerConnectionInfo>,
-    pub(crate) broadcast_tx: mpmc::Sender<ResponseFrame<V>>,
+    pub(super) sender_id: UniqueId,
+    pub(super) sender_info: Arc<PeerConnectionInfo>,
+    pub(super) broadcast_tx: mpmc::Sender<ResponseFrame<V>>,
 }
 
 impl<V: MaybeVersioned> Response<V> {

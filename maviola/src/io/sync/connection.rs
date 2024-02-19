@@ -24,7 +24,7 @@ pub trait ConnectionBuilder<V: MaybeVersioned>: Debug + Send {
     fn build(&self) -> Result<Connection<V>>;
 }
 
-/// Synchronous MAVLink connection.
+/// MAVLink connection.
 #[derive(Clone, Debug)]
 pub struct Connection<V: MaybeVersioned + 'static> {
     info: ConnectionInfo,
@@ -92,60 +92,80 @@ impl<V: MaybeVersioned> Connection<V> {
     }
 }
 
+impl<V: MaybeVersioned> Drop for Connection<V> {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 //                                 PRIVATE                                   //
 ///////////////////////////////////////////////////////////////////////////////
 
-pub(crate) type FrameSender<V> = mpmc::Sender<ResponseFrame<V>>;
-pub(crate) type FrameReceiver<V> = mpmc::Receiver<(Frame<V>, Response<V>)>;
+pub(super) type FrameSender<V> = mpmc::Sender<ResponseFrame<V>>;
+pub(super) type FrameSendHandler<V> = mpmc::Receiver<ResponseFrame<V>>;
+pub(super) type FrameRecvDispatcher<V> = mpmc::Sender<(Frame<V>, Response<V>)>;
+pub(super) type FrameReceiver<V> = mpmc::Receiver<(Frame<V>, Response<V>)>;
 
-pub(crate) struct PeerConnection<V: MaybeVersioned + 'static, R: Read, W: Write> {
-    pub(crate) info: PeerConnectionInfo,
-    pub(crate) reader: R,
-    pub(crate) writer: W,
-    pub(crate) send_tx: mpmc::Sender<ResponseFrame<V>>,
-    pub(crate) send_rx: mpmc::Receiver<ResponseFrame<V>>,
-    pub(crate) recv_tx: mpmc::Sender<(Frame<V>, Response<V>)>,
+pub(super) struct PeerConnection<V: MaybeVersioned + 'static, R: Read, W: Write> {
+    pub(super) info: PeerConnectionInfo,
+    pub(super) reader: R,
+    pub(super) writer: W,
+    pub(super) send_tx: FrameSender<V>,
+    pub(super) send_rx: FrameSendHandler<V>,
+    pub(super) recv_tx: FrameRecvDispatcher<V>,
 }
 
 impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 'static>
     PeerConnection<V, R, W>
 {
-    pub(crate) fn start(self) {
+    pub(super) fn start(self) {
         let id = UniqueId::new();
         let info = Arc::new(self.info);
+        let is_active = Arc::new(AtomicBool::new(true));
 
         {
+            let is_active = is_active.clone();
             let info = info.clone();
             let send_rx = self.send_rx;
             let sender = Sender::new(self.writer);
 
             thread::spawn(move || {
-                Self::send_handler(id, info, send_rx, sender);
+                Self::send_handler(is_active, id, info, send_rx, sender);
             });
         }
 
         {
+            let is_active = is_active.clone();
             let info = info.clone();
             let send_tx = self.send_tx;
             let recv_tx = self.recv_tx;
             let receiver = Receiver::new(self.reader);
 
-            thread::spawn(move || Self::recv_handler(id, info, send_tx, recv_tx, receiver));
+            thread::spawn(move || {
+                Self::recv_handler(is_active, id, info, send_tx, recv_tx, receiver)
+            });
         }
     }
 
     fn send_handler(
+        is_active: Arc<AtomicBool>,
         id: UniqueId,
         info: Arc<PeerConnectionInfo>,
-        send_rx: mpmc::Receiver<ResponseFrame<V>>,
+        send_rx: FrameSendHandler<V>,
         mut sender: Sender<W, V>,
     ) {
         loop {
+            if !is_active.load(atomic::Ordering::Relaxed) {
+                log::trace!("[{info:?}] connection is inactive, stopping send handlers");
+                return;
+            }
+
             let resp_frame = match send_rx.recv() {
                 Ok(frame) => frame,
                 Err(err) => {
-                    log::error!("[{info:?}] can't receive outgoing frame: {err:?}");
+                    log::trace!("[{info:?}] can't receive outgoing frame: {err:?}");
+                    is_active.store(false, atomic::Ordering::Relaxed);
                     return;
                 }
             };
@@ -169,7 +189,8 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
 
                 let err = Error::from(err);
                 if let Error::Io(err) = err {
-                    log::error!("[{info:?}] I/O error sending frame: {err:?}");
+                    log::trace!("[{info:?}] I/O error sending frame: {err:?}");
+                    is_active.store(false, atomic::Ordering::Relaxed);
                     return;
                 }
             }
@@ -177,15 +198,18 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
     }
 
     fn recv_handler(
+        is_active: Arc<AtomicBool>,
         id: UniqueId,
         info: Arc<PeerConnectionInfo>,
-        send_tx: mpmc::Sender<ResponseFrame<V>>,
-        recv_tx: mpmc::Sender<(Frame<V>, Response<V>)>,
+        send_tx: FrameSender<V>,
+        recv_tx: FrameRecvDispatcher<V>,
         mut receiver: Receiver<R, V>,
     ) {
         loop {
-            let info = info.clone();
-            let send_tx = send_tx.clone();
+            if !is_active.load(atomic::Ordering::Relaxed) {
+                log::trace!("[{info:?}] connection is inactive, stopping send handlers");
+                return;
+            }
 
             let frame = match receiver.recv() {
                 Ok(frame) => frame,
@@ -195,11 +219,15 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
                     let err = Error::from(err);
                     if let Error::Io(err) = err {
                         log::trace!("[{info:?}] I/O error receiving frame: {err:?}");
+                        is_active.store(false, atomic::Ordering::Relaxed);
                         return;
                     }
                     continue;
                 }
             };
+
+            let info = info.clone();
+            let send_tx = send_tx.clone();
 
             let response = Response {
                 sender_id: id,
@@ -209,6 +237,7 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
 
             if let Err(err) = recv_tx.send((frame, response)) {
                 log::trace!("[{info:?}] can't pass incoming frame: {err:?}");
+                is_active.store(false, atomic::Ordering::Relaxed);
                 return;
             }
         }

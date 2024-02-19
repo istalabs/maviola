@@ -9,7 +9,7 @@ use crate::io::{ConnectionInfo, PeerConnectionInfo};
 
 use crate::prelude::*;
 
-/// Synchronous TCP client configuration.
+/// TCP client configuration.
 ///
 /// Provides connection configuration for a node that connects to a TCP port as a client.
 ///

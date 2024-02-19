@@ -27,21 +27,20 @@ looking for a solution for embedded devices, then Mavio would be a better option
 Examples
 --------
 
-### TCP Ping-Pong
+Basic examples of client-server communication for different transports:
 
-An example of TCP server and clients sending heartbeats to each other.
-
-```shell
-cargo run --package maviola --example tcp_ping_pong
-```
-
-### UDP Ping-Pong
-
-An example of UDP server and clients sending heartbeats to each other.
-
-```shell
-cargo run --package maviola --example udp_ping_pong
-```
+* TCP
+  ```shell
+  cargo run --package maviola --example tcp_ping_pong
+  ```
+* UDP
+  ```shell
+  cargo run --package maviola --example udp_ping_pong
+  ```
+* Unix sockets
+  ```shell
+  cargo run --package maviola --example sock_ping_pong
+  ```
 
 License
 -------

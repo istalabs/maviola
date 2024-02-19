@@ -15,12 +15,12 @@ use crate::io::sync::event::EventsIterator;
 use crate::io::sync::{Connection, Response};
 use crate::io::ConnectionInfo;
 use crate::io::Event;
-use crate::marker::{HasDialect, Identified, IsIdentified, MaybeDialect, SyncConnConf};
+use crate::protocol::{HasDialect, Identified, IsIdentified, MaybeDialect, SyncConnConf};
 use crate::protocol::{Peer, PeerId};
 
 use crate::prelude::*;
 
-/// Synchronous MAVLink node.
+/// MAVLink node.
 ///
 /// # Examples
 ///
@@ -273,7 +273,7 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
 
             if let Ok(crate::dialects::Minimal::Heartbeat(_)) = frame.decode() {
                 let peer = Peer::new(frame.system_id(), frame.component_id());
-                log::trace!("[{info:?}] received heartbeat from {peer:?}");
+                log::debug!("[{info:?}] received heartbeat from {peer:?}");
 
                 match peers.write() {
                     Ok(mut peers) => {
@@ -282,20 +282,20 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
 
                         if !has_peer {
                             if let Err(err) = events_tx.send(Event::NewPeer(peer)) {
-                                log::error!("[{info:?}] failed to report new peer event: {err}");
+                                log::trace!("[{info:?}] failed to report new peer event: {err}");
                                 return;
                             }
                         }
                     }
                     Err(err) => {
-                        log::error!("[{info:?}] received {peer:?} but node is offline: {err:?}");
+                        log::trace!("[{info:?}] received {peer:?} but node is offline: {err:?}");
                         return;
                     }
                 }
             }
 
             if let Err(err) = events_tx.send(Event::Frame(frame.clone(), response)) {
-                log::error!("[{info:?}] failed to report incoming frame event: {err}");
+                log::trace!("[{info:?}] failed to report incoming frame event: {err}");
                 return;
             }
         });
@@ -323,14 +323,16 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
                 Ok(peers) => {
                     let mut inactive_peers = HashSet::new();
                     for peer in peers.values() {
-                        if now.duration_since(peer.last_active).unwrap() > heartbeat_timeout {
-                            inactive_peers.insert(peer.id);
+                        if let Ok(since) = now.duration_since(peer.last_active) {
+                            if since > heartbeat_timeout {
+                                inactive_peers.insert(peer.id);
+                            }
                         }
                     }
                     inactive_peers
                 }
                 Err(err) => {
-                    log::error!("[{info:?}] stopping heartbeat checks: {err:?}");
+                    log::trace!("[{info:?}] stopping heartbeat checks: {err:?}");
                     return;
                 }
             };
@@ -340,14 +342,14 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
                     for id in inactive_peers {
                         if let Some(peer) = peers.remove(&id) {
                             if let Err(err) = events_tx.send(Event::PeerLost(peer)) {
-                                log::error!("[{info:?}] failed to report lost peer event: {err}");
+                                log::trace!("[{info:?}] failed to report lost peer event: {err}");
                                 return;
                             }
                         }
                     }
                 }
                 Err(err) => {
-                    log::error!("[{info:?}] stopping heartbeat checks: {err:?}");
+                    log::trace!("[{info:?}] stopping heartbeat checks: {err:?}");
                     return;
                 }
             }
@@ -549,10 +551,12 @@ impl<M: DialectMessage + 'static, V: Versioned + 'static> Node<Identified, HasDi
                 log::trace!(
                     "[{info:?}] closing heartbeat emitter since node is no longer connected"
                 );
+                is_active.store(false, atomic::Ordering::Relaxed);
                 return;
             }
             if !is_active.load(atomic::Ordering::Relaxed) {
                 log::trace!("[{info:?}] closing heartbeat emitter since node is no longer active");
+                is_active.store(false, atomic::Ordering::Relaxed);
                 return;
             }
 
@@ -568,7 +572,8 @@ impl<M: DialectMessage + 'static, V: Versioned + 'static> Node<Identified, HasDi
 
             log::trace!("[{info:?}] broadcasting heartbeat");
             if let Err(err) = connection.send(&frame) {
-                log::error!("[{info:?}] heartbeat can't be broadcast: {err:?}");
+                log::trace!("[{info:?}] heartbeat can't be broadcast: {err:?}");
+                is_active.store(false, atomic::Ordering::Relaxed);
                 return;
             }
 

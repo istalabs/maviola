@@ -9,7 +9,7 @@ use crate::io::{ConnectionInfo, PeerConnectionInfo};
 
 use crate::prelude::*;
 
-/// Synchronous TCP server configuration.
+/// TCP server configuration.
 ///
 /// Provides connection configuration for a node that binds to a TCP port as a server.
 ///
@@ -95,7 +95,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpServerConf {
                             Ok(reader) => reader,
                             Err(err) => {
                                 log::error!("[{conn_info:?}] broken incoming stream: {err:?}");
-                                break;
+                                return;
                             }
                         };
 
@@ -114,7 +114,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpServerConf {
                     }
                     Err(err) => {
                         log::error!("[{conn_info:?}] server failure: {err:?}");
-                        break;
+                        return;
                     }
                 };
             }

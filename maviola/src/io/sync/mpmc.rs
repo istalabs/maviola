@@ -50,7 +50,7 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::{mpsc, Arc, RwLock};
-use std::thread;
+use std::{mem, thread};
 
 use crate::utils::UniqueId;
 
@@ -134,9 +134,12 @@ impl<T: Clone + Sync + Send + 'static> Receiver<T> {
 
     /// Disconnect receiver from the channel.
     pub fn disconnect(&mut self) {
-        if self.bus.is_some() {
-            let bus = self.bus.clone().unwrap();
-            bus.remove(&self.id);
+        {
+            let mut bus = None;
+            mem::swap(&mut bus, &mut self.bus);
+            if let Some(bus) = bus {
+                bus.remove(&self.id);
+            }
         }
         self.bus = None;
         self.inner = None;
@@ -191,13 +194,13 @@ impl<T: Clone + Sync + Send + 'static> BroadcastBus<T> {
                 }
             };
 
-            let mut failed_recv_tx_ids = Vec::new();
-
-            {
+            let failed_recv_tx_ids = {
                 let recv_txs = recv_txs.read().unwrap();
                 if recv_txs.is_empty() {
                     return;
                 }
+
+                let mut failed_recv_tx_ids = Vec::new();
 
                 for (id, recv_tx) in recv_txs.iter() {
                     let recv_tx = recv_tx.clone();
@@ -206,7 +209,9 @@ impl<T: Clone + Sync + Send + 'static> BroadcastBus<T> {
                         failed_recv_tx_ids.push(*id);
                     }
                 }
-            }
+
+                failed_recv_tx_ids
+            };
 
             if !failed_recv_tx_ids.is_empty() {
                 let mut recv_txs = recv_txs.write().unwrap();
