@@ -1,5 +1,3 @@
-//! MAVLink node.
-
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, AtomicU8};
 use std::sync::mpsc::TryRecvError;
@@ -7,22 +5,76 @@ use std::sync::{atomic, Arc, RwLock};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
-use crate::io::sync::event::EventsIterator;
-use crate::io::Event;
 use mavio::protocol::{
     ComponentId, DialectImpl, DialectMessage, Frame, MavLinkVersion, MaybeVersioned, SystemId,
     Versioned, Versionless,
 };
 
 use crate::io::node_conf::NodeConf;
+use crate::io::sync::event::EventsIterator;
 use crate::io::sync::{Connection, Response};
 use crate::io::ConnectionInfo;
+use crate::io::Event;
 use crate::marker::{HasDialect, Identified, IsIdentified, MaybeDialect, SyncConnConf};
-
-use crate::prelude::*;
 use crate::protocol::{Peer, PeerId};
 
+use crate::prelude::*;
+
 /// Synchronous MAVLink node.
+///
+/// # Examples
+///
+/// Create a TCP server node:
+///
+/// ```rust
+/// # use maviola::protocol::Peer;
+/// # #[cfg(feature = "sync")]
+/// # {
+/// use maviola::protocol::V2;
+/// use maviola::{Event, Node, NodeConf, TcpServerConf};
+/// use maviola::dialects::minimal;
+/// # use portpicker::pick_unused_port;
+///
+/// let addr = "127.0.0.1:5600";
+/// # let addr = format!("127.0.0.1:{}", pick_unused_port().unwrap());
+///
+/// // Create a node from configuration.
+/// let node = Node::try_from(
+///     NodeConf::builder()
+///         .version(V2)                    // restrict node to MAVLink2 protocol version
+///         .system_id(1)                   // System `ID`
+///         .component_id(1)                // Component `ID`
+///         .dialect(minimal::dialect())    // Dialect is set to `minimal`
+///         .connection(
+///             TcpServerConf::new(addr)    // Configure TCP server connection
+///                 .unwrap()
+///         )
+///         .build()
+/// ).unwrap();
+///
+/// // Activate node to start sending heartbeats.
+/// node.activate().unwrap();
+/// # struct __Struct(); impl __Struct { fn events(&self) -> Vec<Event<V2>> { vec![Event::NewPeer(Peer::new(0, 0))] } }
+/// # let node = __Struct();
+///
+/// for event in node.events() {
+///     match event {
+///         Event::NewPeer(peer) => {
+///             /* handle a new peer */
+/// #           drop(peer);
+///         }
+///         Event::PeerLost(peer) => {
+///             /* handle a peer, that becomes inactive */
+/// #           drop(peer);
+///         }
+///         Event::Frame(frame, res) => {
+///             // Send back any incoming frame directly to sender.
+///             res.respond(&frame).unwrap();
+///         }
+///     }
+/// }
+/// # }
+/// ```
 pub struct Node<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> {
     id: I,
     dialect: D,

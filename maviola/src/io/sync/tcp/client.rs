@@ -10,6 +10,46 @@ use crate::io::{ConnectionInfo, PeerConnectionInfo};
 use crate::prelude::*;
 
 /// Synchronous TCP client configuration.
+///
+/// Provides connection configuration for a node that connects to a TCP port as a client.
+///
+/// # Usage
+///
+/// Create a TCP client node:
+///
+/// ```rust
+/// # use maviola::protocol::Peer;
+/// # #[cfg(feature = "sync")]
+/// # {
+/// # use maviola::protocol::V2;
+/// # use maviola::TcpServerConf;
+/// use maviola::{Event, Node, NodeConf, TcpClientConf};
+/// # use maviola::dialects::minimal;
+/// # use portpicker::pick_unused_port;
+///
+/// let addr = "127.0.0.1:5600";
+/// # let addr = format!("127.0.0.1:{}", pick_unused_port().unwrap());
+///
+/// // Create a TCP client node
+/// let node = Node::try_from(
+///     NodeConf::builder()
+///         /* define other node parameters */
+/// #         .version(V2)
+/// #         .system_id(1)
+/// #         .component_id(1)
+/// #         .dialect(minimal::dialect())
+///         .connection(
+/// # {
+/// #           let _addr = addr.clone();
+///             TcpClientConf::new(addr)    // Configure TCP client connection
+/// #           ;TcpServerConf::new(_addr)
+/// # }
+///                 .unwrap()
+///         )
+///         .build()
+/// ).unwrap();
+/// # }
+/// ```
 #[derive(Clone, Debug)]
 pub struct TcpClientConf {
     addr: SocketAddr,
@@ -23,9 +63,7 @@ impl TcpClientConf {
     /// available.
     pub fn new(addr: impl ToSocketAddrs) -> Result<Self> {
         let addr = resolve_socket_addr(addr)?;
-        let info = ConnectionInfo::TcpClient {
-            remote_addr: addr.clone(),
-        };
+        let info = ConnectionInfo::TcpClient { remote_addr: addr };
         Ok(Self { addr, info })
     }
 }

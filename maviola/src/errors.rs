@@ -1,9 +1,48 @@
-//! Maviola errors.
+//! # Maviola errors
+//!
+//! These errors are returned by all `maviola` methods and functions.
+//!
+//! The top-level error is [`Error`]. Library API returns versions of this error possibly wrapping
+//! other types of errors like [`FrameError`] or [`SpecError`].
+//!
+//! We also re-export errors from [`mavio::errors`](https://docs.rs/mavio/latest/mavio/errors/) and
+//! wrap them as the corresponding variants of [`Error`].
 
 use std::sync::{mpsc, Arc, PoisonError};
 
-pub use mavio::errors::{FrameError, SpecError};
 use mavio::protocol::MessageId;
+
+/// <sup>From [`mavio`](https://docs.rs/mavio/0.2.0-rc2/mavio/errors/)</sup>
+#[doc(inline)]
+pub use mavio::errors::{FrameError, SpecError};
+
+/// <sup>From [`mavio`](https://docs.rs/mavio/latest/mavio/errors/)</sup>
+/// Re-exported from [`mavio::errors::Error`](https://docs.rs/mavio/0.2.0-rc2/mavio/errors/enum.Error.html).
+/// Maviola wraps all variants of [`CoreError`] with its own [`Error`] and provides a proper
+/// conversion.
+///
+/// You may use mavio fallible functions such as [`Frame`](mavio::Frame::add_signature)
+/// with Maviola [`Result`] by calling [`Error::from`].
+///
+/// For example:
+///
+/// ```rust
+/// use maviola::errors::{CoreError, Error, Result};
+///
+/// fn core_fallible() -> core::result::Result<(), CoreError> {
+///     Ok(())
+/// }
+///
+/// fn fallible() -> Result<()> {
+///     core_fallible().map_err(Error::from)
+/// }
+///
+/// fallible().unwrap();
+/// ```
+/// ---
+///
+#[doc(inline)]
+pub use mavio::errors::Error as CoreError;
 
 /// Maviola result type.
 pub type Result<T> = core::result::Result<T, Error>;

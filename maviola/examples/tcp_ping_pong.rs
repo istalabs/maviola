@@ -2,7 +2,7 @@ use mavio::Frame;
 use std::thread;
 use std::time::Duration;
 
-use mavio::protocol::{ComponentId, MaybeVersioned, V2};
+use maviola::protocol::{ComponentId, MaybeVersioned, V2};
 use portpicker::{pick_unused_port, Port};
 
 use maviola::dialects::minimal as dialect;

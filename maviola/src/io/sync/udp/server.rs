@@ -1,10 +1,10 @@
-use mavio::Frame;
 use std::collections::HashMap;
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 use std::sync::mpsc;
 use std::thread;
 
 use mavio::protocol::MaybeVersioned;
+use mavio::Frame;
 
 use crate::io::sync::connection::{ConnectionBuilder, ConnectionConf, PeerConnection};
 use crate::io::sync::mpsc_rw::{MpscReader, MpscWriter};
@@ -15,6 +15,46 @@ use crate::io::{Connection, ConnectionInfo, PeerConnectionInfo, Response};
 use crate::prelude::*;
 
 /// Synchronous TCP server configuration.
+///
+/// Provides connection configuration for a node that binds to a UDP port and communicates with
+/// remote UDP connections.
+///
+/// Each incoming connection will be considered as a separate channel. You can use
+/// [`Response::respond`] or [`Response::respond_others`] to control which channels receive response
+/// messages.
+///
+/// # Usage
+///
+/// Create a UDP server node:
+///
+/// ```rust
+/// # use maviola::protocol::Peer;
+/// # #[cfg(feature = "sync")]
+/// # {
+/// # use maviola::protocol::V2;
+/// use maviola::{Event, Node, NodeConf, UdpServerConf};
+/// # use maviola::dialects::minimal;
+/// # use portpicker::pick_unused_port;
+///
+/// let addr = "127.0.0.1:5600";
+/// # let addr = format!("127.0.0.1:{}", pick_unused_port().unwrap());
+///
+/// // Create a UDP server node
+/// let node = Node::try_from(
+///     NodeConf::builder()
+///         /* define other node parameters */
+/// #         .version(V2)
+/// #         .system_id(1)
+/// #         .component_id(1)
+/// #         .dialect(minimal::dialect())
+///         .connection(
+///             UdpServerConf::new(addr)    // Configure UDP server connection
+///                 .unwrap()
+///         )
+///         .build()
+/// ).unwrap();
+/// # }
+/// ```
 #[derive(Clone, Debug)]
 pub struct UdpServerConf {
     addr: SocketAddr,
@@ -28,9 +68,7 @@ impl UdpServerConf {
     /// available.
     pub fn new(addr: impl ToSocketAddrs) -> Result<Self> {
         let addr = resolve_socket_addr(addr)?;
-        let info = ConnectionInfo::UdpServer {
-            bind_addr: addr.clone(),
-        };
+        let info = ConnectionInfo::UdpServer { bind_addr: addr };
         Ok(Self { addr, info })
     }
 }
@@ -101,6 +139,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServerConf {
 }
 
 impl UdpServerConf {
+    #[allow(clippy::too_many_arguments)]
     fn add_peer_connection<V: MaybeVersioned + 'static>(
         conn_info: ConnectionInfo,
         server_addr: SocketAddr,

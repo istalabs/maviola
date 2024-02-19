@@ -1,4 +1,4 @@
-//! Basic entities for Maviola.
+//! # Basic imports
 
 pub use crate::errors::{Error, Result};
 pub use crate::errors::{NodeError, SyncError};

@@ -10,6 +10,46 @@ use crate::io::{ConnectionInfo, PeerConnectionInfo};
 use crate::prelude::*;
 
 /// Synchronous TCP server configuration.
+///
+/// Provides connection configuration for a node that binds to a TCP port as a server.
+///
+/// Each incoming connection will be considered as a separate channel. You can use
+/// [`Response::respond`](crate::Response::respond) or
+/// [`Response::respond_others`](crate::Response::respond_others) to control which channels receive
+/// response messages.
+///
+/// # Usage
+///
+/// Create a TCP server node:
+///
+/// ```rust
+/// # use maviola::protocol::Peer;
+/// # #[cfg(feature = "sync")]
+/// # {
+/// # use maviola::protocol::V2;
+/// use maviola::{Event, Node, NodeConf, TcpServerConf};
+/// # use maviola::dialects::minimal;
+/// # use portpicker::pick_unused_port;
+///
+/// let addr = "127.0.0.1:5600";
+/// # let addr = format!("127.0.0.1:{}", pick_unused_port().unwrap());
+///
+/// // Create a TCP server node
+/// let node = Node::try_from(
+///     NodeConf::builder()
+///         /* define other node parameters */
+/// #         .version(V2)
+/// #         .system_id(1)
+/// #         .component_id(1)
+/// #         .dialect(minimal::dialect())
+///         .connection(
+///             TcpServerConf::new(addr)    // Configure TCP server connection
+///                 .unwrap()
+///         )
+///         .build()
+/// ).unwrap();
+/// # }
+/// ```
 #[derive(Clone, Debug)]
 pub struct TcpServerConf {
     addr: SocketAddr,
@@ -23,9 +63,7 @@ impl TcpServerConf {
     /// available.
     pub fn new(addr: impl ToSocketAddrs) -> Result<Self> {
         let addr = resolve_socket_addr(addr)?;
-        let info = ConnectionInfo::TcpServer {
-            bind_addr: addr.clone(),
-        };
+        let info = ConnectionInfo::TcpServer { bind_addr: addr };
         Ok(Self { addr, info })
     }
 }
@@ -39,7 +77,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpServerConf {
         let (recv_tx, recv_rx) = mpmc::channel();
 
         let conn_info = ConnectionInfo::TcpServer {
-            bind_addr: server_addr.clone(),
+            bind_addr: server_addr,
         };
         let connection = Connection::new(conn_info.clone(), send_tx.clone(), recv_rx);
 

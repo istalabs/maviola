@@ -1,4 +1,7 @@
-//! Maviola synchronous I/O.
+//! # Maviola synchronous I/O
+
+/// <sup>From [`mavio`](https://docs.rs/mavio/0.2.0-rc2/mavio/)</sup>
+pub use mavio::{Receiver, Sender};
 
 pub(crate) mod connection;
 mod event;

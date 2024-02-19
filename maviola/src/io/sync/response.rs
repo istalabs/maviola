@@ -22,7 +22,7 @@ impl<V: MaybeVersioned> Response<V> {
         self.sender_info.as_ref()
     }
 
-    /// Respond directly to the peer which has sent the [`Response`].
+    /// Respond directly to the peer which sent the [`Response`].
     pub fn respond(&self, frame: &Frame<V>) -> Result<()> {
         let frame = Arc::new(frame.clone());
         self.broadcast_tx
@@ -33,7 +33,7 @@ impl<V: MaybeVersioned> Response<V> {
             .map_err(Error::from)
     }
 
-    /// Respond to all the recipients except the one which has sent the initial frame.
+    /// Respond to all peers except the one which sent the initial frame.
     pub fn respond_others(&self, frame: &Frame<V>) -> Result<()> {
         let frame = Arc::new(frame.clone());
         self.broadcast_tx
@@ -44,7 +44,7 @@ impl<V: MaybeVersioned> Response<V> {
             .map_err(Error::from)
     }
 
-    /// Respond to all the recipients including the one which has sent the initial.
+    /// Respond to all peers including the one which has sent the initial frame.
     pub fn respond_all(&self, frame: &Frame<V>) -> Result<()> {
         let frame = Arc::new(frame.clone());
         self.broadcast_tx

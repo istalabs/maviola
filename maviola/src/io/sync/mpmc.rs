@@ -6,6 +6,8 @@
 //! * [Sender]
 //! * [Receiver]
 //!
+//! Similar to [`mpsc`], an MPMC channel is created by [`channel`] method.
+//!
 //! A [`Sender`] is used to broadcast messages to single or multiple instances of [`Receiver`].
 //! These primitives behave almost identical to their [`mpsc`] counterparts, except that
 //! [`Receiver`] can be cloned. A cloned receiver becomes an independent listener for channel
@@ -14,6 +16,28 @@
 //! In addition, both sender and receiver implement a `disconnect` method which severs connection to
 //! the channel. Disconnected senders and receivers will return standard [`mpsc`] errors on
 //! send / receive attempts.
+//!
+//! # Examples
+//!
+//! ```rust
+//! # #[cfg(feature = "sync")]
+//! # {
+//! use maviola::io::sync::mpmc;
+//!
+//! let (tx_1, rx_1) = mpmc::channel();
+//! let tx_2 = tx_1.clone();
+//! let rx_2 = rx_1.clone();
+//!
+//! tx_1.send(1).unwrap();
+//! tx_2.send(2).unwrap();
+//!
+//! assert_eq!(rx_1.recv().unwrap(), 1);
+//! assert_eq!(rx_2.recv().unwrap(), 1);
+//!
+//! assert_eq!(rx_1.recv().unwrap(), 2);
+//! assert_eq!(rx_2.recv().unwrap(), 2);
+//! # }
+//! ```
 //!
 //! # Limitation
 //!
@@ -178,7 +202,7 @@ impl<T: Clone + Sync + Send + 'static> BroadcastBus<T> {
                 for (id, recv_tx) in recv_txs.iter() {
                     let recv_tx = recv_tx.clone();
                     let data = data.clone();
-                    if let Err(_) = recv_tx.send(data) {
+                    if recv_tx.send(data).is_err() {
                         failed_recv_tx_ids.push(*id);
                     }
                 }
@@ -225,6 +249,7 @@ impl<T> Drop for BroadcastBus<T> {
 ///
 /// Behaves almost identical to [`mpsc::channel`] except that it supports multiple receivers to
 /// which data will be broadcast.
+#[must_use]
 pub fn channel<T: Clone + Sync + Send + 'static>() -> (Sender<T>, Receiver<T>) {
     let (send_tx, send_rx) = mpsc::channel();
 
@@ -257,18 +282,7 @@ pub fn channel<T: Clone + Sync + Send + 'static>() -> (Sender<T>, Receiver<T>) {
 #[cfg(test)]
 mod mpmc_test {
     use super::*;
-    use std::time::Duration;
-
-    const WAIT_DURATION: Duration = Duration::from_micros(100);
-    const WAIT_LONG_DURATION: Duration = Duration::from_micros(1000);
-
-    fn wait() {
-        thread::sleep(WAIT_DURATION)
-    }
-
-    fn wait_long() {
-        thread::sleep(WAIT_LONG_DURATION)
-    }
+    use crate::utils::test::*;
 
     #[test]
     fn mpmc_basic() {

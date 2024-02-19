@@ -8,7 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Identifier which is guaranteed to be unique during the program run. It is intentionally kept
 /// opaque. This identifier can't be serialized or deserialized and dedicated for comparison of
 /// runtime entities like nodes or connections.
-#[derive(Copy, Clone, Eq, Ord, Hash)]
+#[derive(Copy, Clone, Hash, PartialEq, Eq)]
 pub struct UniqueId {
     timestamp: u64,
     counter: UniqueIdCounter,
@@ -30,12 +30,7 @@ impl Debug for UniqueId {
     }
 }
 
-impl PartialEq for UniqueId {
-    fn eq(&self, other: &Self) -> bool {
-        self.timestamp == other.timestamp && self.counter == other.counter
-    }
-}
-
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for UniqueId {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         let timestamp_cmp = self.timestamp.cmp(&other.timestamp);
@@ -44,6 +39,12 @@ impl PartialOrd for UniqueId {
         }
 
         Some(self.counter.cmp(&other.counter))
+    }
+}
+
+impl Ord for UniqueId {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
     }
 }
 

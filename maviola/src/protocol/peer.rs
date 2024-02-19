@@ -19,6 +19,17 @@ pub struct Peer {
 }
 
 impl Peer {
+    /// Creates a new Peer with specified `system_id` and `component_id`.
+    pub fn new(system_id: SystemId, component_id: ComponentId) -> Self {
+        Self {
+            id: PeerId {
+                system_id,
+                component_id,
+            },
+            last_active: SystemTime::now(),
+        }
+    }
+
     /// MAVLink system `ID`.
     #[inline]
     pub fn system_id(&self) -> SystemId {
@@ -35,16 +46,6 @@ impl Peer {
     #[inline]
     pub fn last_active(&self) -> SystemTime {
         self.last_active
-    }
-
-    pub(crate) fn new(system_id: SystemId, component_id: ComponentId) -> Self {
-        Self {
-            id: PeerId {
-                system_id,
-                component_id,
-            },
-            last_active: SystemTime::now(),
-        }
     }
 }
 

@@ -3,7 +3,8 @@ use std::sync::Once;
 use std::thread;
 use std::time::Duration;
 
-use mavio::protocol::{MavLinkVersion, V2};
+use mavio::protocol::{ComponentId, MavLinkVersion, SystemId, V2};
+use portpicker::Port;
 
 use maviola::dialects::minimal;
 use maviola::io::sync::{TcpClientConf, TcpServerConf};
@@ -12,16 +13,20 @@ use maviola::io::{Event, Node};
 use maviola::marker::{HasDialect, Identified};
 
 static INIT: Once = Once::new();
-const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Debug;
+static INIT_LOGGER: Once = Once::new();
+pub const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Debug;
+pub const HOST: &str = "127.0.0.1";
 const WAIT_DURATION: Duration = Duration::from_millis(50);
 const WAIT_LONG_DURATION: Duration = Duration::from_millis(200);
-const HOST: &str = "127.0.0.1";
+pub const DEFAULT_TCP_SERVER_SYS_ID: SystemId = 2;
+pub const DEFAULT_TCP_SERVER_COMP_ID: ComponentId = 0;
+pub const DEFAULT_TCP_CLIENT_SYS_ID: SystemId = 20;
 
-fn unused_port() -> portpicker::Port {
+fn unused_port() -> Port {
     portpicker::pick_unused_port().unwrap()
 }
 
-fn make_addr(port: portpicker::Port) -> String {
+fn make_addr(port: Port) -> String {
     format!("{HOST}:{port}")
 }
 
@@ -33,8 +38,8 @@ fn wait_long() {
     thread::sleep(WAIT_LONG_DURATION)
 }
 
-fn initialize() {
-    INIT.call_once(|| {
+fn init_logger() {
+    INIT_LOGGER.call_once(|| {
         env_logger::builder()
             // Suppress everything below `warn` for third-party modules
             .filter_level(log::LevelFilter::Warn)
@@ -44,11 +49,15 @@ fn initialize() {
     });
 }
 
-fn make_server_node(port: portpicker::Port) -> Node<Identified, HasDialect<minimal::Minimal>, V2> {
+fn initialize() {
+    INIT.call_once(|| init_logger());
+}
+
+pub fn make_tcp_server_node(port: Port) -> Node<Identified, HasDialect<minimal::Minimal>, V2> {
     Node::try_from(
         NodeConf::builder()
-            .system_id(1)
-            .component_id(1)
+            .system_id(DEFAULT_TCP_SERVER_SYS_ID)
+            .component_id(DEFAULT_TCP_SERVER_COMP_ID)
             .dialect(minimal::dialect())
             .version(V2)
             .connection(TcpServerConf::new(make_addr(port)).unwrap())
@@ -57,13 +66,13 @@ fn make_server_node(port: portpicker::Port) -> Node<Identified, HasDialect<minim
     .unwrap()
 }
 
-fn make_client_node(
-    port: portpicker::Port,
+pub fn make_tcp_client_node(
+    port: Port,
     component_id: u8,
 ) -> Node<Identified, HasDialect<minimal::Minimal>, V2> {
     Node::try_from(
         NodeConf::builder()
-            .system_id(2)
+            .system_id(DEFAULT_TCP_CLIENT_SYS_ID)
             .component_id(component_id)
             .dialect(minimal::dialect())
             .version(V2)
@@ -77,7 +86,9 @@ fn make_client_nodes(
     port: portpicker::Port,
     count: u8,
 ) -> HashMap<u8, Node<Identified, HasDialect<minimal::Minimal>, V2>> {
-    (0..count).map(|i| (i, make_client_node(port, i))).collect()
+    (0..count)
+        .map(|i| (i, make_tcp_client_node(port, i)))
+        .collect()
 }
 
 #[test]
@@ -85,7 +96,7 @@ fn messages_are_sent_and_received_server_clients() {
     initialize();
 
     let port = unused_port();
-    let server_node = make_server_node(port);
+    let server_node = make_tcp_server_node(port);
     const CLIENT_COUNT: usize = 5;
     let client_nodes = make_client_nodes(port, CLIENT_COUNT as u8);
     wait();
@@ -116,7 +127,7 @@ fn messages_are_sent_and_received_clients_server() {
     initialize();
 
     let port = unused_port();
-    let server_node = make_server_node(port);
+    let server_node = make_tcp_server_node(port);
     const CLIENT_COUNT: usize = 5;
     let client_nodes = make_client_nodes(port, CLIENT_COUNT as u8);
     wait();
@@ -138,8 +149,8 @@ fn messages_are_sent_and_received_clients_server() {
 //     initialize();
 //
 //     let port = unused_port();
-//     let server_node = make_server_node(port);
-//     let client_node = make_client_node(port, 0);
+//     let server_node = make_tcp_server_node(port);
+//     let client_node = make_tcp_client_node(port, 0);
 //     wait();
 //
 //     client_node.close().unwrap();
@@ -172,7 +183,7 @@ fn events_are_received() {
     )
     .unwrap();
 
-    let client_node = make_client_node(port, 10);
+    let client_node = make_tcp_client_node(port, 10);
     wait();
 
     let message = minimal::messages::Heartbeat::default();
@@ -213,7 +224,7 @@ fn heartbeats_are_sent() {
     .unwrap();
     server_node.activate().unwrap();
 
-    let client_node = make_client_node(port, 10);
+    let client_node = make_tcp_client_node(port, 10);
     wait_long();
 
     client_node.try_recv_frame().unwrap();
@@ -226,7 +237,7 @@ fn node_no_id_no_dialect_no_version() {
     initialize();
 
     let port = unused_port();
-    let server_node = make_server_node(port);
+    let server_node = make_tcp_server_node(port);
     let client_node = Node::try_from(
         NodeConf::builder()
             .connection(TcpClientConf::new(make_addr(port)).unwrap())
@@ -271,7 +282,7 @@ fn node_no_id_no_version() {
     initialize();
 
     let port = unused_port();
-    let server_node = make_server_node(port);
+    let server_node = make_tcp_server_node(port);
     let client_node = Node::try_from(
         NodeConf::builder()
             .dialect(minimal::dialect())
@@ -294,7 +305,7 @@ fn node_no_id() {
     initialize();
 
     let port = unused_port();
-    let server_node = make_server_node(port);
+    let server_node = make_tcp_server_node(port);
     let client_node = Node::try_from(
         NodeConf::builder()
             .dialect(minimal::dialect())
@@ -319,7 +330,7 @@ fn node_no_version() {
     initialize();
 
     let port = unused_port();
-    let server_node = make_server_node(port);
+    let server_node = make_tcp_server_node(port);
     let client_node = Node::try_from(
         NodeConf::builder()
             .system_id(42)
