@@ -32,7 +32,7 @@ pub mod errors;
 pub mod io;
 pub mod prelude;
 pub mod protocol;
-pub(crate) mod utils;
+pub mod utils;
 
 pub(crate) extern crate mavio;
 
@@ -50,7 +50,7 @@ pub use io::{NodeConf, NodeConfBuilder};
 
 #[doc(inline)]
 #[cfg(feature = "sync")]
-pub use io::{Event, Node, Response, TcpClientConf, TcpServerConf, UdpClientConf, UdpServerConf};
+pub use io::{Callback, Event, Node, TcpClientConf, TcpServerConf, UdpClientConf, UdpServerConf};
 #[doc(inline)]
 #[cfg(feature = "sync")]
 #[cfg(unix)]

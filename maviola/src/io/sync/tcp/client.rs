@@ -1,17 +1,18 @@
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
-use std::thread;
 
 use mavio::protocol::MaybeVersioned;
 
-use crate::io::sync::connection::{Connection, ConnectionBuilder, ConnectionConf, PeerConnection};
+use crate::io::sync::connection::{Connection, ConnectionBuilder, ConnectionConf};
 use crate::io::utils::resolve_socket_addr;
 use crate::io::{ConnectionInfo, PeerConnectionInfo};
+use crate::utils::SharedCloser;
 
 use crate::prelude::*;
 
 /// TCP client configuration.
 ///
-/// Provides connection configuration for a node that connects to a TCP port as a client.
+/// Provides connection configuration for a node that connects to a TCP port as a client. Use
+/// [`TcpServerConf`](super::server::TcpServerConf) to create a TCP server node.
 ///
 /// # Usage
 ///
@@ -74,22 +75,15 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpClientConf {
         let writer = TcpStream::connect(server_addr)?;
         let reader = writer.try_clone()?;
 
-        let (send_tx, send_rx) = mpmc::channel();
-        let (recv_tx, recv_rx) = mpmc::channel();
+        let conn_state = SharedCloser::new();
+        let (connection, peer_builder) = Connection::new(self.info.clone(), conn_state);
 
-        let connection = Connection::new(self.info.clone(), send_tx.clone(), recv_rx);
-
-        thread::spawn(move || {
-            PeerConnection {
-                info: PeerConnectionInfo::TcpClient { server_addr },
-                reader,
-                writer,
-                send_tx,
-                send_rx,
-                recv_tx,
-            }
-            .start();
-        });
+        let peer_connection = peer_builder.build(
+            PeerConnectionInfo::TcpClient { server_addr },
+            reader,
+            writer,
+        );
+        peer_connection.spawn().discard();
 
         Ok(connection)
     }

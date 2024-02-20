@@ -5,3 +5,6 @@ pub use crate::errors::{NodeError, SyncError};
 
 #[cfg(feature = "sync")]
 pub(crate) use crate::io::sync::mpmc;
+
+#[cfg(feature = "async")]
+pub(crate) use tokio::sync::broadcast;

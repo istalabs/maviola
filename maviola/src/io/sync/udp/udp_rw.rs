@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 use std::net::UdpSocket;
 use std::thread;
 
-use crate::consts::{UDP_RETRIES, UDP_RETRY_INTERVAL};
+use crate::io::sync::consts::{UDP_RETRIES, UDP_RETRY_INTERVAL};
 
 /// A wrapper around [`UdpSocket`] that implements [`Read`] and [`Write`].
 pub struct UdpRW {

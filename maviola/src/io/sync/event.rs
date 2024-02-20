@@ -1,7 +1,7 @@
 use mavio::protocol::MaybeVersioned;
 use mavio::Frame;
 
-use crate::io::sync::Response;
+use crate::io::sync::Callback;
 use crate::protocol::Peer;
 
 use crate::prelude::*;
@@ -14,7 +14,7 @@ pub enum Event<V: MaybeVersioned> {
     /// A [`Peer`] was lost due to the timeout.
     PeerLost(Peer),
     /// New [`Frame`] received.
-    Frame(Frame<V>, Response<V>),
+    Frame(Frame<V>, Callback<V>),
 }
 
 pub(crate) struct EventsIterator<V: MaybeVersioned + 'static> {

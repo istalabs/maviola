@@ -1,19 +1,20 @@
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
-use std::thread;
 
 use mavio::protocol::MaybeVersioned;
 
 use crate::consts::DEFAULT_UDP_HOST;
-use crate::io::sync::connection::{ConnectionBuilder, ConnectionConf, PeerConnection};
+use crate::io::sync::connection::{ConnectionBuilder, ConnectionConf};
 use crate::io::sync::udp::udp_rw::UdpRW;
 use crate::io::utils::{pick_unused_port, resolve_socket_addr};
 use crate::io::{Connection, ConnectionInfo, PeerConnectionInfo};
+use crate::utils::SharedCloser;
 
 use crate::prelude::*;
 
 /// UDP client configuration.
 ///
-/// Provides connection configuration for a node that communicates with a specified UDP port.
+/// Provides connection configuration for a node that communicates with a specified UDP port. Use
+/// [`UdpServerConf`](super::server::UdpServerConf) to create a UDP server node.
 ///
 /// In UDP-client mode the node will bind to a random port on the system. The host can be set by
 /// [`UdpClientConf::with_host`]. By default, the host is equal to [`DEFAULT_UDP_HOST`]. It is also
@@ -36,7 +37,7 @@ use crate::prelude::*;
 /// let host = "127.0.0.1";
 /// # let addr = format!("127.0.0.1:{}", pick_unused_port().unwrap());
 ///
-/// // Create a TCP client node
+/// // Create a UDP client node
 /// let node = Node::try_from(
 ///     NodeConf::builder()
 ///         /* define other node parameters */
@@ -122,25 +123,18 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpClientConf {
         let writer = UdpRW::new(udp_socket);
         let reader = writer.try_clone()?;
 
-        let (send_tx, send_rx) = mpmc::channel();
-        let (recv_tx, recv_rx) = mpmc::channel();
+        let conn_state = SharedCloser::new();
+        let (connection, peer_builder) = Connection::new(self.info.clone(), conn_state);
 
-        let connection = Connection::new(self.info.clone(), send_tx.clone(), recv_rx);
-
-        thread::spawn(move || {
-            PeerConnection {
-                info: PeerConnectionInfo::UdpClient {
-                    server_addr,
-                    bind_addr,
-                },
-                reader,
-                writer,
-                send_tx,
-                send_rx,
-                recv_tx,
-            }
-            .start();
-        });
+        let peer_connection = peer_builder.build(
+            PeerConnectionInfo::UdpClient {
+                server_addr,
+                bind_addr,
+            },
+            reader,
+            writer,
+        );
+        peer_connection.spawn().discard();
 
         Ok(connection)
     }

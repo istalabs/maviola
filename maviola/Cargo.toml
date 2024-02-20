@@ -29,19 +29,26 @@ mavio = { version = "0.2.0-rc2", path = "../../mavio/mavio" }
 portpicker = "0.1.1"
 serde = { version = "1.0.193", default-features = false, features = ["derive"], optional = true }
 serde_arrays = { version = "0.1.0", default-features = false, optional = true }
+tokio = { version = "1.36.0", default-features = false, features = ["sync", "rt", "net", "io-util"], optional = true }
 thiserror = "1.0.56"
 
 [dev-dependencies]
 env_logger = "0.11.1"
+tokio = { version = "1.36.0", default-features = false, features = ["sync", "rt", "net", "io-util", "test-util", "macros"] }
 
 ###########################################################
 # Features
 ###########################################################
 [features]
 ## Default features.
-default = ["minimal"]
+default = ["minimal", "sync", "async"]
 ## Enables synchromous API.
 sync = []
+## Enables asynchromous API via Tokio.
+async = [
+    "dep:tokio",
+    "mavio/tokio"
+]
 ## Enables serde support.
 serde = [
     "dep:serde",
@@ -124,4 +131,4 @@ required-features = ["sync"]
 ###########################################################
 [package.metadata.docs.rs]
 # Features to include into `docs.rs` documentation
-features = ["serde", "all", "unstable", "sync"]
+features = ["serde", "all", "unstable", "sync", "async"]

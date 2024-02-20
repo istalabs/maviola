@@ -1,15 +1,49 @@
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
-use std::thread;
 
 use mavio::protocol::MaybeVersioned;
 
-use crate::io::sync::connection::{ConnectionBuilder, ConnectionConf, PeerConnection};
+use crate::io::sync::connection::{ConnectionBuilder, ConnectionConf};
 use crate::io::{Connection, ConnectionInfo, PeerConnectionInfo};
+use crate::utils::SharedCloser;
 
 use crate::prelude::*;
 
 /// Unix socket client configuration.
+///
+/// Socket client connects to an existing Unix socket on Unix-like systems. Use
+/// [`SockServerConf`](super::server::SockServerConf) to create a Unix socket server node.
+///
+/// # Usage
+///
+/// Create a Unix-socket server node:
+///
+/// ```no_run
+/// # #[cfg(feature = "sync")]
+/// # #[cfg(unix)]
+/// # {
+/// # use maviola::protocol::V2;
+/// use maviola::{Event, Node, NodeConf, SockClientConf};
+/// # use maviola::dialects::minimal;
+///
+/// let path = "/tmp/maviola.sock";
+///
+/// // Create a Unix-socket client node
+/// let node = Node::try_from(
+///     NodeConf::builder()
+///         /* define other node parameters */
+/// #         .version(V2)
+/// #         .system_id(1)
+/// #         .component_id(1)
+/// #         .dialect(minimal::dialect())
+///         .connection(
+///             SockClientConf::new(path)    // Configure socket server connection
+///                 .unwrap()
+///         )
+///         .build()
+/// ).unwrap();
+/// # }
+/// ```
 #[derive(Clone, Debug)]
 pub struct SockClientConf {
     path: PathBuf,
@@ -38,26 +72,16 @@ impl SockClientConf {
 
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockClientConf {
     fn build(&self) -> Result<Connection<V>> {
-        let writer = UnixStream::connect(self.path.as_path())?;
+        let path = self.path.clone();
+        let writer = UnixStream::connect(path.as_path())?;
         let reader = writer.try_clone()?;
 
-        let (send_tx, send_rx) = mpmc::channel();
-        let (recv_tx, recv_rx) = mpmc::channel();
+        let conn_state = SharedCloser::new();
+        let (connection, peer_builder) = Connection::new(self.info.clone(), conn_state);
 
-        let connection = Connection::new(self.info.clone(), send_tx.clone(), recv_rx);
-        let path = self.path.clone();
-
-        thread::spawn(move || {
-            PeerConnection {
-                info: PeerConnectionInfo::SockClient { path },
-                reader,
-                writer,
-                send_tx,
-                send_rx,
-                recv_tx,
-            }
-            .start();
-        });
+        let peer_connection =
+            peer_builder.build(PeerConnectionInfo::SockClient { path }, reader, writer);
+        peer_connection.spawn().as_closable();
 
         Ok(connection)
     }

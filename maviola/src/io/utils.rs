@@ -1,6 +1,6 @@
 use std::net::{SocketAddr, ToSocketAddrs};
 
-use crate::errors::{Error, Result};
+use crate::prelude::*;
 
 /// Resolves socket address.
 ///

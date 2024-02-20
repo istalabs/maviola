@@ -15,10 +15,10 @@ static GLOBAL: maviola_benchmarks::trallocator::Trallocator<System> =
 fn debug_memory(name: &str, before: u64) {
     let immediate = GLOBAL.get() - before;
 
-    thread::sleep(Duration::from_millis(10));
+    thread::sleep(Duration::from_millis(100));
     let soon = GLOBAL.get() - before;
 
-    log::info!("[{name}] memory used: {immediate} bytes, after 10ms: {soon} bytes",);
+    log::info!("[{name}] memory used: {immediate} bytes, after 100ms: {soon} bytes",);
 }
 
 fn main() {
@@ -33,12 +33,14 @@ fn main() {
     #[cfg(feature = "mpmc")]
     {
         {
+            log::info!("[benchmark_mpmc_broadcast]");
             let base_mem = GLOBAL.get();
             benchmark_mpmc_broadcast(1_000, 1_000);
             debug_memory("benchmark_mpmc_broadcast", base_mem);
         }
 
         {
+            log::info!("[benchmark_mpmc_collect]");
             let base_mem = GLOBAL.get();
             benchmark_mpmc_collect(1_000, 1_000);
             debug_memory("benchmark_mpmc_collect", base_mem);
@@ -47,8 +49,9 @@ fn main() {
 
     #[cfg(feature = "sync")]
     {
+        log::info!("[benchmark_unix_sockets]");
         let base_mem = GLOBAL.get();
-        benchmark_unix_sockets(100, 10_000);
+        benchmark_unix_sockets(100, 1_000);
         debug_memory("benchmark_unix_sockets", base_mem);
     }
 }

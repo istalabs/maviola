@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, AtomicU8};
-use std::sync::mpsc::TryRecvError;
 use std::sync::{atomic, Arc, RwLock};
 use std::thread;
 use std::time::{Duration, SystemTime};
@@ -12,7 +11,7 @@ use mavio::protocol::{
 
 use crate::io::node_conf::NodeConf;
 use crate::io::sync::event::EventsIterator;
-use crate::io::sync::{Connection, Response};
+use crate::io::sync::{Callback, Connection};
 use crate::io::ConnectionInfo;
 use crate::io::Event;
 use crate::protocol::{HasDialect, Identified, IsIdentified, MaybeDialect, SyncConnConf};
@@ -192,12 +191,12 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
     /// Receive MAVLink [`Frame`].
     ///
     /// Blocks until frame received.
-    pub fn recv_frame(&self) -> Result<(Frame<V>, Response<V>)> {
+    pub fn recv_frame(&self) -> Result<(Frame<V>, Callback<V>)> {
         self.recv_frame_internal()
     }
 
     /// Attempts to receive MAVLink [`Frame`] without blocking.
-    pub fn try_recv_frame(&self) -> Result<(Frame<V>, Response<V>)> {
+    pub fn try_recv_frame(&self) -> Result<(Frame<V>, Callback<V>)> {
         self.try_recv_frame_internal()
     }
 
@@ -233,6 +232,7 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
             .map_err(Error::from)
             .map(|mut peers| peers.clear())?;
 
+        log::debug!("[{:?}] node is closed", self.connection.info());
         Ok(())
     }
 
@@ -243,7 +243,7 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
 
     fn handle_incoming_frames(&self) {
         let info = self.info().clone();
-        let connection = self.connection.clone();
+        let receiver = self.connection.receiver();
         let peers = self.peers.clone();
         let events_tx = self.events_tx.clone();
         let is_connected = self.is_connected.clone();
@@ -256,11 +256,11 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
                 return;
             }
 
-            let (frame, response) = match connection.try_recv() {
+            let (frame, response) = match receiver.try_recv() {
                 Ok((frame, resp)) => (frame, resp),
-                Err(Error::Sync(SyncError::TryRecv(err))) => match err {
-                    TryRecvError::Empty => continue,
-                    TryRecvError::Disconnected => {
+                Err(Error::Sync(err)) => match err {
+                    SyncError::Empty => continue,
+                    _ => {
                         log::trace!("[{info:?}] node connection closed");
                         return;
                     }
@@ -273,7 +273,7 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
 
             if let Ok(crate::dialects::Minimal::Heartbeat(_)) = frame.decode() {
                 let peer = Peer::new(frame.system_id(), frame.component_id());
-                log::debug!("[{info:?}] received heartbeat from {peer:?}");
+                log::trace!("[{info:?}] received heartbeat from {peer:?}");
 
                 match peers.write() {
                     Ok(mut peers) => {
@@ -308,59 +308,63 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V
         let events_tx = self.events_tx.clone();
         let is_connected = self.is_connected.clone();
 
-        thread::spawn(move || loop {
-            if !is_connected.load(atomic::Ordering::Relaxed) {
-                log::trace!(
-                    "[{info:?}] closing inactive peers handler since node is no longer active"
-                );
-                return;
-            }
+        thread::spawn(move || {
+            loop {
+                if !is_connected.load(atomic::Ordering::Relaxed) {
+                    log::trace!("[{info:?}] closing inactive peers handler: node is disconnected");
+                    break;
+                }
 
-            thread::sleep(heartbeat_timeout);
-            let now = SystemTime::now();
+                thread::sleep(heartbeat_timeout);
+                let now = SystemTime::now();
 
-            let inactive_peers = match peers.read() {
-                Ok(peers) => {
-                    let mut inactive_peers = HashSet::new();
-                    for peer in peers.values() {
-                        if let Ok(since) = now.duration_since(peer.last_active) {
-                            if since > heartbeat_timeout {
-                                inactive_peers.insert(peer.id);
+                let inactive_peers = match peers.read() {
+                    Ok(peers) => {
+                        let mut inactive_peers = HashSet::new();
+                        for peer in peers.values() {
+                            if let Ok(since) = now.duration_since(peer.last_active) {
+                                if since > heartbeat_timeout {
+                                    inactive_peers.insert(peer.id);
+                                }
+                            }
+                        }
+                        inactive_peers
+                    }
+                    Err(err) => {
+                        log::error!("[{info:?}] can't read peers: {err:?}");
+                        break;
+                    }
+                };
+
+                match peers.write() {
+                    Ok(mut peers) => {
+                        for id in inactive_peers {
+                            if let Some(peer) = peers.remove(&id) {
+                                if let Err(err) = events_tx.send(Event::PeerLost(peer)) {
+                                    log::trace!(
+                                        "[{info:?}] failed to report lost peer event: {err}"
+                                    );
+                                    break;
+                                }
                             }
                         }
                     }
-                    inactive_peers
-                }
-                Err(err) => {
-                    log::trace!("[{info:?}] stopping heartbeat checks: {err:?}");
-                    return;
-                }
-            };
-
-            match peers.write() {
-                Ok(mut peers) => {
-                    for id in inactive_peers {
-                        if let Some(peer) = peers.remove(&id) {
-                            if let Err(err) = events_tx.send(Event::PeerLost(peer)) {
-                                log::trace!("[{info:?}] failed to report lost peer event: {err}");
-                                return;
-                            }
-                        }
+                    Err(err) => {
+                        log::error!("[{info:?}] can't update peers: {err:?}");
+                        break;
                     }
                 }
-                Err(err) => {
-                    log::trace!("[{info:?}] stopping heartbeat checks: {err:?}");
-                    return;
-                }
             }
+
+            log::trace!("[{info:?}] inactive peers handler stopped");
         });
     }
 
-    fn recv_frame_internal(&self) -> Result<(Frame<V>, Response<V>)> {
+    fn recv_frame_internal(&self) -> Result<(Frame<V>, Callback<V>)> {
         self.connection.recv()
     }
 
-    fn try_recv_frame_internal(&self) -> Result<(Frame<V>, Response<V>)> {
+    fn try_recv_frame_internal(&self) -> Result<(Frame<V>, Callback<V>)> {
         self.connection.try_recv()
     }
 
@@ -397,14 +401,14 @@ impl<M: DialectMessage + 'static, I: IsIdentified, V: MaybeVersioned + 'static>
     }
 
     /// Receive MAVLink message blocking until MAVLink frame received.
-    pub fn recv(&self) -> Result<(M, Response<V>)> {
+    pub fn recv(&self) -> Result<(M, Callback<V>)> {
         let (frame, res) = self.recv_frame_internal()?;
         let msg = self.dialect.0.decode(frame.payload())?;
         Ok((msg, res))
     }
 
     /// Attempts to receive MAVLink message without blocking.
-    pub fn try_recv(&self) -> Result<(M, Response<V>)> {
+    pub fn try_recv(&self) -> Result<(M, Callback<V>)> {
         let (frame, res) = self.try_recv_frame_internal()?;
         let msg = self.dialect.0.decode(frame.payload())?;
         Ok((msg, res))
@@ -538,7 +542,7 @@ impl<M: DialectMessage + 'static, V: Versioned + 'static> Node<Identified, HasDi
         let info = self.info().clone();
         let heartbeat_interval = self.heartbeat_interval;
         let version = self.version.clone();
-        let connection = self.connection.clone();
+        let sender = self.connection.sender();
 
         let sequence = self.sequence.clone();
         let system_id = self.system_id();
@@ -546,38 +550,42 @@ impl<M: DialectMessage + 'static, V: Versioned + 'static> Node<Identified, HasDi
 
         let heartbeat_message = self.make_heartbeat_message();
 
-        thread::spawn(move || loop {
-            if !is_connected.load(atomic::Ordering::Relaxed) {
-                log::trace!(
-                    "[{info:?}] closing heartbeat emitter since node is no longer connected"
-                );
-                is_active.store(false, atomic::Ordering::Relaxed);
-                return;
-            }
-            if !is_active.load(atomic::Ordering::Relaxed) {
-                log::trace!("[{info:?}] closing heartbeat emitter since node is no longer active");
-                is_active.store(false, atomic::Ordering::Relaxed);
-                return;
-            }
+        thread::spawn(move || {
+            loop {
+                if !is_connected.load(atomic::Ordering::Relaxed) {
+                    log::trace!(
+                        "[{info:?}] closing heartbeat emitter since node is no longer connected"
+                    );
+                    is_active.store(false, atomic::Ordering::Relaxed);
+                    break;
+                }
+                if !is_active.load(atomic::Ordering::Relaxed) {
+                    log::trace!(
+                        "[{info:?}] closing heartbeat emitter since node is no longer active"
+                    );
+                    break;
+                }
 
-            let sequence = sequence.fetch_add(1, atomic::Ordering::Relaxed);
-            let frame = Frame::builder()
-                .sequence(sequence)
-                .system_id(system_id)
-                .component_id(component_id)
-                .version(version.clone())
-                .message(&heartbeat_message)
-                .unwrap()
-                .build();
+                let sequence = sequence.fetch_add(1, atomic::Ordering::Relaxed);
+                let frame = Frame::builder()
+                    .sequence(sequence)
+                    .system_id(system_id)
+                    .component_id(component_id)
+                    .version(version.clone())
+                    .message(&heartbeat_message)
+                    .unwrap()
+                    .build();
 
-            log::trace!("[{info:?}] broadcasting heartbeat");
-            if let Err(err) = connection.send(&frame) {
-                log::trace!("[{info:?}] heartbeat can't be broadcast: {err:?}");
-                is_active.store(false, atomic::Ordering::Relaxed);
-                return;
+                log::trace!("[{info:?}] broadcasting heartbeat");
+                if let Err(err) = sender.send(&frame) {
+                    log::trace!("[{info:?}] heartbeat can't be broadcast: {err:?}");
+                    is_active.store(false, atomic::Ordering::Relaxed);
+                    break;
+                }
+
+                thread::sleep(heartbeat_interval);
             }
-
-            thread::sleep(heartbeat_interval);
+            log::debug!("[{info:?}] heartbeats emitter stopped");
         });
     }
 

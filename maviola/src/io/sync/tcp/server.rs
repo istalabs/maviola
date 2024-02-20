@@ -3,9 +3,12 @@ use std::thread;
 
 use mavio::protocol::MaybeVersioned;
 
-use crate::io::sync::connection::{Connection, ConnectionBuilder, ConnectionConf, PeerConnection};
+use crate::io::sync::connection::{Connection, ConnectionBuilder, ConnectionConf};
+use crate::io::sync::consts::{TCP_READ_TIMEOUT, TCP_WRITE_TIMEOUT};
+use crate::io::sync::utils::handle_listener_stop;
 use crate::io::utils::resolve_socket_addr;
 use crate::io::{ConnectionInfo, PeerConnectionInfo};
+use crate::utils::Closer;
 
 use crate::prelude::*;
 
@@ -14,9 +17,11 @@ use crate::prelude::*;
 /// Provides connection configuration for a node that binds to a TCP port as a server.
 ///
 /// Each incoming connection will be considered as a separate channel. You can use
-/// [`Response::respond`](crate::Response::respond) or
-/// [`Response::respond_others`](crate::Response::respond_others) to control which channels receive
+/// [`Callback::respond`](crate::Callback::respond) or
+/// [`Callback::respond_others`](crate::Callback::respond_others) to control which channels receive
 /// response messages.
+///
+/// Use [`TcpClientConf`](super::client::TcpClientConf) to create a TCP client node.
 ///
 /// # Usage
 ///
@@ -70,55 +75,40 @@ impl TcpServerConf {
 
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpServerConf {
     fn build(&self) -> Result<Connection<V>> {
-        let listener = TcpListener::bind(self.addr)?;
         let server_addr = self.addr;
+        let listener = TcpListener::bind(self.addr)?;
 
-        let (send_tx, send_rx) = mpmc::channel();
-        let (recv_tx, recv_rx) = mpmc::channel();
+        let conn_state = Closer::new();
+        let (connection, peer_builder) = Connection::new(self.info.clone(), conn_state.as_shared());
 
-        let conn_info = ConnectionInfo::TcpServer {
-            bind_addr: server_addr,
-        };
-        let connection = Connection::new(conn_info.clone(), send_tx.clone(), recv_rx);
-
-        thread::spawn(move || {
+        let handler = thread::spawn(move || -> Result<Closer> {
             for stream in listener.incoming() {
-                let send_tx = send_tx.clone();
-                let send_rx = send_rx.clone();
-                let recv_tx = recv_tx.clone();
+                if conn_state.is_closed() {
+                    return Ok(conn_state);
+                }
 
-                match stream {
-                    Ok(stream) => {
-                        let peer_addr = stream.peer_addr().unwrap();
-                        let writer = stream;
-                        let reader = match writer.try_clone() {
-                            Ok(reader) => reader,
-                            Err(err) => {
-                                log::error!("[{conn_info:?}] broken incoming stream: {err:?}");
-                                return;
-                            }
-                        };
+                let stream = stream?;
+                let peer_addr = stream.peer_addr()?;
+                let writer = stream;
+                let reader = writer.try_clone()?;
 
-                        PeerConnection {
-                            info: PeerConnectionInfo::TcpServer {
-                                server_addr,
-                                peer_addr,
-                            },
-                            reader,
-                            writer,
-                            send_tx,
-                            send_rx,
-                            recv_tx,
-                        }
-                        .start();
-                    }
-                    Err(err) => {
-                        log::error!("[{conn_info:?}] server failure: {err:?}");
-                        return;
-                    }
-                };
+                writer.set_write_timeout(TCP_WRITE_TIMEOUT)?;
+                writer.set_read_timeout(TCP_READ_TIMEOUT)?;
+
+                let peer_connection = peer_builder.build(
+                    PeerConnectionInfo::TcpServer {
+                        server_addr,
+                        peer_addr,
+                    },
+                    reader,
+                    writer,
+                );
+                peer_connection.spawn().discard();
             }
+            Ok(conn_state)
         });
+
+        handle_listener_stop(handler, connection.info().clone());
 
         Ok(connection)
     }
