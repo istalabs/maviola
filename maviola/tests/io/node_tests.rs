@@ -3,14 +3,13 @@ use std::sync::Once;
 use std::thread;
 use std::time::Duration;
 
-use mavio::protocol::{ComponentId, MavLinkVersion, SystemId, V2};
 use portpicker::Port;
 
 use maviola::dialects::minimal;
 use maviola::io::marker::Identified;
 use maviola::io::sync::{TcpClient, TcpServer};
 use maviola::io::{Event, Node};
-use maviola::protocol::HasDialect;
+use maviola::protocol::{ComponentId, HasDialect, MavLinkVersion, SystemId, V2};
 
 static INIT: Once = Once::new();
 static INIT_LOGGER: Once = Once::new();

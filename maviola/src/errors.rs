@@ -6,22 +6,22 @@
 //! other types of errors like [`FrameError`] or [`SpecError`].
 //!
 //! We also re-export errors from [`mavio::errors`](https://docs.rs/mavio/latest/mavio/errors/) and
-//! wrap them as the corresponding variants of [`Error`].
+//! wrap them as the corresponding variants of [`Error`]. All such low-level MAVLink abstractions
+//! are available in [`crate::core`].
 
 use std::sync::{mpsc, Arc, PoisonError};
 
-use mavio::protocol::MessageId;
+use crate::protocol::MessageId;
 
-/// <sup>[`mavio`](https://docs.rs/mavio/0.2.0-rc2/mavio/errors/)</sup>
+/// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
 #[doc(inline)]
-pub use mavio::errors::{FrameError, SpecError};
+pub use crate::core::errors::{FrameError, SpecError};
 
-/// <sup>[`mavio`](https://docs.rs/mavio/latest/mavio/errors/)</sup>
-/// Re-exported from [`mavio::errors::Error`](https://docs.rs/mavio/0.2.0-rc2/mavio/errors/enum.Error.html).
-/// Maviola wraps all variants of [`CoreError`] with its own [`Error`] and provides a proper
-/// conversion.
+/// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
+/// Low-level error re-exported from Mavio. Maviola wraps all variants of [`CoreError`] with its own
+/// [`Error`] and provides proper conversions with [`From`] trait.
 ///
-/// You may use mavio fallible functions such as [`Frame`](mavio::Frame::add_signature)
+/// You may use mavio fallible functions such as [`Frame::add_signature`](mavio::Frame::add_signature)
 /// with Maviola [`Result`] by calling [`Error::from`].
 ///
 /// For example:
@@ -42,7 +42,7 @@ pub use mavio::errors::{FrameError, SpecError};
 /// ---
 ///
 #[doc(inline)]
-pub use mavio::errors::Error as CoreError;
+pub use crate::core::errors::Error as CoreError;
 
 /// Maviola result type.
 pub type Result<T> = core::result::Result<T, Error>;
@@ -114,7 +114,7 @@ pub enum NodeError {
     NotInDialect(MessageId, &'static str),
 }
 
-impl From<mavio::errors::Error> for Error {
+impl From<crate::core::errors::Error> for Error {
     fn from(value: mavio::errors::Error) -> Self {
         match value {
             mavio::errors::Error::Io(err) => Self::Io(err),

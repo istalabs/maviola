@@ -1,10 +1,9 @@
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 
-use mavio::protocol::MaybeVersioned;
-
-use crate::io::sync::connection::{Connection, ConnectionBuilder, ConnectionConf};
+use crate::io::sync::conn::{Connection, ConnectionBuilder};
 use crate::io::utils::resolve_socket_addr;
-use crate::io::{ConnectionInfo, PeerConnectionInfo};
+use crate::io::{ChannelInfo, ConnectionInfo};
+use crate::protocol::MaybeVersioned;
 use crate::utils::SharedCloser;
 
 use crate::prelude::*;
@@ -69,6 +68,10 @@ impl TcpClient {
 }
 
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpClient {
+    fn info(&self) -> &ConnectionInfo {
+        &self.info
+    }
+
     fn build(&self) -> Result<Connection<V>> {
         let server_addr = self.addr;
         let writer = TcpStream::connect(server_addr)?;
@@ -77,19 +80,10 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpClient {
         let conn_state = SharedCloser::new();
         let (connection, peer_builder) = Connection::new(self.info.clone(), conn_state);
 
-        let peer_connection = peer_builder.build(
-            PeerConnectionInfo::TcpClient { server_addr },
-            reader,
-            writer,
-        );
+        let peer_connection =
+            peer_builder.build(ChannelInfo::TcpClient { server_addr }, reader, writer);
         peer_connection.spawn().discard();
 
         Ok(connection)
-    }
-}
-
-impl<V: MaybeVersioned + 'static> ConnectionConf<V> for TcpClient {
-    fn info(&self) -> &ConnectionInfo {
-        &self.info
     }
 }

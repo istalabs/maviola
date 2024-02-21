@@ -34,6 +34,13 @@ pub enum ConnectionInfo {
         /// File path.
         path: PathBuf,
     },
+    /// Custom connection.
+    Custom {
+        /// Name of the custom connection.
+        name: String,
+        /// Implementation-specific details.
+        details: String,
+    },
     /// <sup>`unix`</sup>
     /// Unix socket server.
     #[cfg(unix)]
@@ -50,12 +57,12 @@ pub enum ConnectionInfo {
     },
 }
 
-/// Information about a peer connection.
+/// Information about a channel within a particular connection.
 ///
-/// A particular connection may have several peer connection. For example, a TCP server creates
-/// a peer connection for each client.
+/// A particular connection may have several channels. For example, a TCP server creates a separate
+/// stream for each client.
 #[derive(Clone, Debug)]
-pub enum PeerConnectionInfo {
+pub enum ChannelInfo {
     /// TCP server.
     TcpServer {
         /// Server address.
@@ -91,6 +98,15 @@ pub enum PeerConnectionInfo {
     FileReader {
         /// File path.
         path: PathBuf,
+    },
+    /// Custom channel.
+    Custom {
+        /// Name of the custom connection.
+        conn_name: String,
+        /// Name of the custom channel.
+        channel_name: String,
+        /// Implementation-specific details.
+        details: String,
     },
     /// <sup>`unix`</sup>
     /// Unix socket server.

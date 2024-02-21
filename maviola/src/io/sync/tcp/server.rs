@@ -1,13 +1,13 @@
 use std::net::{SocketAddr, TcpListener, ToSocketAddrs};
 use std::thread;
 
-use mavio::protocol::MaybeVersioned;
+use crate::protocol::MaybeVersioned;
 
-use crate::io::sync::connection::{Connection, ConnectionBuilder, ConnectionConf};
+use crate::io::sync::conn::{Connection, ConnectionBuilder};
 use crate::io::sync::consts::{TCP_READ_TIMEOUT, TCP_WRITE_TIMEOUT};
 use crate::io::sync::utils::handle_listener_stop;
 use crate::io::utils::resolve_socket_addr;
-use crate::io::{ConnectionInfo, PeerConnectionInfo};
+use crate::io::{ChannelInfo, ConnectionInfo};
 use crate::utils::Closer;
 
 use crate::prelude::*;
@@ -17,9 +17,9 @@ use crate::prelude::*;
 /// Provides connection configuration for a node that binds to a TCP port as a server.
 ///
 /// Each incoming connection will be considered as a separate channel. You can use
-/// [`Callback::respond`](crate::Callback::respond) or
-/// [`Callback::respond_others`](crate::Callback::respond_others) to control which channels receive
-/// response messages.
+/// [`Callback::respond`](crate::io::Callback::respond) or
+/// [`Callback::respond_others`](crate::io::Callback::respond_others) to control which channels
+/// receive response messages.
 ///
 /// Use [`TcpClientConf`](super::client::TcpClient) to create a TCP client node.
 ///
@@ -73,6 +73,10 @@ impl TcpServer {
 }
 
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpServer {
+    fn info(&self) -> &ConnectionInfo {
+        &self.info
+    }
+
     fn build(&self) -> Result<Connection<V>> {
         let server_addr = self.addr;
         let listener = TcpListener::bind(self.addr)?;
@@ -95,7 +99,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpServer {
                 writer.set_read_timeout(TCP_READ_TIMEOUT)?;
 
                 let peer_connection = peer_builder.build(
-                    PeerConnectionInfo::TcpServer {
+                    ChannelInfo::TcpServer {
                         server_addr,
                         peer_addr,
                     },
@@ -110,11 +114,5 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpServer {
         handle_listener_stop(handler, connection.info().clone());
 
         Ok(connection)
-    }
-}
-
-impl<V: MaybeVersioned + 'static> ConnectionConf<V> for TcpServer {
-    fn info(&self) -> &ConnectionInfo {
-        &self.info
     }
 }

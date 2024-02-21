@@ -4,7 +4,7 @@ use std::sync::{atomic, Arc, RwLock};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
-use mavio::protocol::{
+use crate::protocol::{
     ComponentId, DialectImpl, DialectMessage, Frame, MavLinkVersion, MaybeVersioned, SystemId,
     Versioned, Versionless,
 };
@@ -13,9 +13,10 @@ use crate::io::marker::{
     HasComponentId, HasSystemId, Identified, MaybeIdentified, NoComponentId, NoConnConf,
     NoSystemId, Unidentified,
 };
+use crate::io::sync::conn::Connection;
 use crate::io::sync::event::EventsIterator;
 use crate::io::sync::marker::ConnConf;
-use crate::io::sync::{Callback, Connection};
+use crate::io::sync::Callback;
 use crate::io::{ConnectionInfo, Event, NodeBuilder, NodeConf};
 use crate::protocol::{Dialectless, HasDialect, MaybeDialect};
 use crate::protocol::{Peer, PeerId};
@@ -634,7 +635,7 @@ impl<M: DialectMessage + 'static, V: Versioned + 'static> Node<Identified, HasDi
     }
 
     fn make_heartbeat_message(&self) -> mavio::dialects::minimal::messages::Heartbeat {
-        use mavio::dialects::minimal as dialect;
+        use crate::dialects::minimal as dialect;
 
         dialect::messages::Heartbeat {
             type_: Default::default(),

@@ -4,12 +4,11 @@ use std::sync::{atomic, mpsc, Arc};
 
 use tokio::io::{AsyncRead, AsyncWrite};
 
-use mavio::protocol::MaybeVersioned;
-use mavio::{AsyncReceiver, AsyncSender, Frame};
-
+use crate::core::io::{AsyncReceiver, AsyncSender};
 use crate::io::asnc::response::AsyncResponse;
 use crate::io::broadcast::OutgoingFrame;
-use crate::io::{ConnectionInfo, PeerConnectionInfo};
+use crate::io::{ChannelInfo, ConnectionInfo};
+use crate::protocol::{Frame, MaybeVersioned};
 use crate::utils::UniqueId;
 
 use crate::prelude::*;
@@ -110,7 +109,7 @@ pub(super) struct AsyncPeerConnection<
     R: AsyncRead,
     W: AsyncWrite + Unpin,
 > {
-    pub(super) info: PeerConnectionInfo,
+    pub(super) info: ChannelInfo,
     pub(super) reader: R,
     pub(super) writer: W,
     pub(super) send_tx: AsyncFrameSender<V>,
@@ -156,7 +155,7 @@ impl<
     async fn send_handler(
         is_active: Arc<AtomicBool>,
         id: UniqueId,
-        info: Arc<PeerConnectionInfo>,
+        info: Arc<ChannelInfo>,
         mut send_rx: AsyncFrameSendHandler<V>,
         mut sender: AsyncSender<W, V>,
     ) {
@@ -195,7 +194,7 @@ impl<
     async fn recv_handler(
         is_active: Arc<AtomicBool>,
         id: UniqueId,
-        info: Arc<PeerConnectionInfo>,
+        info: Arc<ChannelInfo>,
         send_tx: AsyncFrameSender<V>,
         recv_tx: AsyncFrameRecvDispatcher<V>,
         mut receiver: AsyncReceiver<R, V>,

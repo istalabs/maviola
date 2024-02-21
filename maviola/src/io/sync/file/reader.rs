@@ -2,11 +2,11 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
-use mavio::protocol::MaybeVersioned;
+use crate::protocol::MaybeVersioned;
 
-use crate::io::sync::connection::{ConnectionBuilder, ConnectionConf};
+use crate::io::sync::conn::{Connection, ConnectionBuilder};
 use crate::io::sync::utils::BusyWriter;
-use crate::io::{Connection, ConnectionInfo, PeerConnectionInfo};
+use crate::io::{ChannelInfo, ConnectionInfo};
 use crate::utils::SharedCloser;
 
 use crate::prelude::*;
@@ -77,6 +77,10 @@ impl FileReader {
 }
 
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for FileReader {
+    fn info(&self) -> &ConnectionInfo {
+        &self.info
+    }
+
     fn build(&self) -> Result<Connection<V>> {
         let path = self.path.clone();
         let file = File::open(path.as_path())?;
@@ -87,16 +91,9 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for FileReader {
         let conn_state = SharedCloser::new();
         let (connection, peer_builder) = Connection::new(self.info.clone(), conn_state);
 
-        let peer_connection =
-            peer_builder.build(PeerConnectionInfo::FileReader { path }, reader, writer);
+        let peer_connection = peer_builder.build(ChannelInfo::FileReader { path }, reader, writer);
         peer_connection.spawn().as_closable();
 
         Ok(connection)
-    }
-}
-
-impl<V: MaybeVersioned + 'static> ConnectionConf<V> for FileReader {
-    fn info(&self) -> &ConnectionInfo {
-        &self.info
     }
 }

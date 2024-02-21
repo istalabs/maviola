@@ -2,12 +2,12 @@ use std::os::unix::net::UnixListener;
 use std::path::{Path, PathBuf};
 use std::thread;
 
-use mavio::protocol::MaybeVersioned;
+use crate::protocol::MaybeVersioned;
 
-use crate::io::sync::connection::{ConnectionBuilder, ConnectionConf};
+use crate::io::sync::conn::{Connection, ConnectionBuilder};
 use crate::io::sync::consts::{SOCK_ACCEPT_INTERVAL, SOCK_READ_TIMEOUT, SOCK_WRITE_TIMEOUT};
 use crate::io::sync::utils::handle_listener_stop;
-use crate::io::{Connection, ConnectionInfo, PeerConnectionInfo};
+use crate::io::{ChannelInfo, ConnectionInfo};
 use crate::utils::Closer;
 
 use crate::prelude::*;
@@ -19,8 +19,8 @@ use crate::prelude::*;
 /// client node.
 ///
 /// Each incoming connection will be considered as a separate channel. You can use
-/// [`Callback::respond`](crate::Callback::respond) or
-/// [`Callback::respond_others`](crate::Callback::respond_others) to control which channels receive
+/// [`Callback::respond`](crate::io::Callback::respond) or
+/// [`Callback::respond_others`](crate::io::Callback::respond_others) to control which channels receive
 /// response messages.
 ///
 /// # Usage
@@ -81,6 +81,10 @@ impl SockServer {
 }
 
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockServer {
+    fn info(&self) -> &ConnectionInfo {
+        &self.info
+    }
+
     fn build(&self) -> Result<Connection<V>> {
         let path = self.path.clone();
         let listener = UnixListener::bind(self.path.as_path())?;
@@ -112,7 +116,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockServer {
                 reader.set_read_timeout(SOCK_READ_TIMEOUT)?;
 
                 let peer_connection = peer_builder.build(
-                    PeerConnectionInfo::SockClient { path: path.clone() },
+                    ChannelInfo::SockClient { path: path.clone() },
                     reader,
                     writer,
                 );
@@ -123,11 +127,5 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockServer {
         handle_listener_stop(handler, connection.info().clone());
 
         Ok(connection)
-    }
-}
-
-impl<V: MaybeVersioned + 'static> ConnectionConf<V> for SockServer {
-    fn info(&self) -> &ConnectionInfo {
-        &self.info
     }
 }

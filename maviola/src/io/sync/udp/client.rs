@@ -1,12 +1,12 @@
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 
-use mavio::protocol::MaybeVersioned;
+use crate::protocol::MaybeVersioned;
 
 use crate::consts::DEFAULT_UDP_HOST;
-use crate::io::sync::connection::{ConnectionBuilder, ConnectionConf};
+use crate::io::sync::conn::{Connection, ConnectionBuilder};
 use crate::io::sync::udp::udp_rw::UdpRW;
 use crate::io::utils::{pick_unused_port, resolve_socket_addr};
-use crate::io::{Connection, ConnectionInfo, PeerConnectionInfo};
+use crate::io::{ChannelInfo, ConnectionInfo};
 use crate::utils::SharedCloser;
 
 use crate::prelude::*;
@@ -109,6 +109,10 @@ impl UdpClient {
 }
 
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpClient {
+    fn info(&self) -> &ConnectionInfo {
+        &self.info
+    }
+
     fn build(&self) -> Result<Connection<V>> {
         let bind_addr = match self.bind_addr {
             None => resolve_socket_addr(format!("{}:{}", self.host, pick_unused_port()?))?,
@@ -126,7 +130,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpClient {
         let (connection, peer_builder) = Connection::new(self.info.clone(), conn_state);
 
         let peer_connection = peer_builder.build(
-            PeerConnectionInfo::UdpClient {
+            ChannelInfo::UdpClient {
                 server_addr,
                 bind_addr,
             },
@@ -136,11 +140,5 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpClient {
         peer_connection.spawn().discard();
 
         Ok(connection)
-    }
-}
-
-impl<V: MaybeVersioned + 'static> ConnectionConf<V> for UdpClient {
-    fn info(&self) -> &ConnectionInfo {
-        &self.info
     }
 }

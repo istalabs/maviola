@@ -3,7 +3,7 @@ use std::sync::{mpsc, Arc, Condvar, Mutex};
 use std::thread;
 use std::time::SystemTime;
 
-use maviola::io::sync::mpmc;
+use maviola::io::sync::utils::mpmc;
 
 const PAYLOAD_SIZE: usize = 255;
 

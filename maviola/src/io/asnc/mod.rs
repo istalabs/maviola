@@ -1,7 +1,5 @@
 //! # Maviola asynchronous I/O
-
-/// <sup>[`mavio`](https://docs.rs/mavio/0.2.0-rc2/mavio/)</sup>
-pub use mavio::{AsyncReceiver, AsyncSender};
+#![allow(dead_code)]
 
 pub(crate) mod connection;
 mod response;

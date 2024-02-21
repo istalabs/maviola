@@ -1,10 +1,8 @@
 use std::sync::Arc;
 
-use mavio::protocol::MaybeVersioned;
-use mavio::Frame;
-
 use crate::io::broadcast::{BroadcastScope, OutgoingFrame};
-use crate::io::PeerConnectionInfo;
+use crate::io::ChannelInfo;
+use crate::protocol::{Frame, MaybeVersioned};
 use crate::utils::UniqueId;
 
 use crate::prelude::*;
@@ -13,13 +11,13 @@ use crate::prelude::*;
 #[derive(Clone, Debug)]
 pub struct AsyncResponse<V: MaybeVersioned> {
     pub(super) sender_id: UniqueId,
-    pub(super) sender_info: Arc<PeerConnectionInfo>,
+    pub(super) sender_info: Arc<ChannelInfo>,
     pub(super) broadcast_tx: broadcast::Sender<OutgoingFrame<V>>,
 }
 
 impl<V: MaybeVersioned> AsyncResponse<V> {
     /// Information about sender's connection.
-    pub fn info(&self) -> &PeerConnectionInfo {
+    pub fn info(&self) -> &ChannelInfo {
         self.sender_info.as_ref()
     }
 

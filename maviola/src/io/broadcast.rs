@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
+use crate::protocol::{Frame, MaybeVersioned};
 use crate::utils::UniqueId;
-
-use mavio::protocol::MaybeVersioned;
-use mavio::Frame;
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) enum BroadcastScope {

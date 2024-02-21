@@ -3,7 +3,7 @@ use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 use std::time::SystemTime;
 
-use mavio::protocol::{ComponentId, SystemId};
+use crate::protocol::{ComponentId, SystemId};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct PeerId {

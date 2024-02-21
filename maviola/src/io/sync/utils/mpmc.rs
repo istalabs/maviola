@@ -1,4 +1,4 @@
-//! Multiple producers / multiple consumers queue with proper broadcast capability.
+//! # Multiple producers / multiple consumers broadcast channel
 //!
 //! This module provides MPMC primitives which allow to broadcast messages over the channel from
 //! multiple producers to multiple consumers:
@@ -22,7 +22,7 @@
 //! ```rust
 //! # #[cfg(feature = "sync")]
 //! # {
-//! use maviola::io::sync::mpmc;
+//! use maviola::io::sync::utils::mpmc;
 //!
 //! let (tx_1, rx_1) = mpmc::channel();
 //! let tx_2 = tx_1.clone();

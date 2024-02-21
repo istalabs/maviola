@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use mavio::protocol::{
+use crate::protocol::{
     ComponentId, DialectImpl, DialectMessage, MaybeVersioned, SystemId, Versioned, Versionless,
 };
 
@@ -13,7 +13,7 @@ use crate::io::NodeConf;
 use crate::protocol::{Dialectless, HasDialect, MaybeDialect};
 
 #[cfg(feature = "sync")]
-use crate::io::sync::connection::ConnectionConf;
+use crate::io::sync::conn::ConnectionBuilder;
 #[cfg(feature = "sync")]
 use crate::io::sync::marker::ConnConf;
 
@@ -116,7 +116,7 @@ impl<S: MaybeSystemId, C: MaybeComponentId, D: MaybeDialect, V: MaybeVersioned>
     /// Set synchronous [`NodeConf::connection`].
     pub fn connection(
         self,
-        conn_conf: impl ConnectionConf<V> + 'static,
+        conn_conf: impl ConnectionBuilder<V> + 'static,
     ) -> NodeBuilder<S, C, D, V, ConnConf<V>> {
         NodeBuilder {
             system_id: self.system_id,

@@ -3,13 +3,12 @@ use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 use std::sync::mpsc;
 use std::thread;
 
-use mavio::protocol::MaybeVersioned;
+use crate::protocol::MaybeVersioned;
 
-use crate::io::sync::connection::{ConnectionBuilder, ConnectionConf};
-use crate::io::sync::mpsc_rw::{MpscReader, MpscWriter};
-use crate::io::sync::utils::handle_listener_stop;
+use crate::io::sync::conn::{Connection, ConnectionBuilder};
+use crate::io::sync::utils::{handle_listener_stop, MpscReader, MpscWriter};
 use crate::io::utils::resolve_socket_addr;
-use crate::io::{Connection, ConnectionInfo, PeerConnectionInfo};
+use crate::io::{ChannelInfo, ConnectionInfo};
 use crate::utils::{Closable, Closer};
 
 use crate::prelude::*;
@@ -20,9 +19,9 @@ use crate::prelude::*;
 /// remote UDP connections.
 ///
 /// Each incoming connection will be considered as a separate channel. You can use
-/// [`Callback::respond`](crate::Callback::respond) or
-/// [`Callback::respond_others`](crate::Callback::respond_others) to control which channels receive
-/// response messages.
+/// [`Callback::respond`](crate::io::Callback::respond) or
+/// [`Callback::respond_others`](crate::io::Callback::respond_others) to control which channels
+/// receive response messages.
 ///
 /// Use [`UdpClientConf`](super::client::UdpClient) to create a TCP client node.
 ///
@@ -76,6 +75,10 @@ impl UdpServer {
 }
 
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServer {
+    fn info(&self) -> &ConnectionInfo {
+        &self.info
+    }
+
     fn build(&self) -> Result<Connection<V>> {
         let server_addr = self.addr;
         let udp_socket = UdpSocket::bind(server_addr)?;
@@ -106,7 +109,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServer {
                     let reader = MpscReader::new(reader_rx);
 
                     let peer_connection = peer_builder.build(
-                        PeerConnectionInfo::UdpServer {
+                        ChannelInfo::UdpServer {
                             server_addr,
                             peer_addr,
                         },
@@ -160,11 +163,5 @@ impl UdpServer {
                 return;
             }
         });
-    }
-}
-
-impl<V: MaybeVersioned + 'static> ConnectionConf<V> for UdpServer {
-    fn info(&self) -> &ConnectionInfo {
-        &self.info
     }
 }

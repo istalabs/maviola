@@ -1,6 +1,6 @@
 //! MAVLink [message signing](https://mavlink.io/en/guide/message_signing.html) tools.
 
-use mavio::protocol::SecretKey;
+use crate::protocol::SecretKey;
 
 pub use builder::SignConfBuilder;
 use builder::{HasSecretKey, NoSecretKey};

@@ -7,13 +7,13 @@ use crate::io::marker::{
     NoComponentId, NoConnConf, NoSystemId, Unidentified,
 };
 use crate::io::NodeBuilder;
-use mavio::protocol::{
+use crate::protocol::{
     ComponentId, DialectImpl, DialectMessage, MavLinkVersion, MaybeVersioned, SystemId, Versioned,
     Versionless,
 };
 
 #[cfg(feature = "sync")]
-use crate::io::sync::connection::ConnectionConf;
+use crate::io::sync::conn::ConnectionBuilder;
 #[cfg(feature = "sync")]
 use crate::io::sync::marker::ConnConf;
 use crate::protocol::{Dialectless, HasDialect, MaybeDialect};
@@ -121,7 +121,7 @@ impl<I: MaybeIdentified, V: MaybeVersioned, M: DialectMessage, C: HasConnConf>
 #[cfg(feature = "sync")]
 impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned> NodeConf<I, D, V, ConnConf<V>> {
     /// Synchronous connection configuration.
-    pub fn connection(&self) -> &dyn ConnectionConf<V> {
+    pub fn connection(&self) -> &dyn ConnectionBuilder<V> {
         self.connection_conf.0.as_ref()
     }
 }
@@ -195,7 +195,7 @@ impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned> NodeConf<I, D, V, C
 
 #[cfg(test)]
 mod tests {
-    use mavio::protocol::MavLinkVersion;
+    use crate::protocol::MavLinkVersion;
 
     use crate::dialects::minimal;
     use crate::io::sync::TcpClient;

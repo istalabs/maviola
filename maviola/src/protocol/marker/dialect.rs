@@ -1,7 +1,6 @@
 use core::fmt::{Debug, Formatter};
 
-use mavio::protocol::{DialectImpl, DialectMessage, MessageId};
-
+use crate::protocol::{DialectImpl, DialectMessage, MessageId};
 use crate::utils::Sealed;
 
 use crate::prelude::*;
