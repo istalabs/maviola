@@ -106,7 +106,7 @@ fn main() {
     // Setup logger
     env_logger::builder()
         .filter_level(log::LevelFilter::Info) // Suppress everything below `info` for third-party modules.
-        .filter_module(env!("CARGO_PKG_NAME"), log::LevelFilter::Info) // Allow everything from current package
+        .filter_module(env!("CARGO_PKG_NAME"), log::LevelFilter::Info) // Log level for current package
         .init();
 
     let path = PathBuf::from("/tmp/maviola.sock");

@@ -20,12 +20,14 @@ pub use node_conf::NodeConf;
 pub use sync::{Callback, Connection, Event, Node};
 #[doc(inline)]
 #[cfg(feature = "sync")]
-/// <sup>[`sync`] |</sup>
-pub use sync::{SockClientConf, SockServerConf};
+/// <sup>[`sync`]</sup>
+pub use sync::{
+    FileReaderConf, FileWriterConf, TcpClientConf, TcpServerConf, UdpClientConf, UdpServerConf,
+};
 #[doc(inline)]
 #[cfg(feature = "sync")]
-/// <sup>[`sync`]</sup>
-pub use sync::{TcpClientConf, TcpServerConf, UdpClientConf, UdpServerConf};
+/// <sup>[`sync`] |</sup>
+pub use sync::{SockClientConf, SockServerConf};
 
 #[doc(inline)]
 #[cfg(feature = "sync")]

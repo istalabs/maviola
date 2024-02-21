@@ -1,10 +1,8 @@
 use std::time::Duration;
 
-/// Connection will pool incoming frames receiver with this interval.
-pub(super) const RECV_TRY_INTERVAL: Duration = Duration::from_micros(10);
 pub(super) const PEER_CONN_STOP_POOLING_INTERVAL: Duration = Duration::from_micros(100);
 pub(super) const PEER_CONN_STOP_JOIN_POOLING_INTERVAL: Duration = Duration::from_millis(100);
-pub(super) const PEER_CONN_STOP_JOIN_ATTEMPTS: usize = 10;
+pub(super) const PEER_CONN_STOP_JOIN_ATTEMPTS: usize = 30;
 
 pub(super) const CONN_STOP_POOLING_INTERVAL: Duration = Duration::from_millis(10);
 pub(super) const TCP_READ_TIMEOUT: Option<Duration> = None;

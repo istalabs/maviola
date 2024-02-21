@@ -24,6 +24,16 @@ pub enum ConnectionInfo {
         /// Server address.
         remote_addr: SocketAddr,
     },
+    /// Writes binary output to a file.
+    FileWriter {
+        /// File path.
+        path: PathBuf,
+    },
+    /// Reads binary output from a file.
+    FileReader {
+        /// File path.
+        path: PathBuf,
+    },
     /// <sup>`unix`</sup>
     /// Unix socket server.
     #[cfg(unix)]
@@ -71,6 +81,16 @@ pub enum PeerConnectionInfo {
         server_addr: SocketAddr,
         /// Bind address.
         bind_addr: SocketAddr,
+    },
+    /// Writes binary output to a file.
+    FileWriter {
+        /// File path.
+        path: PathBuf,
+    },
+    /// Reads binary output from a file.
+    FileReader {
+        /// File path.
+        path: PathBuf,
     },
     /// <sup>`unix`</sup>
     /// Unix socket server.

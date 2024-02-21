@@ -14,7 +14,7 @@ use crate::io::broadcast::OutgoingFrame;
 use crate::io::sync::callback::Callback;
 use crate::io::sync::consts::{
     PEER_CONN_STOP_JOIN_ATTEMPTS, PEER_CONN_STOP_JOIN_POOLING_INTERVAL,
-    PEER_CONN_STOP_POOLING_INTERVAL, RECV_TRY_INTERVAL,
+    PEER_CONN_STOP_POOLING_INTERVAL,
 };
 use crate::io::{ConnectionInfo, PeerConnectionInfo};
 use crate::utils::{Closable, SharedCloser, UniqueId};
@@ -74,10 +74,7 @@ impl<V: MaybeVersioned> Connection<V> {
                 state: state.as_closable(),
                 sender: sender.clone(),
             },
-            receiver: ConnReceiver {
-                state: state.as_closable(),
-                receiver,
-            },
+            receiver: ConnReceiver { receiver },
             state,
         };
 
@@ -216,18 +213,14 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
 
         log::trace!("[{info:?}] spawning peer connection");
 
-        let send_handler = {
-            let conn_state = conn_state.clone();
-            let state = state.clone();
+        let write_handler = {
             let send_handler = self.send_handler;
             let frame_writer = Sender::new(self.writer);
 
-            thread::spawn(move || {
-                Self::send_handler(state, conn_state, id, send_handler, frame_writer)
-            })
+            thread::spawn(move || Self::write_handler(id, send_handler, frame_writer))
         };
 
-        let recv_handler = {
+        let read_handler = {
             let conn_state = conn_state.clone();
             let state = state.clone();
             let info = info.clone();
@@ -236,7 +229,7 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
             let frame_reader = Receiver::new(self.reader);
 
             thread::spawn(move || {
-                Self::recv_handler(state, conn_state, id, info, sender, producer, frame_reader)
+                Self::read_handler(state, conn_state, id, info, sender, producer, frame_reader)
             })
         };
 
@@ -244,35 +237,20 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
             let info = info.clone();
             let state = state.clone();
             thread::spawn(move || {
-                Self::handle_stop(state, conn_state, info, send_handler, recv_handler);
+                Self::handle_stop(state, conn_state, info, write_handler, read_handler);
             });
         }
 
         state.clone()
     }
 
-    fn send_handler(
-        state: SharedCloser,
-        conn_state: Closable,
+    fn write_handler(
         id: UniqueId,
         send_handler: FrameSendHandler<V>,
         mut frame_writer: Sender<W, V>,
     ) -> Result<()> {
         loop {
-            if conn_state.is_closed() || state.is_closed() {
-                return Ok(());
-            }
-
-            let out_frame = match send_handler.try_recv() {
-                Ok(resp_frame) => resp_frame,
-                Err(mpsc::TryRecvError::Empty) => {
-                    thread::sleep(RECV_TRY_INTERVAL);
-                    continue;
-                }
-                Err(mpsc::TryRecvError::Disconnected) => {
-                    return Err(mpsc::TryRecvError::Disconnected.into())
-                }
-            };
+            let out_frame = send_handler.recv()?;
 
             if !out_frame.should_send_to(id) {
                 continue;
@@ -290,7 +268,7 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
         }
     }
 
-    fn recv_handler(
+    fn read_handler(
         state: SharedCloser,
         conn_state: Closable,
         id: UniqueId,
@@ -335,42 +313,42 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
         state: SharedCloser,
         conn_state: Closable,
         info: Arc<PeerConnectionInfo>,
-        send_handler: thread::JoinHandle<Result<()>>,
-        recv_handler: thread::JoinHandle<Result<()>>,
+        write_handler: thread::JoinHandle<Result<()>>,
+        read_handler: thread::JoinHandle<Result<()>>,
     ) {
         while !(state.is_closed()
             || conn_state.is_closed()
-            || send_handler.is_finished()
-            || recv_handler.is_finished())
+            || write_handler.is_finished()
+            || read_handler.is_finished())
         {
             thread::sleep(PEER_CONN_STOP_POOLING_INTERVAL);
         }
         state.close();
 
         for i in 0..PEER_CONN_STOP_JOIN_ATTEMPTS {
-            if send_handler.is_finished() && recv_handler.is_finished() {
+            if write_handler.is_finished() && read_handler.is_finished() {
                 break;
             }
             thread::sleep(PEER_CONN_STOP_JOIN_POOLING_INTERVAL);
             if i == PEER_CONN_STOP_JOIN_ATTEMPTS - 1 {
                 log::warn!(
-                    "[{info:?}] send/recv handlers are stuck, finished: send={}, recv={}",
-                    send_handler.is_finished(),
-                    recv_handler.is_finished()
+                    "[{info:?}] write/read handlers are stuck, finished: write={}, read={}",
+                    write_handler.is_finished(),
+                    read_handler.is_finished()
                 );
                 return;
             }
         }
 
-        if let (Ok(res_send), Ok(res_recv)) = (send_handler.join(), recv_handler.join()) {
-            if let Err(err) = res_send {
-                log::debug!("[{info:?}] send handler finished with error: {err:?}")
+        if let (Ok(res_write), Ok(res_read)) = (write_handler.join(), read_handler.join()) {
+            if let Err(err) = res_write {
+                log::debug!("[{info:?}] write handler finished with error: {err:?}")
             }
-            if let Err(err) = res_recv {
-                log::debug!("[{info:?}] recv handler finished with error: {err:?}")
+            if let Err(err) = res_read {
+                log::debug!("[{info:?}] read handler finished with error: {err:?}")
             }
         } else {
-            log::error!("[{info:?}] error joining send/recv handlers");
+            log::error!("[{info:?}] error joining read/write handlers");
         }
         log::trace!("[{info:?}] handlers stopped");
     }
@@ -401,37 +379,14 @@ impl<V: MaybeVersioned> ConnSender<V> {
 #[derive(Clone, Debug)]
 pub(super) struct ConnReceiver<V: MaybeVersioned + 'static> {
     receiver: FrameReceiver<V>,
-    state: Closable,
 }
 
 impl<V: MaybeVersioned> ConnReceiver<V> {
     pub(super) fn recv(&self) -> Result<(Frame<V>, Callback<V>)> {
-        if self.state.is_closed() {
-            return Err(Error::from(mpsc::RecvError));
-        }
-
-        loop {
-            match self.receiver.try_recv() {
-                Ok(res) => return Ok(res),
-                Err(mpsc::TryRecvError::Empty) => {
-                    if self.state.is_closed() {
-                        return Err(Error::from(mpsc::RecvError));
-                    }
-                    thread::sleep(RECV_TRY_INTERVAL);
-                    continue;
-                }
-                Err(mpsc::TryRecvError::Disconnected) => {
-                    return Err(Error::from(mpsc::RecvError));
-                }
-            }
-        }
+        self.receiver.recv().map_err(Error::from)
     }
 
     pub(super) fn try_recv(&self) -> Result<(Frame<V>, Callback<V>)> {
-        if self.state.is_closed() {
-            return Err(Error::from(mpsc::TryRecvError::Disconnected));
-        }
-
         self.receiver.try_recv().map_err(Error::from)
     }
 }

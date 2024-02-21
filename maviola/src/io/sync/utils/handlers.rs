@@ -4,7 +4,7 @@ use crate::io::sync::consts::CONN_STOP_POOLING_INTERVAL;
 use crate::io::ConnectionInfo;
 use crate::utils::Closer;
 
-pub(super) fn handle_listener_stop(
+pub(crate) fn handle_listener_stop(
     handler: thread::JoinHandle<crate::errors::Result<Closer>>,
     info: ConnectionInfo,
 ) {

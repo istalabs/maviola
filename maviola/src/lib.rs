@@ -50,7 +50,10 @@ pub use io::{NodeConf, NodeConfBuilder};
 
 #[doc(inline)]
 #[cfg(feature = "sync")]
-pub use io::{Callback, Event, Node, TcpClientConf, TcpServerConf, UdpClientConf, UdpServerConf};
+pub use io::{
+    Callback, Event, FileReaderConf, FileWriterConf, Node, TcpClientConf, TcpServerConf,
+    UdpClientConf, UdpServerConf,
+};
 #[doc(inline)]
 #[cfg(feature = "sync")]
 #[cfg(unix)]
