@@ -4,7 +4,7 @@ use std::time::Duration;
 use portpicker::{pick_unused_port, Port};
 
 use maviola::dialects::minimal as dialect;
-use maviola::io::sync::{UdpClientConf, UdpServerConf};
+use maviola::io::sync::{UdpClient, UdpServer};
 use maviola::io::{Event, Node};
 use maviola::protocol::{ComponentId, Frame, MaybeVersioned, V2};
 
@@ -44,7 +44,7 @@ fn spawn_client(addr: &str, component_id: ComponentId) {
                 .dialect(dialect::dialect())
                 .heartbeat_interval(HEARTBEAT_INTERVAL)
                 .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-                .connection(UdpClientConf::new(client_addr).unwrap()),
+                .connection(UdpClient::new(client_addr).unwrap()),
         )
         .unwrap();
         client.activate().unwrap();
@@ -81,7 +81,7 @@ fn run(addr: &str) {
             .dialect(dialect::dialect())
             .heartbeat_interval(HEARTBEAT_INTERVAL)
             .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-            .connection(UdpServerConf::new(server_addr).unwrap()),
+            .connection(UdpServer::new(server_addr).unwrap()),
     )
     .unwrap();
     server.activate().unwrap();

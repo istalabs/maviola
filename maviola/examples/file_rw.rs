@@ -8,7 +8,7 @@ use std::time::Duration;
 use maviola::dialects::minimal as dialect;
 use maviola::io::{Event, Node};
 use maviola::protocol::{Frame, MaybeVersioned, V2};
-use maviola::{FileReaderConf, FileWriterConf};
+use maviola::{FileReader, FileWriter};
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(50);
 const HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(75);
@@ -53,7 +53,7 @@ fn run(path: PathBuf) {
             .component_id(42)
             .version(V2)
             .dialect(dialect::dialect())
-            .connection(FileWriterConf::new(path.as_path()).unwrap()),
+            .connection(FileWriter::new(path.as_path()).unwrap()),
     )
     .unwrap();
     wait();
@@ -73,7 +73,7 @@ fn run(path: PathBuf) {
             .dialect(dialect::dialect())
             .heartbeat_interval(HEARTBEAT_INTERVAL)
             .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-            .connection(FileReaderConf::new(path.as_path()).unwrap()),
+            .connection(FileReader::new(path.as_path()).unwrap()),
     )
     .unwrap();
 

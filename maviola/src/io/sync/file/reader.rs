@@ -13,7 +13,7 @@ use crate::prelude::*;
 
 /// Reads binary stream from existing file.
 ///
-/// Nodes built with [`FileReaderConf`] can't perform write actions.
+/// Nodes built with [`FileReader`] can't perform write actions.
 ///
 /// # Usage
 ///
@@ -23,7 +23,7 @@ use crate::prelude::*;
 /// # #[cfg(feature = "sync")]
 /// # {
 /// # use maviola::protocol::V2;
-/// use maviola::{Event, Node, FileReaderConf};
+/// use maviola::{Event, Node, FileReader};
 /// # use maviola::dialects::minimal;
 ///
 /// let path = "/tmp/maviola.bin";
@@ -37,19 +37,19 @@ use crate::prelude::*;
 /// #         .component_id(1)
 /// #         .dialect(minimal::dialect())
 ///         .connection(
-///             FileReaderConf::new(path)    // Configure file reader connection
+///             FileReader::new(path)    // Configure file reader connection
 ///                 .unwrap()
 ///         )
 /// ).unwrap();
 /// # }
 /// ```
 #[derive(Clone, Debug)]
-pub struct FileReaderConf {
+pub struct FileReader {
     path: PathBuf,
     info: ConnectionInfo,
 }
 
-impl FileReaderConf {
+impl FileReader {
     /// Instantiates a file reader configuration.
     ///
     /// Accepts as `path` anything that can be converted to [`PathBuf`], validates that file already
@@ -76,7 +76,7 @@ impl FileReaderConf {
     }
 }
 
-impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for FileReaderConf {
+impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for FileReader {
     fn build(&self) -> Result<Connection<V>> {
         let path = self.path.clone();
         let file = File::open(path.as_path())?;
@@ -95,7 +95,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for FileReaderConf {
     }
 }
 
-impl<V: MaybeVersioned + 'static> ConnectionConf<V> for FileReaderConf {
+impl<V: MaybeVersioned + 'static> ConnectionConf<V> for FileReader {
     fn info(&self) -> &ConnectionInfo {
         &self.info
     }

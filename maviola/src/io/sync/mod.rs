@@ -20,17 +20,17 @@ pub mod utils;
 pub use callback::Callback;
 pub use connection::Connection;
 pub use event::Event;
-pub use file::reader::FileReaderConf;
-pub use file::writer::FileWriterConf;
+pub use file::reader::FileReader;
+pub use file::writer::FileWriter;
 pub use node::Node;
-pub use tcp::client::TcpClientConf;
-pub use tcp::server::TcpServerConf;
-pub use udp::client::UdpClientConf;
-pub use udp::server::UdpServerConf;
+pub use tcp::client::TcpClient;
+pub use tcp::server::TcpServer;
+pub use udp::client::UdpClient;
+pub use udp::server::UdpServer;
 
 #[cfg(unix)]
 /// <sup>`unix`</sup>
-pub use sock::client::SockClientConf;
+pub use sock::client::SockClient;
 #[cfg(unix)]
 /// <sup>`unix`</sup>
-pub use sock::server::SockServerConf;
+pub use sock::server::SockServer;

@@ -9,14 +9,14 @@ use mavio::protocol::{
     Versioned, Versionless,
 };
 
-use crate::io::marker::{Identified, MaybeIdentified, NoConnConf, Unidentified};
-use crate::io::node_builder::{
-    HasComponentId, HasSystemId, NoComponentId, NoSystemId, NodeBuilder,
+use crate::io::marker::{
+    HasComponentId, HasSystemId, Identified, MaybeIdentified, NoComponentId, NoConnConf,
+    NoSystemId, Unidentified,
 };
 use crate::io::sync::event::EventsIterator;
-use crate::io::sync::marker::SyncConnConf;
+use crate::io::sync::marker::ConnConf;
 use crate::io::sync::{Callback, Connection};
-use crate::io::{ConnectionInfo, Event, NodeConf};
+use crate::io::{ConnectionInfo, Event, NodeBuilder, NodeConf};
 use crate::protocol::{Dialectless, HasDialect, MaybeDialect};
 use crate::protocol::{Peer, PeerId};
 
@@ -33,7 +33,7 @@ use crate::prelude::*;
 /// # #[cfg(feature = "sync")]
 /// # {
 /// use maviola::protocol::V2;
-/// use maviola::{Event, Node, TcpServerConf};
+/// use maviola::{Event, Node, TcpServer};
 /// use maviola::dialects::minimal;
 /// # use portpicker::pick_unused_port;
 ///
@@ -48,7 +48,7 @@ use crate::prelude::*;
 ///         .component_id(1)                // Component `ID`
 ///         .dialect(minimal::dialect())    // Dialect is set to `minimal`
 ///         .connection(
-///             TcpServerConf::new(addr)    // Configure TCP server connection
+///             TcpServer::new(addr)    // Configure TCP server connection
 ///                 .unwrap()
 ///         )
 /// ).unwrap();
@@ -92,40 +92,38 @@ pub struct Node<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned + 'static
 }
 
 impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned + 'static>
-    TryFrom<NodeConf<I, D, V, SyncConnConf<V>>> for Node<I, D, V>
+    TryFrom<NodeConf<I, D, V, ConnConf<V>>> for Node<I, D, V>
 {
     type Error = Error;
 
     /// Attempts to construct [`Node`] from configuration.
-    fn try_from(value: NodeConf<I, D, V, SyncConnConf<V>>) -> Result<Self> {
+    fn try_from(value: NodeConf<I, D, V, ConnConf<V>>) -> Result<Self> {
         Self::try_from_conf(value)
     }
 }
 
 impl<D: MaybeDialect, V: MaybeVersioned>
-    TryFrom<NodeBuilder<HasSystemId, HasComponentId, D, V, SyncConnConf<V>>>
+    TryFrom<NodeBuilder<HasSystemId, HasComponentId, D, V, ConnConf<V>>>
     for Node<Identified, D, V>
 {
     type Error = Error;
 
     /// Attempts to construct an identified [`Node`] from a node builder.
     fn try_from(
-        value: NodeBuilder<HasSystemId, HasComponentId, D, V, SyncConnConf<V>>,
+        value: NodeBuilder<HasSystemId, HasComponentId, D, V, ConnConf<V>>,
     ) -> Result<Self> {
         Self::try_from_conf(value.conf())
     }
 }
 
 impl<D: MaybeDialect, V: MaybeVersioned>
-    TryFrom<NodeBuilder<NoSystemId, NoComponentId, D, V, SyncConnConf<V>>>
+    TryFrom<NodeBuilder<NoSystemId, NoComponentId, D, V, ConnConf<V>>>
     for Node<Unidentified, D, V>
 {
     type Error = Error;
 
     /// Attempts to construct an unidentified [`Node`] from a node builder.
-    fn try_from(
-        value: NodeBuilder<NoSystemId, NoComponentId, D, V, SyncConnConf<V>>,
-    ) -> Result<Self> {
+    fn try_from(value: NodeBuilder<NoSystemId, NoComponentId, D, V, ConnConf<V>>) -> Result<Self> {
         Self::try_from_conf(value.conf())
     }
 }
@@ -143,7 +141,7 @@ impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D
     ///
     /// Creates ona instance of [`Node`] from [`NodeConf`]. It is also possible to use [`TryFrom`]
     /// and create a node with [`Node::try_from`].
-    pub fn try_from_conf(conf: NodeConf<I, D, V, SyncConnConf<V>>) -> Result<Self> {
+    pub fn try_from_conf(conf: NodeConf<I, D, V, ConnConf<V>>) -> Result<Self> {
         let connection = conf.connection().build()?;
         let (events_tx, events_rx) = mpmc::channel();
 

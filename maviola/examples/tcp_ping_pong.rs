@@ -4,7 +4,7 @@ use std::time::Duration;
 use portpicker::{pick_unused_port, Port};
 
 use maviola::dialects::minimal as dialect;
-use maviola::io::sync::{TcpClientConf, TcpServerConf};
+use maviola::io::sync::{TcpClient, TcpServer};
 use maviola::io::{Event, Node};
 use maviola::protocol::{ComponentId, Frame, MaybeVersioned, V2};
 
@@ -44,7 +44,7 @@ fn spawn_client(addr: &str, component_id: ComponentId) {
                 .dialect(dialect::dialect())
                 .heartbeat_interval(HEARTBEAT_INTERVAL)
                 .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-                .connection(TcpClientConf::new(client_addr).unwrap()),
+                .connection(TcpClient::new(client_addr).unwrap()),
         )
         .unwrap();
         client.activate().unwrap();
@@ -81,7 +81,7 @@ fn run(addr: &str) {
             .dialect(dialect::dialect())
             .heartbeat_interval(HEARTBEAT_INTERVAL)
             .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-            .connection(TcpServerConf::new(server_addr).unwrap()),
+            .connection(TcpServer::new(server_addr).unwrap()),
     )
     .unwrap();
     server.activate().unwrap();

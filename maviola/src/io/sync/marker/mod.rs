@@ -4,4 +4,4 @@
 
 mod connection;
 
-pub use connection::SyncConnConf;
+pub use connection::ConnConf;

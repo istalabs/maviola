@@ -24,7 +24,7 @@ use crate::prelude::*;
 /// [`Callback::respond_others`](crate::Callback::respond_others) to control which channels receive
 /// response messages.
 ///
-/// Use [`UdpClientConf`](super::client::UdpClientConf) to create a TCP client node.
+/// Use [`UdpClientConf`](super::client::UdpClient) to create a TCP client node.
 ///
 /// # Usage
 ///
@@ -35,7 +35,7 @@ use crate::prelude::*;
 /// # #[cfg(feature = "sync")]
 /// # {
 /// # use maviola::protocol::V2;
-/// use maviola::{Event, Node, UdpServerConf};
+/// use maviola::{Event, Node, UdpServer};
 /// # use maviola::dialects::minimal;
 /// # use portpicker::pick_unused_port;
 ///
@@ -51,19 +51,19 @@ use crate::prelude::*;
 /// #         .component_id(1)
 /// #         .dialect(minimal::dialect())
 ///         .connection(
-///             UdpServerConf::new(addr)    // Configure UDP server connection
+///             UdpServer::new(addr)    // Configure UDP server connection
 ///                 .unwrap()
 ///         )
 /// ).unwrap();
 /// # }
 /// ```
 #[derive(Clone, Debug)]
-pub struct UdpServerConf {
+pub struct UdpServer {
     addr: SocketAddr,
     info: ConnectionInfo,
 }
 
-impl UdpServerConf {
+impl UdpServer {
     /// Instantiates a UDP server configuration.
     ///
     /// Accepts as `addr` anything that implements [`ToSocketAddrs`], prefers IPv4 addresses if
@@ -75,7 +75,7 @@ impl UdpServerConf {
     }
 }
 
-impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServerConf {
+impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServer {
     fn build(&self) -> Result<Connection<V>> {
         let server_addr = self.addr;
         let udp_socket = UdpSocket::bind(server_addr)?;
@@ -135,7 +135,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServerConf {
     }
 }
 
-impl UdpServerConf {
+impl UdpServer {
     fn handle_peer_sends(
         conn_state: Closable,
         conn_info: ConnectionInfo,
@@ -163,7 +163,7 @@ impl UdpServerConf {
     }
 }
 
-impl<V: MaybeVersioned + 'static> ConnectionConf<V> for UdpServerConf {
+impl<V: MaybeVersioned + 'static> ConnectionConf<V> for UdpServer {
     fn info(&self) -> &ConnectionInfo {
         &self.info
     }

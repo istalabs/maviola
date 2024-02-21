@@ -21,7 +21,7 @@ use crate::prelude::*;
 /// [`Callback::respond_others`](crate::Callback::respond_others) to control which channels receive
 /// response messages.
 ///
-/// Use [`TcpClientConf`](super::client::TcpClientConf) to create a TCP client node.
+/// Use [`TcpClientConf`](super::client::TcpClient) to create a TCP client node.
 ///
 /// # Usage
 ///
@@ -32,7 +32,7 @@ use crate::prelude::*;
 /// # #[cfg(feature = "sync")]
 /// # {
 /// # use maviola::protocol::V2;
-/// use maviola::{Event, Node, TcpServerConf};
+/// use maviola::{Event, Node, TcpServer};
 /// # use maviola::dialects::minimal;
 /// # use portpicker::pick_unused_port;
 ///
@@ -48,19 +48,19 @@ use crate::prelude::*;
 /// #         .component_id(1)
 /// #         .dialect(minimal::dialect())
 ///         .connection(
-///             TcpServerConf::new(addr)    // Configure TCP server connection
+///             TcpServer::new(addr)    // Configure TCP server connection
 ///                 .unwrap()
 ///         )
 /// ).unwrap();
 /// # }
 /// ```
 #[derive(Clone, Debug)]
-pub struct TcpServerConf {
+pub struct TcpServer {
     addr: SocketAddr,
     info: ConnectionInfo,
 }
 
-impl TcpServerConf {
+impl TcpServer {
     /// Instantiates a TCP server configuration.
     ///
     /// Accepts as `addr` anything that implements [`ToSocketAddrs`], prefers IPv4 addresses if
@@ -72,7 +72,7 @@ impl TcpServerConf {
     }
 }
 
-impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpServerConf {
+impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpServer {
     fn build(&self) -> Result<Connection<V>> {
         let server_addr = self.addr;
         let listener = TcpListener::bind(self.addr)?;
@@ -113,7 +113,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpServerConf {
     }
 }
 
-impl<V: MaybeVersioned + 'static> ConnectionConf<V> for TcpServerConf {
+impl<V: MaybeVersioned + 'static> ConnectionConf<V> for TcpServer {
     fn info(&self) -> &ConnectionInfo {
         &self.info
     }

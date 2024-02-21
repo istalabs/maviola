@@ -48,10 +48,9 @@ pub use protocol::Frame;
 #[doc(inline)]
 #[cfg(feature = "sync")]
 pub use io::{
-    Callback, Event, FileReaderConf, FileWriterConf, Node, TcpClientConf, TcpServerConf,
-    UdpClientConf, UdpServerConf,
+    Callback, Event, FileReader, FileWriter, Node, TcpClient, TcpServer, UdpClient, UdpServer,
 };
 #[doc(inline)]
 #[cfg(feature = "sync")]
 #[cfg(unix)]
-pub use io::{SockClientConf, SockServerConf};
+pub use io::{SockClient, SockServer};

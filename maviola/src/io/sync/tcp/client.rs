@@ -12,7 +12,7 @@ use crate::prelude::*;
 /// TCP client configuration.
 ///
 /// Provides connection configuration for a node that connects to a TCP port as a client. Use
-/// [`TcpServerConf`](super::server::TcpServerConf) to create a TCP server node.
+/// [`TcpServerConf`](super::server::TcpServer) to create a TCP server node.
 ///
 /// # Usage
 ///
@@ -23,8 +23,8 @@ use crate::prelude::*;
 /// # #[cfg(feature = "sync")]
 /// # {
 /// # use maviola::protocol::V2;
-/// # use maviola::TcpServerConf;
-/// use maviola::{Event, Node, TcpClientConf};
+/// # use maviola::TcpServer;
+/// use maviola::{Event, Node, TcpClient};
 /// # use maviola::dialects::minimal;
 /// # use portpicker::pick_unused_port;
 ///
@@ -42,8 +42,8 @@ use crate::prelude::*;
 ///         .connection(
 /// # {
 /// #           let _addr = addr.clone();
-///             TcpClientConf::new(addr)    // Configure TCP client connection
-/// #           ;TcpServerConf::new(_addr)
+///             TcpClient::new(addr)    // Configure TCP client connection
+/// #           ;TcpServer::new(_addr)
 /// # }
 ///                 .unwrap()
 ///         )
@@ -51,12 +51,12 @@ use crate::prelude::*;
 /// # }
 /// ```
 #[derive(Clone, Debug)]
-pub struct TcpClientConf {
+pub struct TcpClient {
     addr: SocketAddr,
     info: ConnectionInfo,
 }
 
-impl TcpClientConf {
+impl TcpClient {
     /// Instantiates a TCP client configuration.
     ///
     /// Accepts as `addr` anything that implements [`ToSocketAddrs`], prefers IPv4 addresses if
@@ -68,7 +68,7 @@ impl TcpClientConf {
     }
 }
 
-impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpClientConf {
+impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpClient {
     fn build(&self) -> Result<Connection<V>> {
         let server_addr = self.addr;
         let writer = TcpStream::connect(server_addr)?;
@@ -88,7 +88,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpClientConf {
     }
 }
 
-impl<V: MaybeVersioned + 'static> ConnectionConf<V> for TcpClientConf {
+impl<V: MaybeVersioned + 'static> ConnectionConf<V> for TcpClient {
     fn info(&self) -> &ConnectionInfo {
         &self.info
     }

@@ -5,36 +5,17 @@ use mavio::protocol::{
 };
 
 use crate::consts::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_TIMEOUT};
-use crate::io::marker::{HasConnConf, Identified, MaybeConnConf, NoConnConf, Unidentified};
+use crate::io::marker::{
+    HasComponentId, HasConnConf, HasSystemId, Identified, MaybeComponentId, MaybeConnConf,
+    MaybeSystemId, NoComponentId, NoConnConf, NoSystemId, Unidentified,
+};
 use crate::io::NodeConf;
 use crate::protocol::{Dialectless, HasDialect, MaybeDialect};
 
 #[cfg(feature = "sync")]
 use crate::io::sync::connection::ConnectionConf;
 #[cfg(feature = "sync")]
-use crate::io::sync::marker::SyncConnConf;
-
-/// Marker trait for [`NodeBuilder`] with or without [`NodeConf::system_id`].
-pub trait MaybeSystemId {}
-
-/// Marker for [`NodeBuilder`] without [`NodeConf::system_id`].
-pub struct NoSystemId;
-impl MaybeSystemId for NoSystemId {}
-
-/// Marker for [`NodeBuilder`] with [`NodeConf::system_id`] set.
-pub struct HasSystemId(pub(super) SystemId);
-impl MaybeSystemId for HasSystemId {}
-
-/// Marker trait for [`NodeBuilder`] with or without [`NodeConf::component_id`].
-pub trait MaybeComponentId {}
-
-/// Marker for [`NodeBuilder`] without [`NodeConf::component_id`].
-pub struct NoComponentId;
-impl MaybeComponentId for NoComponentId {}
-
-/// Marker for [`NodeBuilder`] with [`NodeConf::component_id`] set.
-pub struct HasComponentId(pub(super) ComponentId);
-impl MaybeComponentId for HasComponentId {}
+use crate::io::sync::marker::ConnConf;
 
 /// Builder for [`Node`](crate::Node) and [`NodeConf`].
 #[derive(Clone, Debug, Default)]
@@ -136,13 +117,13 @@ impl<S: MaybeSystemId, C: MaybeComponentId, D: MaybeDialect, V: MaybeVersioned>
     pub fn connection(
         self,
         conn_conf: impl ConnectionConf<V> + 'static,
-    ) -> NodeBuilder<S, C, D, V, SyncConnConf<V>> {
+    ) -> NodeBuilder<S, C, D, V, ConnConf<V>> {
         NodeBuilder {
             system_id: self.system_id,
             component_id: self.component_id,
             dialect: self.dialect,
             version: self.version,
-            conn_conf: SyncConnConf(Box::new(conn_conf)),
+            conn_conf: ConnConf(Box::new(conn_conf)),
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
         }

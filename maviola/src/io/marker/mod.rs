@@ -4,4 +4,7 @@
 
 mod node;
 
-pub use node::{HasConnConf, Identified, MaybeConnConf, MaybeIdentified, NoConnConf, Unidentified};
+pub use node::{
+    HasComponentId, HasConnConf, HasSystemId, Identified, MaybeComponentId, MaybeConnConf,
+    MaybeIdentified, MaybeSystemId, NoComponentId, NoConnConf, NoSystemId, Unidentified,
+};

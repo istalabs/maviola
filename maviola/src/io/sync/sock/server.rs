@@ -15,7 +15,7 @@ use crate::prelude::*;
 /// Unix socket server configuration.
 ///
 /// Socket server creates a Unix socket on Unix-like systems and starts listening for incoming
-/// connections. Use [`SockClientConf`](super::client::SockClientConf) to create a Unix socket
+/// connections. Use [`SockClientConf`](super::client::SockClient) to create a Unix socket
 /// client node.
 ///
 /// Each incoming connection will be considered as a separate channel. You can use
@@ -34,7 +34,7 @@ use crate::prelude::*;
 /// # #[cfg(unix)]
 /// # {
 /// # use maviola::protocol::V2;
-/// use maviola::{Event, Node, SockServerConf};
+/// use maviola::{Event, Node, SockServer};
 /// # use maviola::dialects::minimal;
 ///
 /// let path = "/tmp/maviola.sock";
@@ -48,19 +48,19 @@ use crate::prelude::*;
 /// #         .component_id(1)
 /// #         .dialect(minimal::dialect())
 ///         .connection(
-///             SockServerConf::new(path)    // Configure socket server connection
+///             SockServer::new(path)    // Configure socket server connection
 ///                 .unwrap()
 ///         )
 /// ).unwrap();
 /// # }
 /// ```
 #[derive(Clone, Debug)]
-pub struct SockServerConf {
+pub struct SockServer {
     path: PathBuf,
     info: ConnectionInfo,
 }
 
-impl SockServerConf {
+impl SockServer {
     /// Instantiates a Unix socket server configuration.
     ///
     /// Accepts as `path` anything that can be converted to [`PathBuf`], validates that path does
@@ -80,7 +80,7 @@ impl SockServerConf {
     }
 }
 
-impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockServerConf {
+impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockServer {
     fn build(&self) -> Result<Connection<V>> {
         let path = self.path.clone();
         let listener = UnixListener::bind(self.path.as_path())?;
@@ -126,7 +126,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockServerConf {
     }
 }
 
-impl<V: MaybeVersioned + 'static> ConnectionConf<V> for SockServerConf {
+impl<V: MaybeVersioned + 'static> ConnectionConf<V> for SockServer {
     fn info(&self) -> &ConnectionInfo {
         &self.info
     }

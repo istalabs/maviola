@@ -13,7 +13,7 @@ use crate::prelude::*;
 
 /// Writes binary stream to a file.
 ///
-/// Nodes built with [`FileWriterConf`] can't perform read operations.
+/// Nodes built with [`FileWriter`] can't perform read operations.
 ///
 /// # Usage
 ///
@@ -23,7 +23,7 @@ use crate::prelude::*;
 /// # #[cfg(feature = "sync")]
 /// # {
 /// # use maviola::protocol::V2;
-/// use maviola::{Event, Node, FileWriterConf};
+/// use maviola::{Event, Node, FileWriter};
 /// # use maviola::dialects::minimal;
 ///
 /// let path = "/tmp/maviola.bin";
@@ -37,19 +37,19 @@ use crate::prelude::*;
 /// #         .component_id(1)
 /// #         .dialect(minimal::dialect())
 ///         .connection(
-///             FileWriterConf::new(path)    // Configure file reader connection
+///             FileWriter::new(path)    // Configure file reader connection
 ///                 .unwrap()
 ///         )
 /// ).unwrap();
 /// # }
 /// ```
 #[derive(Clone, Debug)]
-pub struct FileWriterConf {
+pub struct FileWriter {
     path: PathBuf,
     info: ConnectionInfo,
 }
 
-impl FileWriterConf {
+impl FileWriter {
     /// Instantiates a file writer configuration.
     ///
     /// Accepts as `path` anything that can be converted to [`PathBuf`], validates that file does
@@ -69,7 +69,7 @@ impl FileWriterConf {
     }
 }
 
-impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for FileWriterConf {
+impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for FileWriter {
     fn build(&self) -> Result<Connection<V>> {
         let path = self.path.clone();
         let file = File::create(path.as_path())?;
@@ -88,7 +88,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for FileWriterConf {
     }
 }
 
-impl<V: MaybeVersioned + 'static> ConnectionConf<V> for FileWriterConf {
+impl<V: MaybeVersioned + 'static> ConnectionConf<V> for FileWriter {
     fn info(&self) -> &ConnectionInfo {
         &self.info
     }

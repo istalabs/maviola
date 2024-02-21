@@ -12,7 +12,7 @@ use crate::prelude::*;
 /// Unix socket client configuration.
 ///
 /// Socket client connects to an existing Unix socket on Unix-like systems. Use
-/// [`SockServerConf`](super::server::SockServerConf) to create a Unix socket server node.
+/// [`SockServerConf`](super::server::SockServer) to create a Unix socket server node.
 ///
 /// # Usage
 ///
@@ -23,7 +23,7 @@ use crate::prelude::*;
 /// # #[cfg(unix)]
 /// # {
 /// # use maviola::protocol::V2;
-/// use maviola::{Event, Node, SockClientConf};
+/// use maviola::{Event, Node, SockClient};
 /// # use maviola::dialects::minimal;
 ///
 /// let path = "/tmp/maviola.sock";
@@ -37,19 +37,19 @@ use crate::prelude::*;
 /// #         .component_id(1)
 /// #         .dialect(minimal::dialect())
 ///         .connection(
-///             SockClientConf::new(path)    // Configure socket server connection
+///             SockClient::new(path)    // Configure socket server connection
 ///                 .unwrap()
 ///         )
 /// ).unwrap();
 /// # }
 /// ```
 #[derive(Clone, Debug)]
-pub struct SockClientConf {
+pub struct SockClient {
     path: PathBuf,
     info: ConnectionInfo,
 }
 
-impl SockClientConf {
+impl SockClient {
     /// Instantiates a Unix socket client configuration.
     ///
     /// Accepts as `path` anything that can be converted to [`PathBuf`], validates that path exists
@@ -69,7 +69,7 @@ impl SockClientConf {
     }
 }
 
-impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockClientConf {
+impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockClient {
     fn build(&self) -> Result<Connection<V>> {
         let path = self.path.clone();
         let writer = UnixStream::connect(path.as_path())?;
@@ -86,7 +86,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockClientConf {
     }
 }
 
-impl<V: MaybeVersioned + 'static> ConnectionConf<V> for SockClientConf {
+impl<V: MaybeVersioned + 'static> ConnectionConf<V> for SockClient {
     fn info(&self) -> &ConnectionInfo {
         &self.info
     }

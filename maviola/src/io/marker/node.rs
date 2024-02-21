@@ -1,8 +1,10 @@
-//! Markers for MAVLink [`Node`](super::node::Node).
+//! Markers for MAVLink [`Node`](crate::io::Node).
 
-use crate::utils::Sealed;
 use mavio::protocol::{ComponentId, SystemId};
 
+use crate::utils::Sealed;
+
+/// <sup>🔒</sup>
 /// Marker for a node with or without `system_id` and `component_id`.
 ///
 /// ⚠ This trait is sealed ⚠
@@ -34,6 +36,7 @@ pub struct Identified {
 impl Sealed for Identified {}
 impl MaybeIdentified for Identified {}
 
+/// <sup>🔒</sup>
 /// Variant of a node configuration which may or may not have a connection config.
 ///
 /// ⚠ This trait is sealed ⚠
@@ -44,5 +47,40 @@ pub struct NoConnConf;
 impl Sealed for NoConnConf {}
 impl MaybeConnConf for NoConnConf {}
 
+/// <sup>🔒</sup>
 /// Variant of a node configuration which has a connection config.
+///
+/// ⚠ This trait is sealed ⚠
 pub trait HasConnConf: MaybeConnConf {}
+
+/// <sup>🔒</sup>
+/// Marker trait for an entity with or without MAVLink system `ID`.
+///
+/// ⚠ This trait is sealed ⚠
+pub trait MaybeSystemId: Sealed {}
+
+/// Marker for an entity without MAVLink system `ID`.
+pub struct NoSystemId;
+impl Sealed for NoSystemId {}
+impl MaybeSystemId for NoSystemId {}
+
+/// Marker for an entity with a defined MAVLink system `ID`.
+pub struct HasSystemId(pub SystemId);
+impl Sealed for HasSystemId {}
+impl MaybeSystemId for HasSystemId {}
+
+/// <sup>🔒</sup>
+/// Marker trait for an entity with or without MAVLink component `ID`.
+///
+/// ⚠ This trait is sealed ⚠
+pub trait MaybeComponentId: Sealed {}
+
+/// Marker for an entity without MAVLink component `ID`.
+pub struct NoComponentId;
+impl Sealed for NoComponentId {}
+impl MaybeComponentId for NoComponentId {}
+
+/// Marker for an entity with a defined MAVLink component `ID`.
+pub struct HasComponentId(pub ComponentId);
+impl Sealed for HasComponentId {}
+impl MaybeComponentId for HasComponentId {}

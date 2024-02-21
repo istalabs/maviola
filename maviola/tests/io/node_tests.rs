@@ -8,7 +8,7 @@ use portpicker::Port;
 
 use maviola::dialects::minimal;
 use maviola::io::marker::Identified;
-use maviola::io::sync::{TcpClientConf, TcpServerConf};
+use maviola::io::sync::{TcpClient, TcpServer};
 use maviola::io::{Event, Node};
 use maviola::protocol::HasDialect;
 
@@ -60,7 +60,7 @@ pub fn make_tcp_server_node(port: Port) -> Node<Identified, HasDialect<minimal::
             .component_id(DEFAULT_TCP_SERVER_COMP_ID)
             .dialect(minimal::dialect())
             .version(V2)
-            .connection(TcpServerConf::new(make_addr(port)).unwrap()),
+            .connection(TcpServer::new(make_addr(port)).unwrap()),
     )
     .unwrap()
 }
@@ -75,7 +75,7 @@ pub fn make_tcp_client_node(
             .component_id(component_id)
             .dialect(minimal::dialect())
             .version(V2)
-            .connection(TcpClientConf::new(make_addr(port)).unwrap()),
+            .connection(TcpClient::new(make_addr(port)).unwrap()),
     )
     .unwrap()
 }
@@ -175,7 +175,7 @@ fn events_are_received() {
             .component_id(1)
             .dialect(minimal::dialect())
             .version(V2)
-            .connection(TcpServerConf::new(make_addr(port)).unwrap())
+            .connection(TcpServer::new(make_addr(port)).unwrap())
             .heartbeat_timeout(WAIT_DURATION),
     )
     .unwrap();
@@ -213,7 +213,7 @@ fn heartbeats_are_sent() {
             .component_id(1)
             .dialect(minimal::dialect())
             .version(V2)
-            .connection(TcpServerConf::new(make_addr(port)).unwrap())
+            .connection(TcpServer::new(make_addr(port)).unwrap())
             .heartbeat_timeout(WAIT_DURATION.mul_f32(2.0))
             .heartbeat_interval(WAIT_DURATION),
     )
@@ -235,7 +235,7 @@ fn node_no_id_no_dialect_no_version() {
     let port = unused_port();
     let server_node = make_tcp_server_node(port);
     let client_node =
-        Node::try_from(Node::builder().connection(TcpClientConf::new(make_addr(port)).unwrap()))
+        Node::try_from(Node::builder().connection(TcpClient::new(make_addr(port)).unwrap()))
             .unwrap();
     wait();
 
@@ -279,7 +279,7 @@ fn node_no_id_no_version() {
     let client_node = Node::try_from(
         Node::builder()
             .dialect(minimal::dialect())
-            .connection(TcpClientConf::new(make_addr(port)).unwrap()),
+            .connection(TcpClient::new(make_addr(port)).unwrap()),
     )
     .unwrap();
     wait();
@@ -302,7 +302,7 @@ fn node_no_id() {
         Node::builder()
             .dialect(minimal::dialect())
             .version(V2)
-            .connection(TcpClientConf::new(make_addr(port)).unwrap()),
+            .connection(TcpClient::new(make_addr(port)).unwrap()),
     )
     .unwrap();
     wait();
@@ -327,7 +327,7 @@ fn node_no_version() {
             .system_id(42)
             .component_id(142)
             .dialect(minimal::dialect())
-            .connection(TcpClientConf::new(make_addr(port)).unwrap()),
+            .connection(TcpClient::new(make_addr(port)).unwrap()),
     )
     .unwrap();
     wait();

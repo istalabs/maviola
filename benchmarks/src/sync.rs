@@ -6,8 +6,9 @@ use std::time::{Duration, SystemTime};
 
 use maviola::dialects::minimal;
 use maviola::dialects::minimal::enums::{MavAutopilot, MavModeFlag, MavState, MavType};
-use maviola::protocol::{HasDialect, Identified, V2};
-use maviola::{Node, SockClientConf, SockServerConf};
+use maviola::io::marker::Identified;
+use maviola::protocol::{HasDialect, V2};
+use maviola::{Node, SockClient, SockServer};
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(50);
 const HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(75);
@@ -26,7 +27,7 @@ fn make_sock_server(path: PathBuf) -> Node<Identified, HasDialect<minimal::Minim
             .dialect(minimal::dialect())
             .heartbeat_interval(HEARTBEAT_INTERVAL)
             .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-            .connection(SockServerConf::new(path.as_path()).unwrap()),
+            .connection(SockServer::new(path.as_path()).unwrap()),
     )
     .unwrap()
 }
@@ -44,7 +45,7 @@ fn make_sock_client(path: PathBuf, id: u16) -> Node<Identified, HasDialect<minim
             .dialect(minimal::dialect())
             .heartbeat_interval(HEARTBEAT_INTERVAL)
             .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-            .connection(SockClientConf::new(path.as_path()).unwrap()),
+            .connection(SockClient::new(path.as_path()).unwrap()),
     )
     .unwrap()
 }

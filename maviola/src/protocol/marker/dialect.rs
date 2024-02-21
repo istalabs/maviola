@@ -6,6 +6,7 @@ use crate::utils::Sealed;
 
 use crate::prelude::*;
 
+/// <sup>🔒</sup>
 /// Marker for entities which depend on whether a particular dialect has been specified.
 ///
 /// ⚠ This trait is sealed ⚠

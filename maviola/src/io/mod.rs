@@ -23,13 +23,11 @@ pub use sync::{Callback, Connection, Event, Node};
 #[doc(inline)]
 #[cfg(feature = "sync")]
 /// <sup>[`sync`]</sup>
-pub use sync::{
-    FileReaderConf, FileWriterConf, TcpClientConf, TcpServerConf, UdpClientConf, UdpServerConf,
-};
+pub use sync::{FileReader, FileWriter, TcpClient, TcpServer, UdpClient, UdpServer};
 #[doc(inline)]
 #[cfg(feature = "sync")]
 /// <sup>[`sync`] |</sup>
-pub use sync::{SockClientConf, SockServerConf};
+pub use sync::{SockClient, SockServer};
 
 #[doc(inline)]
 #[cfg(feature = "sync")]

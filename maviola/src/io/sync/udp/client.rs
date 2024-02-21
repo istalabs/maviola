@@ -14,11 +14,11 @@ use crate::prelude::*;
 /// UDP client configuration.
 ///
 /// Provides connection configuration for a node that communicates with a specified UDP port. Use
-/// [`UdpServerConf`](super::server::UdpServerConf) to create a UDP server node.
+/// [`UdpServerConf`](super::server::UdpServer) to create a UDP server node.
 ///
 /// In UDP-client mode the node will bind to a random port on the system. The host can be set by
-/// [`UdpClientConf::with_host`]. By default, the host is equal to [`DEFAULT_UDP_HOST`]. It is also
-/// possible to specify exact binding address by [`UdpClientConf::with_bind_addr`].
+/// [`UdpClient::with_host`]. By default, the host is equal to [`DEFAULT_UDP_HOST`]. It is also
+/// possible to specify exact binding address by [`UdpClient::with_bind_addr`].
 ///
 /// # Usage
 ///
@@ -29,7 +29,7 @@ use crate::prelude::*;
 /// # #[cfg(feature = "sync")]
 /// # {
 /// # use maviola::protocol::V2;
-/// use maviola::{Event, Node, UdpClientConf};
+/// use maviola::{Event, Node, UdpClient};
 /// # use maviola::dialects::minimal;
 /// # use portpicker::pick_unused_port;
 ///
@@ -46,7 +46,7 @@ use crate::prelude::*;
 /// #         .component_id(1)
 /// #         .dialect(minimal::dialect())
 ///         .connection(
-///             UdpClientConf::new(addr)    // Configure UDP client connection
+///             UdpClient::new(addr)    // Configure UDP client connection
 ///                 .unwrap()
 ///                 .with_host(host)        // set bind host (random port will be used for bind addr)
 ///                 .unwrap()
@@ -55,14 +55,14 @@ use crate::prelude::*;
 /// # }
 /// ```
 #[derive(Clone, Debug)]
-pub struct UdpClientConf {
+pub struct UdpClient {
     addr: SocketAddr,
     host: String,
     bind_addr: Option<SocketAddr>,
     info: ConnectionInfo,
 }
 
-impl UdpClientConf {
+impl UdpClient {
     /// Instantiates a UDP client configuration.
     ///
     /// Accepts as `addr` anything that implements [`ToSocketAddrs`], prefers IPv4 addresses if
@@ -81,7 +81,7 @@ impl UdpClientConf {
 
     /// Adds host to configuration.
     ///
-    /// Discards bind address specified by [`UdpClientConf::with_bind_addr`].
+    /// Discards bind address specified by [`UdpClient::with_bind_addr`].
     pub fn with_host(self, host: impl ToString) -> Result<Self> {
         let host = host.to_string();
         resolve_socket_addr(format!("{host}:80"))?;
@@ -97,7 +97,7 @@ impl UdpClientConf {
     /// Adds a specific binding address to configuration.
     ///
     /// If specified, the binding address will have higher priority over host specified by
-    /// [`UdpClientConf::with_host`].
+    /// [`UdpClient::with_host`].
     pub fn with_bind_addr(self, addr: impl ToSocketAddrs) -> Result<Self> {
         Ok(Self {
             addr: self.addr,
@@ -108,7 +108,7 @@ impl UdpClientConf {
     }
 }
 
-impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpClientConf {
+impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpClient {
     fn build(&self) -> Result<Connection<V>> {
         let bind_addr = match self.bind_addr {
             None => resolve_socket_addr(format!("{}:{}", self.host, pick_unused_port()?))?,
@@ -139,7 +139,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpClientConf {
     }
 }
 
-impl<V: MaybeVersioned + 'static> ConnectionConf<V> for UdpClientConf {
+impl<V: MaybeVersioned + 'static> ConnectionConf<V> for UdpClient {
     fn info(&self) -> &ConnectionInfo {
         &self.info
     }

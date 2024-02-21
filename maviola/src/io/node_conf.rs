@@ -3,11 +3,10 @@
 use std::time::Duration;
 
 use crate::io::marker::{
-    HasConnConf, Identified, MaybeConnConf, MaybeIdentified, NoConnConf, Unidentified,
+    HasComponentId, HasConnConf, HasSystemId, Identified, MaybeConnConf, MaybeIdentified,
+    NoComponentId, NoConnConf, NoSystemId, Unidentified,
 };
-use crate::io::node_builder::{
-    HasComponentId, HasSystemId, NoComponentId, NoSystemId, NodeBuilder,
-};
+use crate::io::NodeBuilder;
 use mavio::protocol::{
     ComponentId, DialectImpl, DialectMessage, MavLinkVersion, MaybeVersioned, SystemId, Versioned,
     Versionless,
@@ -16,7 +15,7 @@ use mavio::protocol::{
 #[cfg(feature = "sync")]
 use crate::io::sync::connection::ConnectionConf;
 #[cfg(feature = "sync")]
-use crate::io::sync::marker::SyncConnConf;
+use crate::io::sync::marker::ConnConf;
 use crate::protocol::{Dialectless, HasDialect, MaybeDialect};
 use crate::Node;
 
@@ -51,13 +50,13 @@ impl NodeConf<Unidentified, Dialectless, Versionless, NoConnConf> {
     ///
     /// ```rust
     /// use maviola::io::NodeConf;
-    /// use maviola::io::sync::TcpClientConf;
+    /// use maviola::io::sync::TcpClient;
     /// use maviola::dialects::minimal;
     ///
     /// let node = NodeConf::builder()
     ///     .system_id(10)
     ///     .component_id(42)
-    ///     .connection(TcpClientConf::new("localhost:5600").unwrap())
+    ///     .connection(TcpClient::new("localhost:5600").unwrap())
     ///     .dialect(minimal::dialect())
     ///     .conf();
     ///
@@ -70,12 +69,12 @@ impl NodeConf<Unidentified, Dialectless, Versionless, NoConnConf> {
     ///
     /// ```rust
     /// use maviola::io::NodeConf;
-    /// use maviola::io::sync::TcpClientConf;
+    /// use maviola::io::sync::TcpClient;
     ///
     /// let node = NodeConf::builder()
     ///     .system_id(10)
     ///     .component_id(42)
-    ///     .connection(TcpClientConf::new("localhost:5600").unwrap())
+    ///     .connection(TcpClient::new("localhost:5600").unwrap())
     ///     .conf();
     ///
     /// assert_eq!(node.system_id(), 10);
@@ -86,10 +85,10 @@ impl NodeConf<Unidentified, Dialectless, Versionless, NoConnConf> {
     ///
     /// ```rust
     /// use maviola::io::NodeConf;
-    /// use maviola::io::sync::TcpClientConf;
+    /// use maviola::io::sync::TcpClient;
     ///
     /// let node = NodeConf::builder()
-    ///     .connection(TcpClientConf::new("localhost:5600").unwrap())
+    ///     .connection(TcpClient::new("localhost:5600").unwrap())
     ///     .conf();
     /// ```
     pub fn builder() -> NodeBuilder<NoSystemId, NoComponentId, Dialectless, Versionless, NoConnConf>
@@ -120,7 +119,7 @@ impl<I: MaybeIdentified, V: MaybeVersioned, M: DialectMessage, C: HasConnConf>
 }
 
 #[cfg(feature = "sync")]
-impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned> NodeConf<I, D, V, SyncConnConf<V>> {
+impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned> NodeConf<I, D, V, ConnConf<V>> {
     /// Synchronous connection configuration.
     pub fn connection(&self) -> &dyn ConnectionConf<V> {
         self.connection_conf.0.as_ref()
@@ -187,7 +186,7 @@ impl<D: MaybeDialect, V: MaybeVersioned, C: HasConnConf> NodeConf<Unidentified, 
     }
 }
 
-impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned> NodeConf<I, D, V, SyncConnConf<V>> {
+impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned> NodeConf<I, D, V, ConnConf<V>> {
     /// Creates a [`Node`] initialised with current configuration.
     pub fn build(self) -> Result<Node<I, D, V>> {
         Node::try_from_conf(self)
@@ -199,7 +198,7 @@ mod tests {
     use mavio::protocol::MavLinkVersion;
 
     use crate::dialects::minimal;
-    use crate::io::sync::TcpClientConf;
+    use crate::io::sync::TcpClient;
 
     use super::*;
 
@@ -208,7 +207,7 @@ mod tests {
         let node = NodeConf::builder()
             .system_id(10)
             .component_id(42)
-            .connection(TcpClientConf::new("localhost:5600").unwrap())
+            .connection(TcpClient::new("localhost:5600").unwrap())
             .conf();
 
         assert_eq!(node.system_id(), 10);
@@ -218,7 +217,7 @@ mod tests {
     #[test]
     fn node_conf_no_dialect_no_id_builder_workflow() {
         NodeConf::builder()
-            .connection(TcpClientConf::new("localhost:5600").unwrap())
+            .connection(TcpClient::new("localhost:5600").unwrap())
             .conf();
     }
 
@@ -228,7 +227,7 @@ mod tests {
             .system_id(10)
             .component_id(42)
             .dialect(minimal::dialect())
-            .connection(TcpClientConf::new("localhost:5600").unwrap())
+            .connection(TcpClient::new("localhost:5600").unwrap())
             .conf();
 
         assert_eq!(node.system_id(), 10);
@@ -242,7 +241,7 @@ mod tests {
             .system_id(10)
             .component_id(42)
             .dialect(minimal::dialect())
-            .connection(TcpClientConf::new("localhost:5600").unwrap())
+            .connection(TcpClient::new("localhost:5600").unwrap())
             .conf();
 
         let message = minimal::messages::Heartbeat::default();
