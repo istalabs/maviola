@@ -12,13 +12,7 @@ mod signature;
 pub use peer::Peer;
 pub use signature::{SignConf, SignConfBuilder, SignStrategy};
 
-#[cfg(feature = "sync")]
-/// <sup>[`sync`](crate::io::sync)</sup>
-pub use marker::SyncConnConf;
-pub use marker::{
-    ConnConf, Dialectless, HasDialect, Identified, MaybeConnConf, MaybeDialect, MaybeIdentified,
-    NoConnConf, Unidentified,
-};
+pub use marker::{Dialectless, HasDialect, MaybeDialect};
 
 /// <sup>[`mavio`](https://docs.rs/mavio/0.2.0-rc2/mavio/protocol/)</sup>
 #[doc(inline)]

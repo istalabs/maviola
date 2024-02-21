@@ -4,6 +4,7 @@
 pub mod asnc;
 mod broadcast;
 mod connection_info;
+pub mod marker;
 mod node_builder;
 mod node_conf;
 #[cfg(feature = "sync")]

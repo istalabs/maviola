@@ -5,16 +5,14 @@ use mavio::protocol::{
 };
 
 use crate::consts::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_TIMEOUT};
+use crate::io::marker::{HasConnConf, Identified, MaybeConnConf, NoConnConf, Unidentified};
 use crate::io::NodeConf;
-use crate::protocol::{
-    ConnConf, Dialectless, HasDialect, Identified, MaybeConnConf, MaybeDialect, NoConnConf,
-    Unidentified,
-};
+use crate::protocol::{Dialectless, HasDialect, MaybeDialect};
 
 #[cfg(feature = "sync")]
 use crate::io::sync::connection::ConnectionConf;
 #[cfg(feature = "sync")]
-use crate::protocol::SyncConnConf;
+use crate::io::sync::marker::SyncConnConf;
 
 /// Marker trait for [`NodeBuilder`] with or without [`NodeConf::system_id`].
 pub trait MaybeSystemId {}
@@ -220,7 +218,7 @@ impl<V: Versioned, CC: MaybeConnConf, M: DialectMessage>
     }
 }
 
-impl<D: MaybeDialect, V: MaybeVersioned, CC: ConnConf>
+impl<D: MaybeDialect, V: MaybeVersioned, CC: HasConnConf>
     NodeBuilder<NoSystemId, NoComponentId, D, V, CC>
 {
     /// Build and instance of [`NodeConf`] without defined [`NodeConf::system_id`] and
@@ -237,7 +235,7 @@ impl<D: MaybeDialect, V: MaybeVersioned, CC: ConnConf>
     }
 }
 
-impl<D: MaybeDialect, V: MaybeVersioned, CC: ConnConf>
+impl<D: MaybeDialect, V: MaybeVersioned, CC: HasConnConf>
     NodeBuilder<HasSystemId, HasComponentId, D, V, CC>
 {
     /// Build and instance of [`NodeConf`] with defined [`NodeConf::system_id`] and

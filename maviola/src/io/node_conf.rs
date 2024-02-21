@@ -2,6 +2,9 @@
 
 use std::time::Duration;
 
+use crate::io::marker::{
+    HasConnConf, Identified, MaybeConnConf, MaybeIdentified, NoConnConf, Unidentified,
+};
 use crate::io::node_builder::{
     HasComponentId, HasSystemId, NoComponentId, NoSystemId, NodeBuilder,
 };
@@ -13,11 +16,8 @@ use mavio::protocol::{
 #[cfg(feature = "sync")]
 use crate::io::sync::connection::ConnectionConf;
 #[cfg(feature = "sync")]
-use crate::protocol::SyncConnConf;
-use crate::protocol::{
-    ConnConf, Dialectless, HasDialect, Identified, MaybeConnConf, MaybeDialect, MaybeIdentified,
-    NoConnConf, Unidentified,
-};
+use crate::io::sync::marker::SyncConnConf;
+use crate::protocol::{Dialectless, HasDialect, MaybeDialect};
 use crate::Node;
 
 use crate::prelude::*;
@@ -98,7 +98,7 @@ impl NodeConf<Unidentified, Dialectless, Versionless, NoConnConf> {
     }
 }
 
-impl<D: MaybeDialect, V: MaybeVersioned, C: ConnConf> NodeConf<Identified, D, V, C> {
+impl<D: MaybeDialect, V: MaybeVersioned, C: HasConnConf> NodeConf<Identified, D, V, C> {
     /// MAVLink system ID.
     pub fn system_id(&self) -> SystemId {
         self.id.system_id
@@ -110,7 +110,7 @@ impl<D: MaybeDialect, V: MaybeVersioned, C: ConnConf> NodeConf<Identified, D, V,
     }
 }
 
-impl<I: MaybeIdentified, V: MaybeVersioned, M: DialectMessage, C: ConnConf>
+impl<I: MaybeIdentified, V: MaybeVersioned, M: DialectMessage, C: HasConnConf>
     NodeConf<I, HasDialect<M>, V, C>
 {
     /// MAVLink dialect.
@@ -127,14 +127,14 @@ impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned> NodeConf<I, D, V, S
     }
 }
 
-impl<I: MaybeIdentified, D: MaybeDialect, V: Versioned, C: ConnConf> NodeConf<I, D, V, C> {
+impl<I: MaybeIdentified, D: MaybeDialect, V: Versioned, C: HasConnConf> NodeConf<I, D, V, C> {
     /// MAVLink version.
     pub fn version(&self) -> MavLinkVersion {
         V::version()
     }
 }
 
-impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned, C: ConnConf> NodeConf<I, D, V, C> {
+impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned, C: HasConnConf> NodeConf<I, D, V, C> {
     /// Timeout for MAVLink heartbeats.
     ///
     /// If peer hasn't been sent heartbeats for as long as specified duration, it will be considered
@@ -146,7 +146,7 @@ impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned, C: ConnConf> NodeCo
     }
 }
 
-impl<V: Versioned, M: DialectMessage, C: ConnConf> NodeConf<Identified, HasDialect<M>, V, C> {
+impl<V: Versioned, M: DialectMessage, C: HasConnConf> NodeConf<Identified, HasDialect<M>, V, C> {
     /// Interval for MAVLink heartbeats.
     ///
     /// Node will send heartbeats within this interval.
@@ -157,7 +157,7 @@ impl<V: Versioned, M: DialectMessage, C: ConnConf> NodeConf<Identified, HasDiale
     }
 }
 
-impl<D: MaybeDialect, V: MaybeVersioned, C: ConnConf> NodeConf<Identified, D, V, C> {
+impl<D: MaybeDialect, V: MaybeVersioned, C: HasConnConf> NodeConf<Identified, D, V, C> {
     /// Creates a [`NodeBuilder`] initialised with current configuration.
     pub fn update(self) -> NodeBuilder<HasSystemId, HasComponentId, D, V, C> {
         NodeBuilder {
@@ -172,7 +172,7 @@ impl<D: MaybeDialect, V: MaybeVersioned, C: ConnConf> NodeConf<Identified, D, V,
     }
 }
 
-impl<D: MaybeDialect, V: MaybeVersioned, C: ConnConf> NodeConf<Unidentified, D, V, C> {
+impl<D: MaybeDialect, V: MaybeVersioned, C: HasConnConf> NodeConf<Unidentified, D, V, C> {
     /// Creates a [`NodeBuilder`] initialised with current configuration.
     pub fn update(self) -> NodeBuilder<NoSystemId, NoComponentId, D, V, C> {
         NodeBuilder {

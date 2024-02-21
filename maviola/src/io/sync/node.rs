@@ -9,18 +9,15 @@ use mavio::protocol::{
     Versioned, Versionless,
 };
 
+use crate::io::marker::{Identified, MaybeIdentified, NoConnConf, Unidentified};
 use crate::io::node_builder::{
     HasComponentId, HasSystemId, NoComponentId, NoSystemId, NodeBuilder,
 };
-use crate::io::node_conf::NodeConf;
 use crate::io::sync::event::EventsIterator;
+use crate::io::sync::marker::SyncConnConf;
 use crate::io::sync::{Callback, Connection};
-use crate::io::ConnectionInfo;
-use crate::io::Event;
-use crate::protocol::{
-    Dialectless, HasDialect, Identified, MaybeDialect, MaybeIdentified, NoConnConf, SyncConnConf,
-    Unidentified,
-};
+use crate::io::{ConnectionInfo, Event, NodeConf};
+use crate::protocol::{Dialectless, HasDialect, MaybeDialect};
 use crate::protocol::{Peer, PeerId};
 
 use crate::prelude::*;

@@ -8,6 +8,7 @@ pub(crate) mod connection;
 mod consts;
 mod event;
 mod file;
+pub mod marker;
 pub mod mpmc;
 mod mpsc_rw;
 mod node;

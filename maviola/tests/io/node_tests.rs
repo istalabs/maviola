@@ -7,9 +7,10 @@ use mavio::protocol::{ComponentId, MavLinkVersion, SystemId, V2};
 use portpicker::Port;
 
 use maviola::dialects::minimal;
+use maviola::io::marker::Identified;
 use maviola::io::sync::{TcpClientConf, TcpServerConf};
 use maviola::io::{Event, Node};
-use maviola::protocol::{HasDialect, Identified};
+use maviola::protocol::HasDialect;
 
 static INIT: Once = Once::new();
 static INIT_LOGGER: Once = Once::new();
