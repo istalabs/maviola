@@ -32,7 +32,7 @@ use crate::prelude::*;
 /// # #[cfg(feature = "sync")]
 /// # {
 /// # use maviola::protocol::V2;
-/// use maviola::{Event, Node, NodeConf, TcpServerConf};
+/// use maviola::{Event, Node, TcpServerConf};
 /// # use maviola::dialects::minimal;
 /// # use portpicker::pick_unused_port;
 ///
@@ -41,7 +41,7 @@ use crate::prelude::*;
 ///
 /// // Create a TCP server node
 /// let node = Node::try_from(
-///     NodeConf::builder()
+///     Node::builder()
 ///         /* define other node parameters */
 /// #         .version(V2)
 /// #         .system_id(1)
@@ -51,7 +51,6 @@ use crate::prelude::*;
 ///             TcpServerConf::new(addr)    // Configure TCP server connection
 ///                 .unwrap()
 ///         )
-///         .build()
 /// ).unwrap();
 /// # }
 /// ```

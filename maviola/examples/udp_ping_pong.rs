@@ -5,7 +5,7 @@ use portpicker::{pick_unused_port, Port};
 
 use maviola::dialects::minimal as dialect;
 use maviola::io::sync::{UdpClientConf, UdpServerConf};
-use maviola::io::{Event, Node, NodeConf};
+use maviola::io::{Event, Node};
 use maviola::protocol::{ComponentId, Frame, MaybeVersioned, V2};
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(50);
@@ -37,15 +37,14 @@ fn spawn_client(addr: &str, component_id: ComponentId) {
 
     thread::spawn(move || {
         let client = Node::try_from(
-            NodeConf::builder()
+            Node::builder()
                 .system_id(31)
                 .component_id(component_id)
                 .version(V2)
                 .dialect(dialect::dialect())
                 .heartbeat_interval(HEARTBEAT_INTERVAL)
                 .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-                .connection(UdpClientConf::new(client_addr).unwrap())
-                .build(),
+                .connection(UdpClientConf::new(client_addr).unwrap()),
         )
         .unwrap();
         client.activate().unwrap();
@@ -75,15 +74,14 @@ fn spawn_client(addr: &str, component_id: ComponentId) {
 fn run(addr: &str) {
     let server_addr = addr.to_string();
     let server = Node::try_from(
-        NodeConf::builder()
+        Node::builder()
             .system_id(17)
             .component_id(42)
             .version(V2)
             .dialect(dialect::dialect())
             .heartbeat_interval(HEARTBEAT_INTERVAL)
             .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-            .connection(UdpServerConf::new(server_addr).unwrap())
-            .build(),
+            .connection(UdpServerConf::new(server_addr).unwrap()),
     )
     .unwrap();
     server.activate().unwrap();

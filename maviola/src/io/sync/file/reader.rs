@@ -23,14 +23,14 @@ use crate::prelude::*;
 /// # #[cfg(feature = "sync")]
 /// # {
 /// # use maviola::protocol::V2;
-/// use maviola::{Event, Node, NodeConf, FileReaderConf};
+/// use maviola::{Event, Node, FileReaderConf};
 /// # use maviola::dialects::minimal;
 ///
 /// let path = "/tmp/maviola.bin";
 ///
 /// // Create a node that reads binary input from a file
 /// let node = Node::try_from(
-///     NodeConf::builder()
+///     Node::builder()
 ///         /* define other node parameters */
 /// #         .version(V2)
 /// #         .system_id(1)
@@ -40,7 +40,6 @@ use crate::prelude::*;
 ///             FileReaderConf::new(path)    // Configure file reader connection
 ///                 .unwrap()
 ///         )
-///         .build()
 /// ).unwrap();
 /// # }
 /// ```

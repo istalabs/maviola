@@ -46,9 +46,6 @@ pub use mavio::dialects;
 pub use protocol::Frame;
 
 #[doc(inline)]
-pub use io::{NodeConf, NodeConfBuilder};
-
-#[doc(inline)]
 #[cfg(feature = "sync")]
 pub use io::{
     Callback, Event, FileReaderConf, FileWriterConf, Node, TcpClientConf, TcpServerConf,

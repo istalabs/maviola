@@ -8,7 +8,6 @@ use portpicker::Port;
 
 use maviola::dialects::minimal;
 use maviola::io::sync::{TcpClientConf, TcpServerConf};
-use maviola::io::NodeConf;
 use maviola::io::{Event, Node};
 use maviola::protocol::{HasDialect, Identified};
 
@@ -55,13 +54,12 @@ fn initialize() {
 
 pub fn make_tcp_server_node(port: Port) -> Node<Identified, HasDialect<minimal::Minimal>, V2> {
     Node::try_from(
-        NodeConf::builder()
+        Node::builder()
             .system_id(DEFAULT_TCP_SERVER_SYS_ID)
             .component_id(DEFAULT_TCP_SERVER_COMP_ID)
             .dialect(minimal::dialect())
             .version(V2)
-            .connection(TcpServerConf::new(make_addr(port)).unwrap())
-            .build(),
+            .connection(TcpServerConf::new(make_addr(port)).unwrap()),
     )
     .unwrap()
 }
@@ -71,13 +69,12 @@ pub fn make_tcp_client_node(
     component_id: u8,
 ) -> Node<Identified, HasDialect<minimal::Minimal>, V2> {
     Node::try_from(
-        NodeConf::builder()
+        Node::builder()
             .system_id(DEFAULT_TCP_CLIENT_SYS_ID)
             .component_id(component_id)
             .dialect(minimal::dialect())
             .version(V2)
-            .connection(TcpClientConf::new(make_addr(port)).unwrap())
-            .build(),
+            .connection(TcpClientConf::new(make_addr(port)).unwrap()),
     )
     .unwrap()
 }
@@ -172,14 +169,13 @@ fn events_are_received() {
 
     let port = unused_port();
     let server_node = Node::try_from(
-        NodeConf::builder()
+        Node::builder()
             .system_id(1)
             .component_id(1)
             .dialect(minimal::dialect())
             .version(V2)
             .connection(TcpServerConf::new(make_addr(port)).unwrap())
-            .heartbeat_timeout(WAIT_DURATION)
-            .build(),
+            .heartbeat_timeout(WAIT_DURATION),
     )
     .unwrap();
 
@@ -211,15 +207,14 @@ fn heartbeats_are_sent() {
 
     let port = unused_port();
     let server_node = Node::try_from(
-        NodeConf::builder()
+        Node::builder()
             .system_id(1)
             .component_id(1)
             .dialect(minimal::dialect())
             .version(V2)
             .connection(TcpServerConf::new(make_addr(port)).unwrap())
             .heartbeat_timeout(WAIT_DURATION.mul_f32(2.0))
-            .heartbeat_interval(WAIT_DURATION)
-            .build(),
+            .heartbeat_interval(WAIT_DURATION),
     )
     .unwrap();
     server_node.activate().unwrap();
@@ -238,12 +233,9 @@ fn node_no_id_no_dialect_no_version() {
 
     let port = unused_port();
     let server_node = make_tcp_server_node(port);
-    let client_node = Node::try_from(
-        NodeConf::builder()
-            .connection(TcpClientConf::new(make_addr(port)).unwrap())
-            .build(),
-    )
-    .unwrap();
+    let client_node =
+        Node::try_from(Node::builder().connection(TcpClientConf::new(make_addr(port)).unwrap()))
+            .unwrap();
     wait();
 
     server_node
@@ -284,10 +276,9 @@ fn node_no_id_no_version() {
     let port = unused_port();
     let server_node = make_tcp_server_node(port);
     let client_node = Node::try_from(
-        NodeConf::builder()
+        Node::builder()
             .dialect(minimal::dialect())
-            .connection(TcpClientConf::new(make_addr(port)).unwrap())
-            .build(),
+            .connection(TcpClientConf::new(make_addr(port)).unwrap()),
     )
     .unwrap();
     wait();
@@ -307,11 +298,10 @@ fn node_no_id() {
     let port = unused_port();
     let server_node = make_tcp_server_node(port);
     let client_node = Node::try_from(
-        NodeConf::builder()
+        Node::builder()
             .dialect(minimal::dialect())
             .version(V2)
-            .connection(TcpClientConf::new(make_addr(port)).unwrap())
-            .build(),
+            .connection(TcpClientConf::new(make_addr(port)).unwrap()),
     )
     .unwrap();
     wait();
@@ -332,12 +322,11 @@ fn node_no_version() {
     let port = unused_port();
     let server_node = make_tcp_server_node(port);
     let client_node = Node::try_from(
-        NodeConf::builder()
+        Node::builder()
             .system_id(42)
             .component_id(142)
             .dialect(minimal::dialect())
-            .connection(TcpClientConf::new(make_addr(port)).unwrap())
-            .build(),
+            .connection(TcpClientConf::new(make_addr(port)).unwrap()),
     )
     .unwrap();
     wait();

@@ -16,8 +16,8 @@ pub use signature::{SignConf, SignConfBuilder, SignStrategy};
 /// <sup>[`sync`](crate::io::sync)</sup>
 pub use marker::SyncConnConf;
 pub use marker::{
-    ConnConf, Dialectless, HasDialect, Identified, IsIdentified, MaybeConnConf, MaybeDialect,
-    NoConnConf, NotIdentified,
+    ConnConf, Dialectless, HasDialect, Identified, MaybeConnConf, MaybeDialect, MaybeIdentified,
+    NoConnConf, Unidentified,
 };
 
 /// <sup>[`mavio`](https://docs.rs/mavio/0.2.0-rc2/mavio/protocol/)</sup>

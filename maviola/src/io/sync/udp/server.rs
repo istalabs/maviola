@@ -35,7 +35,7 @@ use crate::prelude::*;
 /// # #[cfg(feature = "sync")]
 /// # {
 /// # use maviola::protocol::V2;
-/// use maviola::{Event, Node, NodeConf, UdpServerConf};
+/// use maviola::{Event, Node, UdpServerConf};
 /// # use maviola::dialects::minimal;
 /// # use portpicker::pick_unused_port;
 ///
@@ -44,7 +44,7 @@ use crate::prelude::*;
 ///
 /// // Create a UDP server node
 /// let node = Node::try_from(
-///     NodeConf::builder()
+///     Node::builder()
 ///         /* define other node parameters */
 /// #         .version(V2)
 /// #         .system_id(1)
@@ -54,7 +54,6 @@ use crate::prelude::*;
 ///             UdpServerConf::new(addr)    // Configure UDP server connection
 ///                 .unwrap()
 ///         )
-///         .build()
 /// ).unwrap();
 /// # }
 /// ```

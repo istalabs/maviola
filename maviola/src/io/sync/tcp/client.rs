@@ -24,7 +24,7 @@ use crate::prelude::*;
 /// # {
 /// # use maviola::protocol::V2;
 /// # use maviola::TcpServerConf;
-/// use maviola::{Event, Node, NodeConf, TcpClientConf};
+/// use maviola::{Event, Node, TcpClientConf};
 /// # use maviola::dialects::minimal;
 /// # use portpicker::pick_unused_port;
 ///
@@ -33,7 +33,7 @@ use crate::prelude::*;
 ///
 /// // Create a TCP client node
 /// let node = Node::try_from(
-///     NodeConf::builder()
+///     Node::builder()
 ///         /* define other node parameters */
 /// #         .version(V2)
 /// #         .system_id(1)
@@ -47,7 +47,6 @@ use crate::prelude::*;
 /// # }
 ///                 .unwrap()
 ///         )
-///         .build()
 /// ).unwrap();
 /// # }
 /// ```

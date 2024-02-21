@@ -4,6 +4,7 @@
 pub mod asnc;
 mod broadcast;
 mod connection_info;
+mod node_builder;
 mod node_conf;
 #[cfg(feature = "sync")]
 pub mod sync;
@@ -11,7 +12,7 @@ mod utils;
 
 pub use broadcast::OutgoingFrame;
 pub use connection_info::{ConnectionInfo, PeerConnectionInfo};
-pub use node_conf::builder::NodeConfBuilder;
+pub use node_builder::NodeBuilder;
 pub use node_conf::NodeConf;
 
 #[doc(inline)]

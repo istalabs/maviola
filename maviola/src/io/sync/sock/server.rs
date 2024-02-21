@@ -34,14 +34,14 @@ use crate::prelude::*;
 /// # #[cfg(unix)]
 /// # {
 /// # use maviola::protocol::V2;
-/// use maviola::{Event, Node, NodeConf, SockServerConf};
+/// use maviola::{Event, Node, SockServerConf};
 /// # use maviola::dialects::minimal;
 ///
 /// let path = "/tmp/maviola.sock";
 ///
 /// // Create a Unix-socket server node
 /// let node = Node::try_from(
-///     NodeConf::builder()
+///     Node::builder()
 ///         /* define other node parameters */
 /// #         .version(V2)
 /// #         .system_id(1)
@@ -51,7 +51,6 @@ use crate::prelude::*;
 ///             SockServerConf::new(path)    // Configure socket server connection
 ///                 .unwrap()
 ///         )
-///         .build()
 /// ).unwrap();
 /// # }
 /// ```

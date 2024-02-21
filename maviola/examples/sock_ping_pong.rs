@@ -4,7 +4,7 @@ use std::thread;
 use std::time::Duration;
 
 use maviola::dialects::minimal as dialect;
-use maviola::io::{Event, Node, NodeConf};
+use maviola::io::{Event, Node};
 use maviola::protocol::{ComponentId, Frame, MaybeVersioned, V2};
 use maviola::{SockClientConf, SockServerConf};
 
@@ -31,15 +31,14 @@ fn spawn_client(path: PathBuf, component_id: ComponentId) {
 
     thread::spawn(move || {
         let client = Node::try_from(
-            NodeConf::builder()
+            Node::builder()
                 .system_id(31)
                 .component_id(component_id)
                 .version(V2)
                 .dialect(dialect::dialect())
                 .heartbeat_interval(HEARTBEAT_INTERVAL)
                 .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-                .connection(SockClientConf::new(path).unwrap())
-                .build(),
+                .connection(SockClientConf::new(path).unwrap()),
         )
         .unwrap();
         client.activate().unwrap();
@@ -68,15 +67,14 @@ fn spawn_client(path: PathBuf, component_id: ComponentId) {
 
 fn run(path: PathBuf) {
     let server = Node::try_from(
-        NodeConf::builder()
+        Node::builder()
             .system_id(17)
             .component_id(42)
             .version(V2)
             .dialect(dialect::dialect())
             .heartbeat_interval(HEARTBEAT_INTERVAL)
             .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-            .connection(SockServerConf::new(path.as_path()).unwrap())
-            .build(),
+            .connection(SockServerConf::new(path.as_path()).unwrap()),
     )
     .unwrap();
     server.activate().unwrap();

@@ -9,12 +9,18 @@ use mavio::protocol::{
     Versioned, Versionless,
 };
 
+use crate::io::node_builder::{
+    HasComponentId, HasSystemId, NoComponentId, NoSystemId, NodeBuilder,
+};
 use crate::io::node_conf::NodeConf;
 use crate::io::sync::event::EventsIterator;
 use crate::io::sync::{Callback, Connection};
 use crate::io::ConnectionInfo;
 use crate::io::Event;
-use crate::protocol::{HasDialect, Identified, IsIdentified, MaybeDialect, SyncConnConf};
+use crate::protocol::{
+    Dialectless, HasDialect, Identified, MaybeDialect, MaybeIdentified, NoConnConf, SyncConnConf,
+    Unidentified,
+};
 use crate::protocol::{Peer, PeerId};
 
 use crate::prelude::*;
@@ -30,7 +36,7 @@ use crate::prelude::*;
 /// # #[cfg(feature = "sync")]
 /// # {
 /// use maviola::protocol::V2;
-/// use maviola::{Event, Node, NodeConf, TcpServerConf};
+/// use maviola::{Event, Node, TcpServerConf};
 /// use maviola::dialects::minimal;
 /// # use portpicker::pick_unused_port;
 ///
@@ -39,7 +45,7 @@ use crate::prelude::*;
 ///
 /// // Create a node from configuration.
 /// let node = Node::try_from(
-///     NodeConf::builder()
+///     Node::builder()
 ///         .version(V2)                    // restrict node to MAVLink2 protocol version
 ///         .system_id(1)                   // System `ID`
 ///         .component_id(1)                // Component `ID`
@@ -48,7 +54,6 @@ use crate::prelude::*;
 ///             TcpServerConf::new(addr)    // Configure TCP server connection
 ///                 .unwrap()
 ///         )
-///         .build()
 /// ).unwrap();
 ///
 /// // Activate node to start sending heartbeats.
@@ -74,7 +79,7 @@ use crate::prelude::*;
 /// }
 /// # }
 /// ```
-pub struct Node<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> {
+pub struct Node<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> {
     id: I,
     dialect: D,
     version: V,
@@ -89,27 +94,73 @@ pub struct Node<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> {
     events_rx: mpmc::Receiver<Event<V>>,
 }
 
-impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static>
+impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned + 'static>
     TryFrom<NodeConf<I, D, V, SyncConnConf<V>>> for Node<I, D, V>
 {
     type Error = Error;
 
-    /// Instantiates [`Node`] from node configuration.
+    /// Attempts to construct [`Node`] from configuration.
     fn try_from(value: NodeConf<I, D, V, SyncConnConf<V>>) -> Result<Self> {
-        let connection = value.connection().build()?;
+        Self::try_from_conf(value)
+    }
+}
+
+impl<D: MaybeDialect, V: MaybeVersioned>
+    TryFrom<NodeBuilder<HasSystemId, HasComponentId, D, V, SyncConnConf<V>>>
+    for Node<Identified, D, V>
+{
+    type Error = Error;
+
+    /// Attempts to construct an identified [`Node`] from a node builder.
+    fn try_from(
+        value: NodeBuilder<HasSystemId, HasComponentId, D, V, SyncConnConf<V>>,
+    ) -> Result<Self> {
+        Self::try_from_conf(value.conf())
+    }
+}
+
+impl<D: MaybeDialect, V: MaybeVersioned>
+    TryFrom<NodeBuilder<NoSystemId, NoComponentId, D, V, SyncConnConf<V>>>
+    for Node<Unidentified, D, V>
+{
+    type Error = Error;
+
+    /// Attempts to construct an unidentified [`Node`] from a node builder.
+    fn try_from(
+        value: NodeBuilder<NoSystemId, NoComponentId, D, V, SyncConnConf<V>>,
+    ) -> Result<Self> {
+        Self::try_from_conf(value.conf())
+    }
+}
+
+impl Node<Unidentified, Dialectless, Versionless> {
+    /// Instantiates an empty [`NodeBuilder`].
+    pub fn builder() -> NodeBuilder<NoSystemId, NoComponentId, Dialectless, Versionless, NoConnConf>
+    {
+        NodeBuilder::new()
+    }
+}
+
+impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V> {
+    /// Instantiates node from node configuration.
+    ///
+    /// Creates ona instance of [`Node`] from [`NodeConf`]. It is also possible to use [`TryFrom`]
+    /// and create a node with [`Node::try_from`].
+    pub fn try_from_conf(conf: NodeConf<I, D, V, SyncConnConf<V>>) -> Result<Self> {
+        let connection = conf.connection().build()?;
         let (events_tx, events_rx) = mpmc::channel();
 
         let node = Self {
-            id: value.id,
-            dialect: value.dialect,
-            version: value.version,
+            id: conf.id,
+            dialect: conf.dialect,
+            version: conf.version,
             is_connected: Arc::new(AtomicBool::new(true)),
             is_active: Arc::new(AtomicBool::new(false)),
             sequence: Arc::new(AtomicU8::new(0)),
             connection,
             peers: Default::default(),
-            heartbeat_timeout: value.heartbeat_timeout,
-            heartbeat_interval: value.heartbeat_interval,
+            heartbeat_timeout: conf.heartbeat_timeout,
+            heartbeat_interval: conf.heartbeat_interval,
             events_tx,
             events_rx,
         };
@@ -118,9 +169,7 @@ impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static>
 
         Ok(node)
     }
-}
 
-impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D, V> {
     /// Information about this node's connection.
     pub fn info(&self) -> &ConnectionInfo {
         self.connection.info()
@@ -385,14 +434,14 @@ impl<D: MaybeDialect, V: MaybeVersioned> Node<Identified, D, V> {
     }
 }
 
-impl<I: IsIdentified, D: MaybeDialect, V: Versioned> Node<I, D, V> {
+impl<I: MaybeIdentified, D: MaybeDialect, V: Versioned> Node<I, D, V> {
     /// MAVLink version.
     pub fn version(&self) -> MavLinkVersion {
         V::version()
     }
 }
 
-impl<M: DialectMessage + 'static, I: IsIdentified, V: MaybeVersioned + 'static>
+impl<M: DialectMessage + 'static, I: MaybeIdentified, V: MaybeVersioned + 'static>
     Node<I, HasDialect<M>, V>
 {
     /// Dialect specification.
@@ -603,7 +652,7 @@ impl<M: DialectMessage + 'static, V: Versioned + 'static> Node<Identified, HasDi
     }
 }
 
-impl<I: IsIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Drop for Node<I, D, V> {
+impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Drop for Node<I, D, V> {
     fn drop(&mut self) {
         if let Err(err) = self.close() {
             log::error!("{:?}: can't close node: {err:?}", self.info());

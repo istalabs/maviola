@@ -6,9 +6,8 @@ use std::thread;
 use std::time::Duration;
 
 use maviola::dialects::minimal as dialect;
-use maviola::io::{Event, Node, NodeConf};
-use maviola::protocol::Versioned;
-use maviola::protocol::{ComponentId, Frame, MaybeVersioned, V2};
+use maviola::io::{Event, Node};
+use maviola::protocol::{Frame, MaybeVersioned, V2};
 use maviola::{FileReaderConf, FileWriterConf};
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(50);
@@ -49,13 +48,12 @@ fn make_frame(i: u16) -> Frame<V2> {
 
 fn run(path: PathBuf) {
     let writer = Node::try_from(
-        NodeConf::builder()
+        Node::builder()
             .system_id(17)
             .component_id(42)
             .version(V2)
             .dialect(dialect::dialect())
-            .connection(FileWriterConf::new(path.as_path()).unwrap())
-            .build(),
+            .connection(FileWriterConf::new(path.as_path()).unwrap()),
     )
     .unwrap();
     wait();
@@ -68,15 +66,14 @@ fn run(path: PathBuf) {
     wait();
 
     let reader = Node::try_from(
-        NodeConf::builder()
+        Node::builder()
             .system_id(17)
             .component_id(42)
             .version(V2)
             .dialect(dialect::dialect())
             .heartbeat_interval(HEARTBEAT_INTERVAL)
             .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-            .connection(FileReaderConf::new(path.as_path()).unwrap())
-            .build(),
+            .connection(FileReaderConf::new(path.as_path()).unwrap()),
     )
     .unwrap();
 
