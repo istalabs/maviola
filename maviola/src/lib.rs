@@ -53,3 +53,7 @@ pub use io::{Event, FileReader, FileWriter, Node, TcpClient, TcpServer, UdpClien
 #[cfg(feature = "sync")]
 #[cfg(unix)]
 pub use io::{SockClient, SockServer};
+
+#[doc(inline)]
+#[cfg(feature = "async")]
+pub use io::{AsyncTcpClient, AsyncTcpServer};

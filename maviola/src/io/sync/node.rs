@@ -22,6 +22,7 @@ use crate::protocol::{Dialectless, HasDialect, MaybeDialect};
 use crate::protocol::{Peer, PeerId};
 
 use crate::prelude::*;
+use crate::utils::{Closable, Closer, SharedCloser};
 
 /// MAVLink node.
 ///
@@ -82,7 +83,7 @@ pub struct Node<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned + 'static
     dialect: D,
     version: V,
     sequence: Arc<AtomicU8>,
-    is_connected: Arc<AtomicBool>,
+    state: SharedCloser,
     is_active: Arc<AtomicBool>,
     connection: Connection<V>,
     peers: Arc<RwLock<HashMap<PeerId, Peer>>>,
@@ -144,13 +145,14 @@ impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D
     /// and create a node with [`Node::try_from`].
     pub fn try_from_conf(conf: NodeConf<I, D, V, ConnConf<V>>) -> Result<Self> {
         let connection = conf.connection().build()?;
+        let state = connection.share_state();
         let (events_tx, events_rx) = mpmc::channel();
 
         let node = Self {
             id: conf.id,
             dialect: conf.dialect,
             version: conf.version,
-            is_connected: Arc::new(AtomicBool::new(true)),
+            state,
             is_active: Arc::new(AtomicBool::new(false)),
             sequence: Arc::new(AtomicU8::new(0)),
             connection,
@@ -184,10 +186,10 @@ impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D
 
     /// Returns `true` if node is connected.
     ///
-    /// All nodes are connected by default. If node wasn't disconnected by [`Node::close`], then it
-    /// can become disconnected only when underlying I/O transport failed or exhausted.
+    /// All nodes are connected by default, they can become disconnected only if I/O transport
+    /// failed or have been exhausted.
     pub fn is_connected(&self) -> bool {
-        self.is_connected.load(atomic::Ordering::Relaxed)
+        !self.state.is_closed()
     }
 
     /// Returns an iterator over current peers.
@@ -268,9 +270,8 @@ impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D
 
     /// Close all connections and stop.
     pub fn close(&mut self) -> Result<()> {
-        self.is_connected.store(false, atomic::Ordering::Relaxed);
         self.is_active.store(false, atomic::Ordering::Relaxed);
-        self.connection.close();
+        self.state.close();
 
         self.peers
             .write()
@@ -291,10 +292,10 @@ impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D
         let receiver = self.connection.receiver();
         let peers = self.peers.clone();
         let events_tx = self.events_tx.clone();
-        let is_connected = self.is_connected.clone();
+        let state = self.state.as_closable();
 
         thread::spawn(move || loop {
-            if !is_connected.load(atomic::Ordering::Relaxed) {
+            if state.is_closed() {
                 log::trace!(
                     "[{info:?}] closing incoming frames handler since node is no longer active"
                 );
@@ -351,11 +352,11 @@ impl<I: MaybeIdentified, D: MaybeDialect, V: MaybeVersioned + 'static> Node<I, D
         let peers = self.peers.clone();
         let heartbeat_timeout = self.heartbeat_timeout;
         let events_tx = self.events_tx.clone();
-        let is_connected = self.is_connected.clone();
+        let state = self.state.as_closable();
 
         thread::spawn(move || {
             loop {
-                if !is_connected.load(atomic::Ordering::Relaxed) {
+                if state.is_closed() {
                     log::trace!("[{info:?}] closing inactive peers handler: node is disconnected");
                     break;
                 }
@@ -494,6 +495,18 @@ impl<M: DialectMessage + 'static> Node<Identified, HasDialect<M>, Versionless> {
 }
 
 impl<M: DialectMessage + 'static, V: Versioned + 'static> Node<Identified, HasDialect<M>, V> {
+    /// Send MAVLink message.
+    ///
+    /// The message will be encoded according to the node's dialect specification and MAVLink
+    /// protocol version.
+    ///
+    /// If you want to send messages within different MAVLink protocols simultaneously, you have
+    /// to construct a [`Versionless`] node and use [`Node::send_versioned`]
+    pub fn send(&self, message: M) -> Result<()> {
+        let frame = self.make_frame_from_message(message, self.version.clone())?;
+        self.send_frame_internal(&frame)
+    }
+
     /// Returns `true`, if node is active.
     ///
     /// All nodes are inactive by default and have to be activated using [`Node::activate`].
@@ -533,7 +546,7 @@ impl<M: DialectMessage + 'static, V: Versioned + 'static> Node<Identified, HasDi
     /// [`Node::activate`] is idempotent while node is connected. Otherwise, it will return
     /// [`NodeError::Inactive`] variant of [`Error::Node`].
     pub fn activate(&self) -> Result<()> {
-        if !self.is_connected.load(atomic::Ordering::Relaxed) {
+        if self.state.is_closed() {
             return Err(Error::Node(NodeError::Inactive));
         }
 
@@ -556,7 +569,7 @@ impl<M: DialectMessage + 'static, V: Versioned + 'static> Node<Identified, HasDi
     /// [`Node::deactivate`] is idempotent while node is connected. Otherwise, it will return
     /// [`NodeError::Inactive`] variant of [`Error::Node`].
     pub fn deactivate(&self) -> Result<()> {
-        if !self.is_connected.load(atomic::Ordering::Relaxed) {
+        if self.state.is_closed() {
             return Err(Error::Node(NodeError::Inactive));
         }
 
@@ -569,20 +582,8 @@ impl<M: DialectMessage + 'static, V: Versioned + 'static> Node<Identified, HasDi
         Ok(())
     }
 
-    /// Send MAVLink message.
-    ///
-    /// The message will be encoded according to the node's dialect specification and MAVLink
-    /// protocol version.
-    ///
-    /// If you want to send messages within different MAVLink protocols simultaneously, you have
-    /// to construct a [`Versionless`] node and use [`Node::send_versioned`]
-    pub fn send(&self, message: M) -> Result<()> {
-        let frame = self.make_frame_from_message(message, self.version.clone())?;
-        self.send_frame_internal(&frame)
-    }
-
     fn start_sending_heartbeats(&self) {
-        let is_connected = self.is_connected.clone();
+        let state = self.state.as_closable();
         let is_active = self.is_active.clone();
         let info = self.info().clone();
         let heartbeat_interval = self.heartbeat_interval;
@@ -597,7 +598,7 @@ impl<M: DialectMessage + 'static, V: Versioned + 'static> Node<Identified, HasDi
 
         thread::spawn(move || {
             loop {
-                if !is_connected.load(atomic::Ordering::Relaxed) {
+                if state.is_closed() {
                     log::trace!(
                         "[{info:?}] closing heartbeat emitter since node is no longer connected"
                     );

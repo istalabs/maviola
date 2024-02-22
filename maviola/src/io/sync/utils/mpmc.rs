@@ -38,29 +38,22 @@
 //! assert_eq!(rx_2.recv().unwrap(), 2);
 //! # }
 //! ```
-//!
-//! # Limitation
-//!
-//! Due to the current implementation, it is possible that message, which has been successfully
-//! sent, won't be consumed if all consumers had been disconnected right before the sending. This
-//! means that caller should not rely on the [`Ok`] result of the [`Sender::send`] in scenarios,
-//! where message consumption must be acknowledged by any means. If this is the case, then it is
-//! suggested to fall back to [`mpsc`] primitives.   
 
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::{mpsc, Arc, RwLock};
-use std::{mem, thread};
+use std::thread;
 
-use crate::utils::UniqueId;
+use crate::utils::{Closable, Closer, UniqueId};
 
 /// MPMC sender.
 ///
-/// Behaves almost identical to [`mpsc::Sender`] except it has a
-/// [`disconnect`](Receiver::disconnect) method that disconnect sender from its channel.
+/// Behaves almost identical to [`mpsc::Sender`]. The latter [`mpsc`] sender can be obtained through
+/// the [`Sender::into_inner`] method.
 #[derive(Clone, Debug)]
 pub struct Sender<T> {
-    inner: Option<mpsc::Sender<T>>,
+    inner: mpsc::Sender<T>,
+    state: Closable,
 }
 
 unsafe impl<T: Send> Send for Sender<T> {}
@@ -72,34 +65,35 @@ impl<T> Sender<T> {
     ///
     /// Behaves identical to [`mpsc::Sender::send`].
     pub fn send(&self, value: T) -> Result<(), mpsc::SendError<T>> {
-        match &self.inner {
-            None => Err(mpsc::SendError(value)),
-            Some(inner) => inner.send(value),
+        if self.state.is_closed() {
+            return Err(mpsc::SendError(value));
         }
+
+        self.inner.send(value)
     }
 
-    /// Disconnect sender from channel.
-    pub fn disconnect(&mut self) {
-        self.inner = None;
-    }
-}
-
-impl<T> Drop for Sender<T> {
-    fn drop(&mut self) {
-        self.disconnect()
+    /// Returns inner [`mpsc::Sender`].
+    ///
+    /// # Limitation
+    ///
+    /// Once inner sender has been obtained, it is no longer guaranteed that messages it sends will
+    /// be consumed by at least one receiver. This may happen if the last receiver becomes
+    /// disconnected right before or slightly after the message was sent.
+    #[must_use]
+    pub fn into_inner(self) -> mpsc::Sender<T> {
+        self.inner
     }
 }
 
 /// MPMC receiver.
 ///
-/// Behaves almost identical to [`mpsc::Receiver`] except it can be cloned and disconnected from the
-/// channel by calling [`disconnect`](Receiver::disconnect) method.
+/// Behaves almost identical to [`mpsc::Receiver`] except that it can be cloned. The underlying
+/// [`mpsc`] receiver can be obtained through the [`Receiver::into_inner`] method.
 ///
 /// Each cloned receiver will receive its own message.
 pub struct Receiver<T: Clone + Sync + Send + 'static> {
-    id: UniqueId,
-    inner: Option<mpsc::Receiver<T>>,
-    bus: Option<Arc<BroadcastBus<T>>>,
+    inner: mpsc::Receiver<T>,
+    guard: RecvGuard<T>,
 }
 
 impl<T: Clone + Sync + Send + 'static> Debug for Receiver<T> {
@@ -116,64 +110,109 @@ impl<T: Clone + Sync + Send + 'static> Receiver<T> {
     ///
     /// Behaves identical to [`mpsc::Receiver::recv`].
     pub fn recv(&self) -> Result<T, mpsc::RecvError> {
-        match &self.inner {
-            None => Err(mpsc::RecvError),
-            Some(inner) => inner.recv(),
-        }
+        self.inner.recv()
     }
 
     /// Attempts to return a pending value on this receiver without blocking.
     ///
     /// Behaves identical to [`mpsc::Receiver::try_recv`].
     pub fn try_recv(&self) -> Result<T, mpsc::TryRecvError> {
-        match &self.inner {
-            None => Err(mpsc::TryRecvError::Disconnected),
-            Some(inner) => inner.try_recv(),
-        }
+        self.inner.try_recv()
     }
 
-    /// Disconnect receiver from the channel.
-    pub fn disconnect(&mut self) {
-        {
-            let mut bus = None;
-            mem::swap(&mut bus, &mut self.bus);
-            if let Some(bus) = bus {
-                bus.remove(&self.id);
-            }
-        }
-        self.bus = None;
-        self.inner = None;
+    /// Returns inner [`mpsc::Receiver`].
+    ///
+    /// Returns inner receiver and [`RecvGuard`]. When guard is dropped, the receiver will be
+    /// disconnected from the bus.
+    ///
+    /// # Usage
+    ///
+    /// Guard is present, the receiver can accept messages:
+    ///
+    /// ```rust
+    /// # #[cfg(feature = "sync")]
+    /// # {
+    /// use std::thread;
+    /// use std::sync::mpsc;
+    /// use maviola::io::sync::utils::mpmc;
+    ///
+    /// let (tx, rx) = mpmc::channel();
+    /// let (rx_inner, _guard) = rx.into_inner();
+    ///
+    /// let handler = thread::spawn(move || -> Result<(), mpsc::RecvError> { rx_inner.recv() });
+    ///
+    /// assert!(tx.send(()).is_ok());
+    /// assert!(handler.join().unwrap().is_ok());
+    /// # }
+    /// ```
+    ///
+    /// Guard is dropped, the receiver is no longer connected to the bus:
+    ///
+    /// ```rust
+    /// # #[cfg(feature = "sync")]
+    /// # {
+    /// use std::thread;
+    /// use std::sync::mpsc;
+    /// use maviola::io::sync::utils::mpmc;
+    ///
+    /// let (tx, rx) = mpmc::channel();
+    /// let (rx_inner, guard) = rx.into_inner();
+    ///
+    /// let handler = { thread::spawn(move || -> Result<(), mpsc::RecvError> { rx_inner.recv() }) };
+    ///
+    /// drop(guard);
+    ///
+    /// assert!(tx.send(()).is_err());
+    /// assert!(handler.join().unwrap().is_err());
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn into_inner(self) -> (mpsc::Receiver<T>, RecvGuard<T>) {
+        (self.inner, self.guard)
     }
 }
+
 impl<T: Clone + Sync + Send + 'static> Clone for Receiver<T> {
     fn clone(&self) -> Self {
-        match &self.bus {
-            None => Receiver {
-                id: UniqueId::new(),
-                inner: None,
-                bus: None,
-            },
-            Some(bus) => {
-                let (id, rx) = bus.add();
+        let (id, rx) = self.guard.bus.add();
 
-                Receiver {
-                    id,
-                    inner: Some(rx),
-                    bus: self.bus.clone(),
-                }
-            }
+        Receiver {
+            inner: rx,
+            guard: RecvGuard {
+                id,
+                bus: self.guard.bus.clone(),
+            },
         }
     }
 }
 
-impl<T: Clone + Sync + Send + 'static> Drop for Receiver<T> {
+/// Guards connection for the [`Receiver`].
+///
+/// When receiver is obtained from an inner [`mpsc::Receiver`] by calling [`Receiver::into_inner`],
+/// then an instance of [`RecvGuard`] is returned. Once guard is dropped, the corresponding receiver
+/// will be disconnected from the bus.
+///
+/// See [`Receiver::into_inner`] for details.
+pub struct RecvGuard<T: Clone + Sync + Send + 'static> {
+    id: UniqueId,
+    bus: Arc<BroadcastBus<T>>,
+}
+
+impl<T: Clone + Sync + Send + 'static> Debug for RecvGuard<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RecvGuard").finish_non_exhaustive()
+    }
+}
+
+impl<T: Clone + Sync + Send + 'static> Drop for RecvGuard<T> {
     fn drop(&mut self) {
-        self.disconnect();
+        self.bus.remove(&self.id);
     }
 }
 
 struct BroadcastBus<T> {
     recv_txs: Arc<RwLock<HashMap<UniqueId, mpsc::Sender<T>>>>,
+    _state: Closer,
 }
 
 impl<T: Clone + Sync + Send + 'static> BroadcastBus<T> {
@@ -257,23 +296,28 @@ impl<T> Drop for BroadcastBus<T> {
 #[must_use]
 pub fn channel<T: Clone + Sync + Send + 'static>() -> (Sender<T>, Receiver<T>) {
     let (send_tx, send_rx) = mpsc::channel();
+    let state = Closer::new();
 
     let sender = Sender {
-        inner: Some(send_tx),
+        inner: send_tx,
+        state: state.as_closable(),
     };
 
     let receiver = {
         let bus = BroadcastBus {
             recv_txs: Default::default(),
+            _state: state,
         };
 
         let (id, rx) = bus.add();
         let bus = Arc::new(bus);
 
         let receiver = Receiver {
-            id,
-            inner: Some(rx),
-            bus: Some(bus.clone()),
+            inner: rx,
+            guard: RecvGuard {
+                id,
+                bus: bus.clone(),
+            },
         };
 
         bus.start(send_rx);
@@ -287,7 +331,6 @@ pub fn channel<T: Clone + Sync + Send + 'static>() -> (Sender<T>, Receiver<T>) {
 #[cfg(test)]
 mod mpmc_test {
     use super::*;
-    use crate::utils::test::*;
 
     #[test]
     fn mpmc_basic() {
@@ -315,7 +358,6 @@ mod mpmc_test {
     fn mpmc_close_on_receivers_dropped() {
         let (tx, rx) = channel();
         drop(rx);
-        wait();
 
         assert!(tx.send(1).is_err());
 
@@ -324,7 +366,6 @@ mod mpmc_test {
         let rx_2 = rx_1.clone();
         drop(rx_1);
         drop(rx_2);
-        wait_long();
 
         assert!(tx.send(1).is_err());
     }
@@ -339,5 +380,29 @@ mod mpmc_test {
 
         let res = handler.join().unwrap();
         assert_eq!(res, 1);
+    }
+
+    #[test]
+    fn inner_receiver_is_active_while_guard_is_present() {
+        let (tx, rx) = channel();
+        let (rx_inner, _guard) = rx.into_inner();
+
+        let handler = thread::spawn(move || -> Result<(), mpsc::RecvError> { rx_inner.recv() });
+
+        assert!(tx.send(()).is_ok());
+        assert!(handler.join().unwrap().is_ok());
+    }
+
+    #[test]
+    fn inner_receiver_disconnects_when_guard_is_dropped() {
+        let (tx, rx) = channel();
+        let (rx_inner, guard) = rx.into_inner();
+
+        let handler = { thread::spawn(move || -> Result<(), mpsc::RecvError> { rx_inner.recv() }) };
+
+        drop(guard);
+
+        assert!(tx.send(()).is_err());
+        assert!(handler.join().unwrap().is_err());
     }
 }

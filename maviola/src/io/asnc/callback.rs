@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::io::asnc::conn::AsyncFrameSender;
 use crate::io::broadcast::{BroadcastScope, OutgoingFrame};
 use crate::io::ChannelInfo;
 use crate::protocol::{Frame, MaybeVersioned};
@@ -7,21 +8,29 @@ use crate::utils::UniqueId;
 
 use crate::prelude::*;
 
-/// Response object which caller receives upon each incoming frame.
+/// AsyncCallback object which caller receives upon each incoming frame.
+///
+/// You can control how to respond to incoming frames by choosing a channel to which response will
+/// be broadcast:
+///
+/// * [`AsyncCallback::respond`] sends frame directly to the sender's channel.
+/// * [`AsyncCallback::respond_others`] sends frame to all channels except the one from which original
+///   frame was received.
+/// * [`AsyncCallback::respond_all`] sends frame to all channels.
 #[derive(Clone, Debug)]
-pub struct AsyncResponse<V: MaybeVersioned> {
+pub struct AsyncCallback<V: MaybeVersioned> {
     pub(super) sender_id: UniqueId,
     pub(super) sender_info: Arc<ChannelInfo>,
-    pub(super) broadcast_tx: broadcast::Sender<OutgoingFrame<V>>,
+    pub(super) broadcast_tx: AsyncFrameSender<V>,
 }
 
-impl<V: MaybeVersioned> AsyncResponse<V> {
+impl<V: MaybeVersioned> AsyncCallback<V> {
     /// Information about sender's connection.
     pub fn info(&self) -> &ChannelInfo {
         self.sender_info.as_ref()
     }
 
-    /// Respond directly to the peer which sent the [`AsyncResponse`].
+    /// Respond directly to the peer which sent the [`AsyncCallback`].
     pub fn respond(&self, frame: &Frame<V>) -> Result<usize> {
         self.broadcast_tx
             .send(OutgoingFrame::scoped(

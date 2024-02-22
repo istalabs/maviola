@@ -19,6 +19,9 @@
 //! serves as a basis for Maviola.
 
 #[cfg(feature = "sync")]
+#[allow(async_fn_in_trait)]
+#[allow(unused_imports)]
+#[allow(dead_code)]
 pub mod asnc;
 mod broadcast;
 mod connection_info;
@@ -51,4 +54,9 @@ pub use sync::{SockClient, SockServer};
 #[doc(inline)]
 #[cfg(feature = "async")]
 /// <sup>[`async`](asnc)</sup>
-pub use asnc::{AsyncConnection, AsyncResponse};
+pub use asnc::AsyncCallback;
+
+#[doc(inline)]
+#[cfg(feature = "async")]
+/// <sup>[`async`](asnc)</sup>
+pub use asnc::{AsyncTcpClient, AsyncTcpServer};

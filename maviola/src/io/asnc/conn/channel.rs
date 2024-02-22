@@ -1,46 +1,46 @@
-use std::io::{Read, Write};
 use std::sync::Arc;
-use std::thread;
 
-use crate::core::io::{Receiver, Sender};
-use crate::io::sync::conn::{FrameProducer, FrameSendHandler, FrameSender};
-use crate::io::sync::consts::{
+use tokio::io::{AsyncRead, AsyncWrite};
+
+use crate::core::io::{AsyncReceiver, AsyncSender};
+use crate::io::asnc::conn::{AsyncFrameProducer, AsyncFrameSendHandler, AsyncFrameSender};
+use crate::io::asnc::consts::{
     PEER_CONN_STOP_JOIN_ATTEMPTS, PEER_CONN_STOP_JOIN_POOLING_INTERVAL,
     PEER_CONN_STOP_POOLING_INTERVAL,
 };
-use crate::io::sync::Callback;
+use crate::io::asnc::AsyncCallback;
 use crate::io::{ChannelInfo, ConnectionInfo};
 use crate::protocol::MaybeVersioned;
 use crate::utils::{Closable, SharedCloser, UniqueId};
 
 use crate::prelude::*;
 
-/// Factory that produces a channels withing associated [`Connection`](super::Connection).
-#[derive(Clone, Debug)]
-pub struct ChannelFactory<V: MaybeVersioned + 'static> {
+/// Factory that produces a channels withing associated [`AsyncConnection`](super::AsyncConnection).
+#[derive(Debug)]
+pub struct AsyncChannelFactory<V: MaybeVersioned + 'static> {
     pub(super) info: ConnectionInfo,
     pub(super) state: Closable,
-    pub(super) sender: FrameSender<V>,
-    pub(super) send_handler: FrameSendHandler<V>,
-    pub(super) producer: FrameProducer<V>,
+    pub(super) sender: AsyncFrameSender<V>,
+    pub(super) send_handler: AsyncFrameSendHandler<V>,
+    pub(super) producer: AsyncFrameProducer<V>,
 }
 
-impl<V: MaybeVersioned> ChannelFactory<V> {
+impl<V: MaybeVersioned> AsyncChannelFactory<V> {
     /// Builds a channel associated with the corresponding.
     #[must_use]
-    pub fn build<R: Read, W: Write>(
+    pub fn build<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
         &self,
         info: ChannelInfo,
         reader: R,
         writer: W,
-    ) -> Channel<V, R, W> {
-        Channel {
+    ) -> AsyncChannel<V, R, W> {
+        AsyncChannel {
             conn_state: self.state.clone(),
             info,
             reader,
             writer,
             sender: self.sender.clone(),
-            send_handler: self.send_handler.clone(),
+            send_handler: self.send_handler.resubscribe(),
             producer: self.producer.clone(),
         }
     }
@@ -56,34 +56,37 @@ impl<V: MaybeVersioned> ChannelFactory<V> {
     }
 }
 
-/// Channel associated with a particular connection.
+/// AsyncChannel associated with a particular connection.
 ///
-/// Channels are constructed by [`ChannelFactory`] bound to a particular
-/// [`Connection`](super::Connection).
-pub struct Channel<V: MaybeVersioned + 'static, R: Read, W: Write> {
+/// Channels are constructed by [`AsyncChannelFactory`] bound to a particular
+/// [`AsyncConnection`](super::AsyncConnection).
+pub struct AsyncChannel<V: MaybeVersioned + 'static, R: AsyncRead, W: AsyncWrite> {
     conn_state: Closable,
     info: ChannelInfo,
     reader: R,
     writer: W,
-    sender: FrameSender<V>,
-    send_handler: FrameSendHandler<V>,
-    producer: FrameProducer<V>,
+    sender: AsyncFrameSender<V>,
+    send_handler: AsyncFrameSendHandler<V>,
+    producer: AsyncFrameProducer<V>,
 }
 
-impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 'static>
-    Channel<V, R, W>
+impl<
+        V: MaybeVersioned + 'static,
+        R: AsyncRead + Send + Unpin + 'static,
+        W: AsyncWrite + Send + Unpin + 'static,
+    > AsyncChannel<V, R, W>
 {
     /// Spawn this channel.
     ///
     /// Returns [`SharedCloser`] which can be used to control channel state. The state of the
-    /// channel depends on the state of the associated [`Connection`](super::Connection). However,
+    /// channel depends on the state of the associated [`AsyncConnection`](super::AsyncConnection). However,
     /// it is not guaranteed, that channel will immediately close once connection is closed. There
     /// could be a lag relating to blocking nature of the underlying reader and writer.
     ///
     /// If caller is not interested in managing this channel, then it is required to drop returned
     /// [`SharedCloser`] or replace it with the corresponding [`Closable`].
     #[must_use]
-    pub fn spawn(self) -> SharedCloser {
+    pub async fn spawn(self) -> SharedCloser {
         let id = UniqueId::new();
         let info = Arc::new(self.info);
         let conn_state = self.conn_state.clone();
@@ -93,9 +96,9 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
 
         let write_handler = {
             let send_handler = self.send_handler;
-            let frame_writer = Sender::new(self.writer);
+            let frame_writer = AsyncSender::new(self.writer);
 
-            thread::spawn(move || Self::write_handler(id, send_handler, frame_writer))
+            tokio::spawn(async move { Self::write_handler(id, send_handler, frame_writer).await })
         };
 
         let read_handler = {
@@ -104,37 +107,38 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
             let info = info.clone();
             let sender = self.sender;
             let producer = self.producer;
-            let frame_reader = Receiver::new(self.reader);
+            let frame_reader = AsyncReceiver::new(self.reader);
 
-            thread::spawn(move || {
+            tokio::spawn(async move {
                 Self::read_handler(state, conn_state, id, info, sender, producer, frame_reader)
+                    .await
             })
         };
 
         {
             let info = info.clone();
             let state = state.clone();
-            thread::spawn(move || {
-                Self::handle_stop(state, conn_state, info, write_handler, read_handler);
+            tokio::spawn(async move {
+                Self::handle_stop(state, conn_state, info, write_handler, read_handler).await;
             });
         }
 
         state.clone()
     }
 
-    fn write_handler(
+    async fn write_handler(
         id: UniqueId,
-        send_handler: FrameSendHandler<V>,
-        mut frame_writer: Sender<W, V>,
+        mut send_handler: AsyncFrameSendHandler<V>,
+        mut frame_writer: AsyncSender<W, V>,
     ) -> Result<()> {
         loop {
-            let out_frame = send_handler.recv()?;
+            let out_frame = send_handler.recv().await?;
 
             if !out_frame.should_send_to(id) {
                 continue;
             }
 
-            if let Err(err) = frame_writer.send(out_frame.frame()) {
+            if let Err(err) = frame_writer.send(out_frame.frame()).await {
                 let err = Error::from(err);
                 if let Error::Io(err) = err {
                     if let std::io::ErrorKind::TimedOut = err.kind() {
@@ -146,21 +150,21 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
         }
     }
 
-    fn read_handler(
+    async fn read_handler(
         state: SharedCloser,
         conn_state: Closable,
         id: UniqueId,
         info: Arc<ChannelInfo>,
-        sender: FrameSender<V>,
-        producer: FrameProducer<V>,
-        mut frame_reader: Receiver<R, V>,
+        sender: AsyncFrameSender<V>,
+        producer: AsyncFrameProducer<V>,
+        mut frame_reader: AsyncReceiver<R, V>,
     ) -> Result<()> {
         loop {
             if conn_state.is_closed() || state.is_closed() {
                 return Ok(());
             }
 
-            let frame = match frame_reader.recv() {
+            let frame = match frame_reader.recv().await {
                 Ok(frame) => frame,
                 Err(err) => {
                     let err = Error::from(err);
@@ -177,7 +181,7 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
             let info = info.clone();
             let send_tx = sender.clone();
 
-            let response = Callback {
+            let response = AsyncCallback {
                 sender_id: id,
                 sender_info: info.clone(),
                 broadcast_tx: send_tx,
@@ -187,19 +191,19 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
         }
     }
 
-    fn handle_stop(
+    async fn handle_stop(
         state: SharedCloser,
         conn_state: Closable,
         info: Arc<ChannelInfo>,
-        write_handler: thread::JoinHandle<Result<()>>,
-        read_handler: thread::JoinHandle<Result<()>>,
+        write_handler: tokio::task::JoinHandle<Result<()>>,
+        read_handler: tokio::task::JoinHandle<Result<()>>,
     ) {
         while !(state.is_closed()
             || conn_state.is_closed()
             || write_handler.is_finished()
             || read_handler.is_finished())
         {
-            thread::sleep(PEER_CONN_STOP_POOLING_INTERVAL);
+            tokio::time::sleep(PEER_CONN_STOP_POOLING_INTERVAL).await;
         }
         state.close();
 
@@ -207,7 +211,7 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
             if write_handler.is_finished() && read_handler.is_finished() {
                 break;
             }
-            thread::sleep(PEER_CONN_STOP_JOIN_POOLING_INTERVAL);
+            tokio::time::sleep(PEER_CONN_STOP_JOIN_POOLING_INTERVAL).await;
             if i == PEER_CONN_STOP_JOIN_ATTEMPTS - 1 {
                 log::warn!(
                     "[{info:?}] write/read handlers are stuck, finished: write={}, read={}",
@@ -218,7 +222,7 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
             }
         }
 
-        if let (Ok(res_write), Ok(res_read)) = (write_handler.join(), read_handler.join()) {
+        if let (Ok(res_write), Ok(res_read)) = (write_handler.await, read_handler.await) {
             if let Err(err) = res_write {
                 log::debug!("[{info:?}] write handler finished with error: {err:?}")
             }

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::io::broadcast::{BroadcastScope, OutgoingFrame};
+use crate::io::sync::conn::FrameSender;
 use crate::io::ChannelInfo;
 use crate::protocol::{Frame, MaybeVersioned};
 use crate::utils::UniqueId;
@@ -20,7 +21,7 @@ use crate::prelude::*;
 pub struct Callback<V: MaybeVersioned> {
     pub(super) sender_id: UniqueId,
     pub(super) sender_info: Arc<ChannelInfo>,
-    pub(super) broadcast_tx: mpmc::Sender<OutgoingFrame<V>>,
+    pub(super) broadcast_tx: FrameSender<V>,
 }
 
 impl<V: MaybeVersioned> Callback<V> {
