@@ -87,7 +87,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockServer {
         listener.set_nonblocking(true)?;
 
         let conn_state = Closer::new();
-        let (connection, peer_builder) = Connection::new(self.info.clone(), conn_state.as_shared());
+        let (connection, peer_builder) = Connection::new(self.info.clone(), conn_state.to_shared());
 
         let handler = thread::spawn(move || -> Result<Closer> {
             loop {

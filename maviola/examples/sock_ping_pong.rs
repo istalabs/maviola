@@ -30,7 +30,7 @@ fn spawn_client(path: PathBuf, component_id: ComponentId) {
     let whoami = format!("client #{component_id}");
 
     thread::spawn(move || {
-        let client = Node::try_from(
+        let mut client = Node::try_from(
             Node::builder()
                 .system_id(31)
                 .component_id(component_id)
@@ -66,7 +66,7 @@ fn spawn_client(path: PathBuf, component_id: ComponentId) {
 }
 
 fn run(path: PathBuf) {
-    let server = Node::try_from(
+    let mut server = Node::try_from(
         Node::builder()
             .system_id(17)
             .component_id(42)

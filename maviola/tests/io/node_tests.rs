@@ -204,7 +204,7 @@ fn heartbeats_are_sent() {
     initialize();
 
     let port = unused_port();
-    let server_node = Node::try_from(
+    let mut server_node = Node::try_from(
         Node::builder()
             .system_id(1)
             .component_id(1)

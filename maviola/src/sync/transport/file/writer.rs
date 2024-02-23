@@ -81,7 +81,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for FileWriter {
         let (connection, peer_builder) = Connection::new(self.info.clone(), conn_state);
 
         let peer_connection = peer_builder.build(ChannelInfo::FileWriter { path }, reader, writer);
-        peer_connection.spawn().as_closable();
+        peer_connection.spawn().to_closable();
 
         Ok(connection)
     }

@@ -36,7 +36,7 @@ fn spawn_client(addr: &str, component_id: ComponentId) {
     let whoami = format!("client #{component_id}");
 
     thread::spawn(move || {
-        let client = Node::try_from(
+        let mut client = Node::try_from(
             Node::builder()
                 .system_id(31)
                 .component_id(component_id)
@@ -72,7 +72,7 @@ fn spawn_client(addr: &str, component_id: ComponentId) {
 
 fn run(addr: &str) {
     let server_addr = addr.to_string();
-    let server = Node::try_from(
+    let mut server = Node::try_from(
         Node::builder()
             .system_id(17)
             .component_id(42)

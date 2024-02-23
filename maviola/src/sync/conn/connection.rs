@@ -35,7 +35,7 @@ impl<V: MaybeVersioned> Connection<V> {
         let connection = Self {
             info,
             sender: ConnSender {
-                state: state.as_closable(),
+                state: state.to_closable(),
                 sender: sender.clone(),
             },
             receiver: ConnReceiver { receiver },
@@ -44,7 +44,7 @@ impl<V: MaybeVersioned> Connection<V> {
 
         let builder = ChannelFactory {
             info: connection.info.clone(),
-            state: connection.state.as_closable(),
+            state: connection.state.to_closable(),
             sender,
             send_handler,
             producer,

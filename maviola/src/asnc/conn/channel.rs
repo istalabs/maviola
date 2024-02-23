@@ -191,7 +191,7 @@ impl<
     }
 
     async fn handle_stop(
-        state: SharedCloser,
+        mut state: SharedCloser,
         conn_state: Closable,
         info: Arc<ChannelInfo>,
         write_handler: tokio::task::JoinHandle<Result<()>>,

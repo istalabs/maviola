@@ -78,7 +78,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpServer {
         let listener = TcpListener::bind(self.addr)?;
 
         let conn_state = Closer::new();
-        let (connection, peer_builder) = Connection::new(self.info.clone(), conn_state.as_shared());
+        let (connection, peer_builder) = Connection::new(self.info.clone(), conn_state.to_shared());
 
         let handler = thread::spawn(move || -> Result<Closer> {
             for stream in listener.incoming() {

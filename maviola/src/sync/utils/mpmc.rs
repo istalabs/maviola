@@ -300,7 +300,7 @@ pub fn channel<T: Clone + Sync + Send + 'static>() -> (Sender<T>, Receiver<T>) {
 
     let sender = Sender {
         inner: send_tx,
-        state: state.as_closable(),
+        state: state.to_closable(),
     };
 
     let receiver = {

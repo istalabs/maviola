@@ -80,7 +80,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServer {
         let udp_socket = UdpSocket::bind(server_addr)?;
 
         let conn_state = Closer::new();
-        let (connection, peer_builder) = Connection::new(self.info.clone(), conn_state.as_shared());
+        let (connection, peer_builder) = Connection::new(self.info.clone(), conn_state.to_shared());
 
         let handler = thread::spawn(move || -> Result<Closer> {
             let mut peers = HashMap::new();
@@ -116,7 +116,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServer {
                     peer_connection.spawn().discard();
 
                     Self::handle_peer_sends(
-                        conn_state.as_closable(),
+                        conn_state.to_closable(),
                         peer_builder.info().clone(),
                         peer_addr,
                         udp_socket,

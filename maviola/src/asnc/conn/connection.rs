@@ -39,7 +39,7 @@ impl<V: MaybeVersioned> AsyncConnection<V> {
         let connection = Self {
             info,
             sender: ConnSender {
-                state: state.as_closable(),
+                state: state.to_closable(),
                 sender: sender.clone(),
             },
             receiver: ConnReceiver { receiver },
@@ -48,7 +48,7 @@ impl<V: MaybeVersioned> AsyncConnection<V> {
 
         let builder = AsyncChannelFactory {
             info: connection.info.clone(),
-            state: connection.state.as_closable(),
+            state: connection.state.to_closable(),
             sender,
             send_handler,
             producer,

@@ -15,7 +15,7 @@ pub(crate) fn handle_listener_stop(
 
         match handler.join() {
             Ok(res) => match res {
-                Ok(closer) => {
+                Ok(mut closer) => {
                     closer.close();
                     log::debug!("[{info:?}] listener stopped")
                 }

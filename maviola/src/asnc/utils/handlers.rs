@@ -10,7 +10,7 @@ pub(crate) fn handle_listener_stop(
     tokio::task::spawn(async move {
         match handler.await {
             Ok(res) => match res {
-                Ok(closer) => {
+                Ok(mut closer) => {
                     closer.close();
                     log::debug!("[{info:?}] listener stopped")
                 }

@@ -51,7 +51,7 @@ impl<V: MaybeVersioned + 'static> AsyncConnectionBuilder<V> for AsyncTcpServer {
 
         let conn_state = Closer::new();
         let (connection, peer_builder) =
-            AsyncConnection::new(self.info.clone(), conn_state.as_shared());
+            AsyncConnection::new(self.info.clone(), conn_state.to_shared());
 
         let handler: tokio::task::JoinHandle<Result<Closer>> = tokio::spawn(async move {
             loop {

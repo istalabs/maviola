@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::sync::atomic::{AtomicBool, AtomicU8};
+use std::sync::atomic::AtomicU8;
 use std::sync::{atomic, Arc, RwLock};
 use std::thread;
 use std::time::Duration;
@@ -15,7 +15,7 @@ use crate::core::marker::{
     HasComponentId, HasSystemId, Identified, MaybeIdentified, NoComponentId, NoConnConf,
     NoSystemId, Unidentified,
 };
-use crate::core::utils::SharedCloser;
+use crate::core::utils::{Guarded, SharedCloser, Switch};
 use crate::core::{NodeBuilder, NodeConf};
 use crate::protocol::{Peer, PeerId};
 use crate::sync::conn::Connection;
@@ -44,7 +44,7 @@ use crate::sync::handler::InactivePeersHandler;
 /// # let addr = format!("127.0.0.1:{}", pick_unused_port().unwrap());
 ///
 /// // Create a node from configuration.
-/// let node = Node::try_from(
+/// let mut node = Node::try_from(
 ///     Node::builder()
 ///         .version(V2)                // restrict node to MAVLink2 protocol version
 ///         .system_id(1)               // System `ID`
@@ -84,7 +84,7 @@ pub struct Node<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static> {
     version: V,
     sequence: Arc<AtomicU8>,
     state: SharedCloser,
-    is_active: Arc<AtomicBool>,
+    is_active: Guarded<SharedCloser, Switch>,
     connection: Connection<V>,
     peers: Arc<RwLock<HashMap<PeerId, Peer>>>,
     heartbeat_timeout: Duration,
@@ -146,13 +146,14 @@ impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static> Node<I, D, V> 
     pub fn try_from_conf(conf: NodeConf<I, D, V, ConnConf<V>>) -> Result<Self> {
         let connection = conf.connection().build()?;
         let state = connection.share_state();
+        let is_active = Guarded::from(&state);
         let (events_tx, events_rx) = mpmc::channel();
 
         let node = Self {
             id: conf.id,
             version: conf.version,
             state,
-            is_active: Arc::new(AtomicBool::new(false)),
+            is_active,
             sequence: Arc::new(AtomicU8::new(0)),
             connection,
             peers: Default::default(),
@@ -292,7 +293,7 @@ impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static> Node<I, D, V> 
         let receiver = self.connection.receiver();
         let peers = self.peers.clone();
         let events_tx = self.events_tx.clone();
-        let state = self.state.as_closable();
+        let state = self.state.to_closable();
 
         thread::spawn(move || loop {
             if state.is_closed() {
@@ -355,7 +356,7 @@ impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static> Node<I, D, V> 
             events_tx: self.events_tx.clone(),
         };
 
-        handler.spawn(self.state.as_closable());
+        handler.spawn(self.state.to_closable());
     }
 
     fn recv_frame_internal(&self) -> Result<(Frame<V>, Callback<V>)> {
@@ -400,7 +401,7 @@ impl<D: Dialect, V: Versioned + 'static> Node<Identified, D, V> {
     /// Node transitions into inactive state when it becomes disconnected or when
     /// [`Node::deactivate`] called.
     pub fn is_active(&self) -> bool {
-        self.is_active.load(atomic::Ordering::Relaxed)
+        self.is_active.is()
     }
 
     /// Heartbeat interval.
@@ -421,16 +422,16 @@ impl<D: Dialect, V: Versioned + 'static> Node<Identified, D, V> {
     ///
     /// [`Node::activate`] is idempotent while node is connected. Otherwise, it will return
     /// [`NodeError::Inactive`] variant of [`Error::Node`].
-    pub fn activate(&self) -> Result<()> {
+    pub fn activate(&mut self) -> Result<()> {
         if self.state.is_closed() {
             return Err(Error::Node(NodeError::Inactive));
         }
 
-        if self.is_active.load(atomic::Ordering::Relaxed) {
+        if self.is_active.is() {
             return Ok(());
         }
 
-        self.is_active.store(true, atomic::Ordering::Relaxed);
+        self.is_active.set(true);
         self.start_sending_heartbeats();
 
         Ok(())
@@ -444,23 +445,22 @@ impl<D: Dialect, V: Versioned + 'static> Node<Identified, D, V> {
     ///
     /// [`Node::deactivate`] is idempotent while node is connected. Otherwise, it will return
     /// [`NodeError::Inactive`] variant of [`Error::Node`].
-    pub fn deactivate(&self) -> Result<()> {
+    pub fn deactivate(&mut self) -> Result<()> {
         if self.state.is_closed() {
             return Err(Error::Node(NodeError::Inactive));
         }
 
-        if !self.is_active.load(atomic::Ordering::Relaxed) {
+        if !self.is_active.is() {
             return Ok(());
         }
 
-        self.is_active.store(false, atomic::Ordering::Relaxed);
+        self.is_active.set(false);
 
         Ok(())
     }
 
     fn start_sending_heartbeats(&self) {
-        let state = self.state.as_closable();
-        let is_active = self.is_active.clone();
+        let mut is_active = self.is_active.clone();
         let info = self.info().clone();
         let heartbeat_interval = self.heartbeat_interval;
         let version = self.version.clone();
@@ -474,14 +474,7 @@ impl<D: Dialect, V: Versioned + 'static> Node<Identified, D, V> {
 
         thread::spawn(move || {
             loop {
-                if state.is_closed() {
-                    log::trace!(
-                        "[{info:?}] closing heartbeat emitter since node is no longer connected"
-                    );
-                    is_active.store(false, atomic::Ordering::Relaxed);
-                    break;
-                }
-                if !is_active.load(atomic::Ordering::Relaxed) {
+                if !is_active.is() {
                     log::trace!(
                         "[{info:?}] closing heartbeat emitter since node is no longer active"
                     );
@@ -501,7 +494,7 @@ impl<D: Dialect, V: Versioned + 'static> Node<Identified, D, V> {
                 log::trace!("[{info:?}] broadcasting heartbeat");
                 if let Err(err) = sender.send(&frame) {
                     log::trace!("[{info:?}] heartbeat can't be broadcast: {err:?}");
-                    is_active.store(false, atomic::Ordering::Relaxed);
+                    is_active.set(false);
                     break;
                 }
 
@@ -577,7 +570,6 @@ impl<D: Dialect> Node<Identified, D, Versionless> {
 
 impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static> Drop for Node<I, D, V> {
     fn drop(&mut self) {
-        self.is_active.store(false, atomic::Ordering::Relaxed);
         self.state.close();
 
         log::debug!("{:?}: node is dropped", self.info());
