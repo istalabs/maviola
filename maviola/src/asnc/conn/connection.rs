@@ -25,8 +25,8 @@ pub trait AsyncConnectionBuilder<V: MaybeVersioned + 'static>: Debug + Send {
 #[derive(Debug)]
 pub struct AsyncConnection<V: MaybeVersioned + 'static> {
     info: ConnectionInfo,
-    sender: ConnSender<V>,
-    receiver: ConnReceiver<V>,
+    sender: AsyncConnSender<V>,
+    receiver: AsyncConnReceiver<V>,
     state: SharedCloser,
 }
 
@@ -38,11 +38,11 @@ impl<V: MaybeVersioned> AsyncConnection<V> {
 
         let connection = Self {
             info,
-            sender: ConnSender {
+            sender: AsyncConnSender {
                 state: state.to_closable(),
                 sender: sender.clone(),
             },
-            receiver: ConnReceiver { receiver },
+            receiver: AsyncConnReceiver { receiver },
             state,
         };
 
@@ -91,11 +91,11 @@ impl<V: MaybeVersioned> AsyncConnection<V> {
         log::debug!("[{:?}] connection closed", self.info);
     }
 
-    pub(crate) fn sender(&self) -> ConnSender<V> {
+    pub(crate) fn sender(&self) -> AsyncConnSender<V> {
         self.sender.clone()
     }
 
-    pub(crate) fn receiver(&self) -> ConnReceiver<V> {
+    pub(crate) fn receiver(&self) -> AsyncConnReceiver<V> {
         self.receiver.clone()
     }
 }
@@ -111,12 +111,12 @@ impl<V: MaybeVersioned> Drop for AsyncConnection<V> {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug)]
-pub(crate) struct ConnSender<V: MaybeVersioned + 'static> {
+pub(crate) struct AsyncConnSender<V: MaybeVersioned + 'static> {
     sender: AsyncFrameSender<V>,
     state: Closable,
 }
 
-impl<V: MaybeVersioned> ConnSender<V> {
+impl<V: MaybeVersioned> AsyncConnSender<V> {
     pub(crate) fn send(&self, frame: &Frame<V>) -> Result<usize> {
         if self.state.is_closed() {
             return Err(Error::from(mpsc::SendError(frame)));
@@ -129,11 +129,11 @@ impl<V: MaybeVersioned> ConnSender<V> {
 }
 
 #[derive(Debug)]
-pub(crate) struct ConnReceiver<V: MaybeVersioned + 'static> {
+pub(crate) struct AsyncConnReceiver<V: MaybeVersioned + 'static> {
     receiver: AsyncFrameReceiver<V>,
 }
 
-impl<V: MaybeVersioned + 'static> Clone for ConnReceiver<V> {
+impl<V: MaybeVersioned + 'static> Clone for AsyncConnReceiver<V> {
     fn clone(&self) -> Self {
         Self {
             receiver: self.receiver.resubscribe(),
@@ -141,7 +141,7 @@ impl<V: MaybeVersioned + 'static> Clone for ConnReceiver<V> {
     }
 }
 
-impl<V: MaybeVersioned> ConnReceiver<V> {
+impl<V: MaybeVersioned> AsyncConnReceiver<V> {
     pub(crate) async fn recv(&mut self) -> Result<(Frame<V>, AsyncCallback<V>)> {
         self.receiver.recv().await.map_err(Error::from)
     }

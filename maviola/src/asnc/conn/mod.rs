@@ -14,6 +14,8 @@ mod connection;
 pub use channel::{AsyncChannel, AsyncChannelFactory};
 pub use connection::{AsyncConnection, AsyncConnectionBuilder};
 
+pub(crate) use connection::{AsyncConnReceiver, AsyncConnSender};
+
 use crate::asnc::AsyncCallback;
 use crate::core::io::OutgoingFrame;
 use crate::protocol::Frame;

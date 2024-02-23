@@ -14,13 +14,13 @@ mod connection;
 pub use channel::{Channel, ChannelFactory};
 pub use connection::{Connection, ConnectionBuilder};
 
+pub(crate) use connection::{ConnReceiver, ConnSender};
+
 use crate::core::io::OutgoingFrame;
 use crate::protocol::Frame;
 use crate::sync::Callback;
 
 use crate::prelude::*;
-
-pub(crate) use connection::{ConnReceiver, ConnSender};
 
 /// Producing part of channel that sends outgoing frames to a [`Connection`].
 ///

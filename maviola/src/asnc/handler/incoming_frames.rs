@@ -1,29 +1,30 @@
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
-use std::thread;
+use std::sync::Arc;
 
+use tokio::sync::RwLock;
+
+use crate::asnc::conn::AsyncConnReceiver;
+use crate::asnc::AsyncEvent;
 use crate::core::io::ConnectionInfo;
 use crate::core::utils::Closable;
 use crate::protocol::{Peer, PeerId};
-use crate::sync::conn::ConnReceiver;
-use crate::sync::Event;
 
 use crate::prelude::*;
 
 pub(crate) struct IncomingFramesHandler<V: MaybeVersioned + 'static> {
     pub(crate) info: ConnectionInfo,
     pub(crate) peers: Arc<RwLock<HashMap<PeerId, Peer>>>,
-    pub(crate) receiver: ConnReceiver<V>,
-    pub(crate) events_tx: mpmc::Sender<Event<V>>,
+    pub(crate) receiver: AsyncConnReceiver<V>,
+    pub(crate) events_tx: broadcast::Sender<AsyncEvent<V>>,
 }
 
 impl<V: MaybeVersioned + 'static> IncomingFramesHandler<V> {
-    pub(crate) fn spawn(self, state: Closable) {
-        thread::spawn(move || {
+    pub(crate) async fn spawn(mut self, state: Closable) {
+        tokio::spawn(async move {
             let info = &self.info;
 
             while !state.is_closed() {
-                let (frame, response) = match self.receiver.try_recv() {
+                let (frame, response) = match self.receiver.recv().await {
                     Ok((frame, resp)) => (frame, resp),
                     Err(Error::Sync(err)) => match err {
                         SyncError::Empty => continue,
@@ -42,30 +43,24 @@ impl<V: MaybeVersioned + 'static> IncomingFramesHandler<V> {
                     let peer = Peer::new(frame.system_id(), frame.component_id());
                     log::trace!("[{info:?}] received heartbeat from {peer:?}");
 
-                    match self.peers.write() {
-                        Ok(mut peers) => {
-                            let has_peer = peers.contains_key(&peer.id);
-                            peers.insert(peer.id, peer.clone());
+                    {
+                        let mut peers = self.peers.write().await;
+                        let has_peer = peers.contains_key(&peer.id);
+                        peers.insert(peer.id, peer.clone());
 
-                            if !has_peer {
-                                if let Err(err) = self.events_tx.send(Event::NewPeer(peer)) {
-                                    log::trace!(
-                                        "[{info:?}] failed to report new peer event: {err}"
-                                    );
-                                    return;
-                                }
+                        if !has_peer {
+                            if let Err(err) = self.events_tx.send(AsyncEvent::NewPeer(peer)) {
+                                log::trace!("[{info:?}] failed to report new peer event: {err}");
+                                return;
                             }
-                        }
-                        Err(err) => {
-                            log::trace!(
-                                "[{info:?}] received {peer:?} but node is offline: {err:?}"
-                            );
-                            return;
                         }
                     }
                 }
 
-                if let Err(err) = self.events_tx.send(Event::Frame(frame.clone(), response)) {
+                if let Err(err) = self
+                    .events_tx
+                    .send(AsyncEvent::Frame(frame.clone(), response))
+                {
                     log::trace!("[{info:?}] failed to report incoming frame event: {err}");
                     return;
                 }

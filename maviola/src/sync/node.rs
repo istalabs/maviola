@@ -4,11 +4,6 @@ use std::sync::atomic::AtomicU8;
 use std::sync::{atomic, Arc, RwLock};
 use std::time::Duration;
 
-use crate::protocol::{
-    ComponentId, Dialect, Frame, MavLinkVersion, MaybeVersioned, Message, SystemId, Versioned,
-    Versionless,
-};
-
 use crate::core::io::ConnectionInfo;
 use crate::core::marker::{
     HasComponentId, HasSystemId, Identified, MaybeIdentified, NoComponentId, NoConnConf,
@@ -16,14 +11,18 @@ use crate::core::marker::{
 };
 use crate::core::utils::{Guarded, SharedCloser, Switch};
 use crate::core::{NodeBuilder, NodeConf};
+use crate::protocol::{
+    ComponentId, Dialect, Frame, MavLinkVersion, MaybeVersioned, Message, SystemId, Versioned,
+    Versionless,
+};
 use crate::protocol::{Peer, PeerId};
 use crate::sync::conn::Connection;
 use crate::sync::event::{Event, EventsIterator};
+use crate::sync::handler::{HeartbeatEmitter, InactivePeersHandler, IncomingFramesHandler};
 use crate::sync::marker::ConnConf;
 use crate::sync::Callback;
 
 use crate::prelude::*;
-use crate::sync::handler::{HeartbeatEmitter, InactivePeersHandler, IncomingFramesHandler};
 
 /// MAVLink node.
 ///

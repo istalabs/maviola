@@ -22,12 +22,7 @@ impl<V: MaybeVersioned + 'static> InactivePeersHandler<V> {
         thread::spawn(move || {
             let info = &self.info;
 
-            loop {
-                if state.is_closed() {
-                    log::trace!("[{info:?}] closing inactive peers handler: node is disconnected");
-                    break;
-                }
-
+            while !state.is_closed() {
                 thread::sleep(self.timeout);
                 let now = SystemTime::now();
 
