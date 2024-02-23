@@ -4,12 +4,12 @@ use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
+use maviola::core::marker::Identified;
 use maviola::dialects::minimal::enums::{MavAutopilot, MavModeFlag, MavState, MavType};
 use maviola::dialects::minimal::messages::Heartbeat;
 use maviola::dialects::Minimal;
-use maviola::io::marker::Identified;
 use maviola::protocol::{Dialect, V2};
-use maviola::{Node, SockClient, SockServer};
+use maviola::sync::{Node, SockClient, SockServer};
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(50);
 const HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(75);

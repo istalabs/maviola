@@ -27,13 +27,16 @@
     html_favicon_url = "https://gitlab.com/mavka/libs/maviola/-/raw/main/avatar.png?ref_type=heads"
 )]
 
-pub mod consts;
+#[cfg(feature = "async")]
+#[allow(async_fn_in_trait)]
+#[allow(unused_imports)]
+#[allow(dead_code)]
+pub mod asnc;
 pub mod core;
-pub mod errors;
-pub mod io;
 pub mod prelude;
 pub mod protocol;
-pub mod utils;
+#[cfg(feature = "sync")]
+pub mod sync;
 
 pub(crate) extern crate mavio;
 
@@ -41,19 +44,3 @@ pub(crate) extern crate mavio;
 /// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
 /// MAVLink dialects
 pub use mavio::dialects;
-
-#[doc(inline)]
-/// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
-pub use protocol::Frame;
-
-#[doc(inline)]
-#[cfg(feature = "sync")]
-pub use io::{Event, FileReader, FileWriter, Node, TcpClient, TcpServer, UdpClient, UdpServer};
-#[doc(inline)]
-#[cfg(feature = "sync")]
-#[cfg(unix)]
-pub use io::{SockClient, SockServer};
-
-#[doc(inline)]
-#[cfg(feature = "async")]
-pub use io::{AsyncTcpClient, AsyncTcpServer};

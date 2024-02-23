@@ -4,9 +4,9 @@ use std::thread;
 use std::time::Duration;
 
 use maviola::dialects::Minimal;
-use maviola::io::{Event, Node};
 use maviola::protocol::{ComponentId, Frame, MaybeVersioned, V2};
-use maviola::{SockClient, SockServer};
+use maviola::sync::{Event, Node};
+use maviola::sync::{SockClient, SockServer};
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(50);
 const HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(75);

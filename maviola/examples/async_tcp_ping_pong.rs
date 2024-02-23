@@ -2,13 +2,11 @@ use std::sync::atomic;
 use std::sync::atomic::AtomicU8;
 use std::time::Duration;
 
-use mavio::protocol::MaybeVersioned;
-use mavio::Frame;
+use maviola::asnc::conn::AsyncConnection;
+use maviola::asnc::conn::AsyncConnectionBuilder;
+use maviola::asnc::{AsyncTcpClient, AsyncTcpServer};
 use maviola::dialects::minimal as dialect;
-use maviola::io::asnc::conn::AsyncConnectionBuilder;
-use maviola::io::asnc::AsyncConnection;
-use maviola::protocol::V2;
-use maviola::{AsyncTcpClient, AsyncTcpServer};
+use maviola::protocol::{Frame, MaybeVersioned, V2};
 
 static SEQUENCE: AtomicU8 = AtomicU8::new(0);
 

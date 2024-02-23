@@ -6,11 +6,11 @@ use std::time::Duration;
 
 use portpicker::Port;
 
+use maviola::core::marker::Identified;
 use maviola::dialects::minimal;
-use maviola::io::marker::Identified;
-use maviola::io::sync::{TcpClient, TcpServer};
-use maviola::io::{Event, Node};
 use maviola::protocol::{ComponentId, MavLinkVersion, SystemId, V2};
+use maviola::sync::{Event, Node};
+use maviola::sync::{TcpClient, TcpServer};
 
 static INIT: Once = Once::new();
 static INIT_LOGGER: Once = Once::new();

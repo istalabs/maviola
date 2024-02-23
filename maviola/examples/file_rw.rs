@@ -7,9 +7,9 @@ use std::thread;
 use std::time::Duration;
 
 use maviola::dialects::minimal as dialect;
-use maviola::io::{Event, Node};
 use maviola::protocol::{Frame, MaybeVersioned, V2};
-use maviola::{FileReader, FileWriter};
+use maviola::sync::{Event, Node};
+use maviola::sync::{FileReader, FileWriter};
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(50);
 const HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(75);
