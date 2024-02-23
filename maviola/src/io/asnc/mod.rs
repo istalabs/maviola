@@ -3,6 +3,8 @@
 mod callback;
 pub mod conn;
 mod consts;
+mod event;
+pub mod marker;
 mod tcp;
 mod utils;
 

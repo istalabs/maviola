@@ -24,6 +24,7 @@ path = "src/lib.rs"
 # Dependencies
 ###########################################################
 [dependencies]
+async-trait = { version = "0.1.77", optional = true }
 log = "0.4.20"
 mavio = { version = "0.2.0-rc2", path = "../../mavio/mavio", features = ["extras"] }
 portpicker = "0.1.1"
@@ -47,6 +48,7 @@ sync = []
 ## Enables asynchromous API via Tokio.
 async = [
     "dep:tokio",
+    "dep:async-trait",
     "mavio/tokio"
 ]
 ## Enables serde support.

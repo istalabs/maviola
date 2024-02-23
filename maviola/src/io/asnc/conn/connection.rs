@@ -1,6 +1,8 @@
 use std::fmt::Debug;
 use std::sync::mpsc;
 
+use async_trait::async_trait;
+
 use crate::io::asnc::conn::{AsyncChannelFactory, AsyncFrameReceiver, AsyncFrameSender};
 use crate::io::asnc::consts::CONN_BROADCAST_CHAN_CAPACITY;
 use crate::io::asnc::AsyncCallback;
@@ -10,6 +12,7 @@ use crate::utils::{Closable, SharedCloser};
 use crate::prelude::*;
 
 /// AsyncConnection builder used to create a [`AsyncConnection`].
+#[async_trait]
 pub trait AsyncConnectionBuilder<V: MaybeVersioned + 'static>: Debug + Send {
     /// Provides information about connection.
     fn info(&self) -> &ConnectionInfo;

@@ -1,5 +1,6 @@
 use std::net::{SocketAddr, ToSocketAddrs};
 
+use async_trait::async_trait;
 use tokio::net::TcpListener;
 
 use crate::io::asnc::conn::{AsyncConnection, AsyncConnectionBuilder};
@@ -38,6 +39,7 @@ impl AsyncTcpServer {
     }
 }
 
+#[async_trait]
 impl<V: MaybeVersioned + 'static> AsyncConnectionBuilder<V> for AsyncTcpServer {
     fn info(&self) -> &ConnectionInfo {
         &self.info
