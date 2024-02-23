@@ -10,36 +10,33 @@ use crate::sync::Event;
 
 use crate::prelude::*;
 
-pub(crate) struct InactivePeersHandler<'a, V: MaybeVersioned> {
-    pub(crate) info: &'a ConnectionInfo,
+pub(crate) struct InactivePeersHandler<V: MaybeVersioned> {
+    pub(crate) info: ConnectionInfo,
     pub(crate) peers: Arc<RwLock<HashMap<PeerId, Peer>>>,
     pub(crate) timeout: Duration,
     pub(crate) events_tx: mpmc::Sender<Event<V>>,
 }
 
-impl<V: MaybeVersioned + 'static> InactivePeersHandler<'_, V> {
+impl<V: MaybeVersioned + 'static> InactivePeersHandler<V> {
     pub(crate) fn spawn(self, state: Closable) {
-        let info = self.info.clone();
-        let peers = self.peers.clone();
-        let heartbeat_timeout = self.timeout;
-        let events_tx = self.events_tx.clone();
-
         thread::spawn(move || {
+            let info = &self.info;
+
             loop {
                 if state.is_closed() {
                     log::trace!("[{info:?}] closing inactive peers handler: node is disconnected");
                     break;
                 }
 
-                thread::sleep(heartbeat_timeout);
+                thread::sleep(self.timeout);
                 let now = SystemTime::now();
 
-                let inactive_peers = match peers.read() {
+                let inactive_peers = match self.peers.read() {
                     Ok(peers) => {
                         let mut inactive_peers = HashSet::new();
                         for peer in peers.values() {
                             if let Ok(since) = now.duration_since(peer.last_active) {
-                                if since > heartbeat_timeout {
+                                if since > self.timeout {
                                     inactive_peers.insert(peer.id);
                                 }
                             }
@@ -52,11 +49,11 @@ impl<V: MaybeVersioned + 'static> InactivePeersHandler<'_, V> {
                     }
                 };
 
-                match peers.write() {
+                match self.peers.write() {
                     Ok(mut peers) => {
                         for id in inactive_peers {
                             if let Some(peer) = peers.remove(&id) {
-                                if let Err(err) = events_tx.send(Event::PeerLost(peer)) {
+                                if let Err(err) = self.events_tx.send(Event::PeerLost(peer)) {
                                     log::trace!(
                                         "[{info:?}] failed to report lost peer event: {err}"
                                     );

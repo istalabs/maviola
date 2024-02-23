@@ -203,6 +203,12 @@ impl<C: WillClose, F: Flipper> Guarded<C, F> {
     }
 }
 
+impl Default for Guarded<Closer, Switch> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<F: Flipper> Clone for Guarded<SharedCloser, F> {
     fn clone(&self) -> Self {
         Self {

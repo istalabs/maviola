@@ -20,6 +20,8 @@ use crate::sync::Callback;
 
 use crate::prelude::*;
 
+pub(crate) use connection::{ConnReceiver, ConnSender};
+
 /// Producing part of channel that sends outgoing frames to a [`Connection`].
 ///
 /// Paired with [`FrameSendHandler`] that usually is owned by a [`Channel`].

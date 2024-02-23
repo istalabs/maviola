@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicU8;
 use std::sync::{atomic, Arc, RwLock};
-use std::thread;
 use std::time::Duration;
 
 use crate::protocol::{
@@ -24,7 +23,7 @@ use crate::sync::marker::ConnConf;
 use crate::sync::Callback;
 
 use crate::prelude::*;
-use crate::sync::handler::InactivePeersHandler;
+use crate::sync::handler::{HeartbeatEmitter, InactivePeersHandler, IncomingFramesHandler};
 
 /// MAVLink node.
 ///
@@ -92,43 +91,6 @@ pub struct Node<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static> {
     events_tx: mpmc::Sender<Event<V>>,
     events_rx: mpmc::Receiver<Event<V>>,
     _dialect: PhantomData<D>,
-}
-
-impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static>
-    TryFrom<NodeConf<I, D, V, ConnConf<V>>> for Node<I, D, V>
-{
-    type Error = Error;
-
-    /// Attempts to construct [`Node`] from configuration.
-    fn try_from(value: NodeConf<I, D, V, ConnConf<V>>) -> Result<Self> {
-        Self::try_from_conf(value)
-    }
-}
-
-impl<D: Dialect, V: MaybeVersioned>
-    TryFrom<NodeBuilder<HasSystemId, HasComponentId, D, V, ConnConf<V>>>
-    for Node<Identified, D, V>
-{
-    type Error = Error;
-
-    /// Attempts to construct an identified [`Node`] from a node builder.
-    fn try_from(
-        value: NodeBuilder<HasSystemId, HasComponentId, D, V, ConnConf<V>>,
-    ) -> Result<Self> {
-        Self::try_from_conf(value.conf())
-    }
-}
-
-impl<D: Dialect, V: MaybeVersioned>
-    TryFrom<NodeBuilder<NoSystemId, NoComponentId, D, V, ConnConf<V>>>
-    for Node<Unidentified, D, V>
-{
-    type Error = Error;
-
-    /// Attempts to construct an unidentified [`Node`] from a node builder.
-    fn try_from(value: NodeBuilder<NoSystemId, NoComponentId, D, V, ConnConf<V>>) -> Result<Self> {
-        Self::try_from_conf(value.conf())
-    }
 }
 
 impl Node<Unidentified, Minimal, Versionless> {
@@ -289,68 +251,18 @@ impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static> Node<I, D, V> 
     }
 
     fn handle_incoming_frames(&self) {
-        let info = self.info().clone();
-        let receiver = self.connection.receiver();
-        let peers = self.peers.clone();
-        let events_tx = self.events_tx.clone();
-        let state = self.state.to_closable();
-
-        thread::spawn(move || loop {
-            if state.is_closed() {
-                log::trace!(
-                    "[{info:?}] closing incoming frames handler since node is no longer active"
-                );
-                return;
-            }
-
-            let (frame, response) = match receiver.try_recv() {
-                Ok((frame, resp)) => (frame, resp),
-                Err(Error::Sync(err)) => match err {
-                    SyncError::Empty => continue,
-                    _ => {
-                        log::trace!("[{info:?}] node connection closed");
-                        return;
-                    }
-                },
-                Err(err) => {
-                    log::error!("[{info:?}] unhandled node error: {err}");
-                    return;
-                }
-            };
-
-            if let Ok(Minimal::Heartbeat(_)) = frame.decode() {
-                let peer = Peer::new(frame.system_id(), frame.component_id());
-                log::trace!("[{info:?}] received heartbeat from {peer:?}");
-
-                match peers.write() {
-                    Ok(mut peers) => {
-                        let has_peer = peers.contains_key(&peer.id);
-                        peers.insert(peer.id, peer.clone());
-
-                        if !has_peer {
-                            if let Err(err) = events_tx.send(Event::NewPeer(peer)) {
-                                log::trace!("[{info:?}] failed to report new peer event: {err}");
-                                return;
-                            }
-                        }
-                    }
-                    Err(err) => {
-                        log::trace!("[{info:?}] received {peer:?} but node is offline: {err:?}");
-                        return;
-                    }
-                }
-            }
-
-            if let Err(err) = events_tx.send(Event::Frame(frame.clone(), response)) {
-                log::trace!("[{info:?}] failed to report incoming frame event: {err}");
-                return;
-            }
-        });
+        let handler = IncomingFramesHandler {
+            info: self.info().clone(),
+            peers: self.peers.clone(),
+            receiver: self.connection.receiver(),
+            events_tx: self.events_tx.clone(),
+        };
+        handler.spawn(self.state.to_closable());
     }
 
     fn handle_inactive_peers(&self) {
         let handler = InactivePeersHandler {
-            info: self.info(),
+            info: self.info().clone(),
             peers: self.peers.clone(),
             timeout: self.heartbeat_timeout,
             events_tx: self.events_tx.clone(),
@@ -460,61 +372,16 @@ impl<D: Dialect, V: Versioned + 'static> Node<Identified, D, V> {
     }
 
     fn start_sending_heartbeats(&self) {
-        let mut is_active = self.is_active.clone();
-        let info = self.info().clone();
-        let heartbeat_interval = self.heartbeat_interval;
-        let version = self.version.clone();
-        let sender = self.connection.sender();
-
-        let sequence = self.sequence.clone();
-        let system_id = self.system_id();
-        let component_id = self.component_id();
-
-        let heartbeat_message = self.make_heartbeat_message();
-
-        thread::spawn(move || {
-            loop {
-                if !is_active.is() {
-                    log::trace!(
-                        "[{info:?}] closing heartbeat emitter since node is no longer active"
-                    );
-                    break;
-                }
-
-                let sequence = sequence.fetch_add(1, atomic::Ordering::Relaxed);
-                let frame = Frame::builder()
-                    .sequence(sequence)
-                    .system_id(system_id)
-                    .component_id(component_id)
-                    .version(version.clone())
-                    .message(&heartbeat_message)
-                    .unwrap()
-                    .build();
-
-                log::trace!("[{info:?}] broadcasting heartbeat");
-                if let Err(err) = sender.send(&frame) {
-                    log::trace!("[{info:?}] heartbeat can't be broadcast: {err:?}");
-                    is_active.set(false);
-                    break;
-                }
-
-                thread::sleep(heartbeat_interval);
-            }
-            log::debug!("[{info:?}] heartbeats emitter stopped");
-        });
-    }
-
-    fn make_heartbeat_message(&self) -> mavio::dialects::minimal::messages::Heartbeat {
-        use crate::dialects::minimal as dialect;
-
-        dialect::messages::Heartbeat {
-            type_: Default::default(),
-            autopilot: dialect::enums::MavAutopilot::Generic,
-            base_mode: Default::default(),
-            custom_mode: 0,
-            system_status: dialect::enums::MavState::Active,
-            mavlink_version: D::version().unwrap_or_default(),
-        }
+        let emitter = HeartbeatEmitter {
+            info: self.info().clone(),
+            id: self.id.clone(),
+            interval: self.heartbeat_interval,
+            version: self.version.clone(),
+            sender: self.connection.sender(),
+            sequence: self.sequence.clone(),
+            _dialect: PhantomData::<D>,
+        };
+        emitter.spawn(self.is_active.clone());
     }
 }
 
@@ -565,6 +432,43 @@ impl<D: Dialect> Node<Identified, D, Versionless> {
             .make_frame_from_message(message, version)?
             .versionless();
         self.send_frame_internal(&frame)
+    }
+}
+
+impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static>
+    TryFrom<NodeConf<I, D, V, ConnConf<V>>> for Node<I, D, V>
+{
+    type Error = Error;
+
+    /// Attempts to construct [`Node`] from configuration.
+    fn try_from(value: NodeConf<I, D, V, ConnConf<V>>) -> Result<Self> {
+        Self::try_from_conf(value)
+    }
+}
+
+impl<D: Dialect, V: MaybeVersioned>
+    TryFrom<NodeBuilder<HasSystemId, HasComponentId, D, V, ConnConf<V>>>
+    for Node<Identified, D, V>
+{
+    type Error = Error;
+
+    /// Attempts to construct an identified [`Node`] from a node builder.
+    fn try_from(
+        value: NodeBuilder<HasSystemId, HasComponentId, D, V, ConnConf<V>>,
+    ) -> Result<Self> {
+        Self::try_from_conf(value.conf())
+    }
+}
+
+impl<D: Dialect, V: MaybeVersioned>
+    TryFrom<NodeBuilder<NoSystemId, NoComponentId, D, V, ConnConf<V>>>
+    for Node<Unidentified, D, V>
+{
+    type Error = Error;
+
+    /// Attempts to construct an unidentified [`Node`] from a node builder.
+    fn try_from(value: NodeBuilder<NoSystemId, NoComponentId, D, V, ConnConf<V>>) -> Result<Self> {
+        Self::try_from_conf(value.conf())
     }
 }
 
