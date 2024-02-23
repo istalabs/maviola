@@ -1,10 +1,9 @@
-use mavio::dialects::Minimal;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, AtomicU8};
 use std::sync::{atomic, Arc, RwLock};
 use std::thread;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use crate::protocol::{
     ComponentId, Dialect, Frame, MavLinkVersion, MaybeVersioned, Message, SystemId, Versioned,
@@ -25,6 +24,7 @@ use crate::sync::marker::ConnConf;
 use crate::sync::Callback;
 
 use crate::prelude::*;
+use crate::sync::handler::InactivePeersHandler;
 
 /// MAVLink node.
 ///
@@ -282,20 +282,6 @@ impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static> Node<I, D, V> 
         }
     }
 
-    /// Close all connections and stop.
-    pub fn close(&mut self) -> Result<()> {
-        self.is_active.store(false, atomic::Ordering::Relaxed);
-        self.state.close();
-
-        self.peers
-            .write()
-            .map_err(Error::from)
-            .map(|mut peers| peers.clear())?;
-
-        log::debug!("[{:?}] node is closed", self.connection.info());
-        Ok(())
-    }
-
     fn start_default_handlers(&self) {
         self.handle_incoming_frames();
         self.handle_inactive_peers();
@@ -331,7 +317,7 @@ impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static> Node<I, D, V> 
                 }
             };
 
-            if let Ok(crate::dialects::Minimal::Heartbeat(_)) = frame.decode() {
+            if let Ok(Minimal::Heartbeat(_)) = frame.decode() {
                 let peer = Peer::new(frame.system_id(), frame.component_id());
                 log::trace!("[{info:?}] received heartbeat from {peer:?}");
 
@@ -362,62 +348,14 @@ impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static> Node<I, D, V> 
     }
 
     fn handle_inactive_peers(&self) {
-        let info = self.info().clone();
-        let peers = self.peers.clone();
-        let heartbeat_timeout = self.heartbeat_timeout;
-        let events_tx = self.events_tx.clone();
-        let state = self.state.as_closable();
+        let handler = InactivePeersHandler {
+            info: self.info(),
+            peers: self.peers.clone(),
+            timeout: self.heartbeat_timeout,
+            events_tx: self.events_tx.clone(),
+        };
 
-        thread::spawn(move || {
-            loop {
-                if state.is_closed() {
-                    log::trace!("[{info:?}] closing inactive peers handler: node is disconnected");
-                    break;
-                }
-
-                thread::sleep(heartbeat_timeout);
-                let now = SystemTime::now();
-
-                let inactive_peers = match peers.read() {
-                    Ok(peers) => {
-                        let mut inactive_peers = HashSet::new();
-                        for peer in peers.values() {
-                            if let Ok(since) = now.duration_since(peer.last_active) {
-                                if since > heartbeat_timeout {
-                                    inactive_peers.insert(peer.id);
-                                }
-                            }
-                        }
-                        inactive_peers
-                    }
-                    Err(err) => {
-                        log::error!("[{info:?}] can't read peers: {err:?}");
-                        break;
-                    }
-                };
-
-                match peers.write() {
-                    Ok(mut peers) => {
-                        for id in inactive_peers {
-                            if let Some(peer) = peers.remove(&id) {
-                                if let Err(err) = events_tx.send(Event::PeerLost(peer)) {
-                                    log::trace!(
-                                        "[{info:?}] failed to report lost peer event: {err}"
-                                    );
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    Err(err) => {
-                        log::error!("[{info:?}] can't update peers: {err:?}");
-                        break;
-                    }
-                }
-            }
-
-            log::trace!("[{info:?}] inactive peers handler stopped");
-        });
+        handler.spawn(self.state.as_closable());
     }
 
     fn recv_frame_internal(&self) -> Result<(Frame<V>, Callback<V>)> {
@@ -639,8 +577,9 @@ impl<D: Dialect> Node<Identified, D, Versionless> {
 
 impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static> Drop for Node<I, D, V> {
     fn drop(&mut self) {
-        if let Err(err) = self.close() {
-            log::error!("{:?}: can't close node: {err:?}", self.info());
-        }
+        self.is_active.store(false, atomic::Ordering::Relaxed);
+        self.state.close();
+
+        log::debug!("{:?}: node is dropped", self.info());
     }
 }

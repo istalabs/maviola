@@ -3,7 +3,7 @@
 //! This module provides abstractions for resources which state has to be tracked in distributed
 //! computations.
 //!
-//! There are three level ow resource ownership:
+//! There are three level of resource ownership:
 //!
 //! * [`Closer`] represents a resource which is closed when its owner goes out of scope (similar to
 //!   the regular Rust ownership model). This struct is intentionally not [`Clone`].
@@ -15,6 +15,9 @@
 //! Each level may be "downgraded" to a lower one. A [`Closer`] can produce a [`SharedCloser`], and
 //! both of them can create a [`Closable`].
 //!
+//! All eventually "closable" entities implement trait [`WillClose`], as well as [`Closed`], a
+//! constant type which is always closed.
+//!
 //! The idea behind this hierarchy is that an expensive resource like a server listener ([`Closer`])
 //! may be bounded to several co-dependent resources like connection interfaces exposed to a library
 //! client ([`SharedCloser`]). If one of the sides are gone, then all should stop. Furthermore,
@@ -25,6 +28,23 @@
 use std::mem;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{atomic, Arc};
+
+use crate::core::utils::Sealed;
+
+/// <sup>🔒</sup>
+/// A trait for anything that may be closed.
+///
+/// ⚠ This trait is sealed ⚠
+///
+/// This trait is implemented by [`Closer`], [`SharedCloser`], [`Closable`], and [`Closed`].
+pub trait WillClose: Sealed {
+    /// Returns `true` if resource is closed.
+    ///
+    /// The blanket implementation always returns `true`.
+    fn is_closed(&self) -> bool {
+        true
+    }
+}
 
 /// State of a resource or operation that governed by the main task.
 ///
@@ -122,6 +142,13 @@ impl Closer {
     }
 }
 
+impl Sealed for Closer {}
+impl WillClose for Closer {
+    fn is_closed(&self) -> bool {
+        self.is_closed()
+    }
+}
+
 impl Default for Closer {
     fn default() -> Self {
         Self::new()
@@ -194,6 +221,13 @@ impl SharedCloser {
     }
 }
 
+impl Sealed for SharedCloser {}
+impl WillClose for SharedCloser {
+    fn is_closed(&self) -> bool {
+        self.is_closed()
+    }
+}
+
 impl Default for SharedCloser {
     fn default() -> Self {
         Self::new()
@@ -232,6 +266,33 @@ impl Closable {
     /// Returns `true` if resource is closed.
     pub fn is_closed(&self) -> bool {
         self.0.load(atomic::Ordering::Acquire)
+    }
+}
+
+impl Sealed for Closable {}
+impl WillClose for Closable {
+    #[inline(always)]
+    fn is_closed(&self) -> bool {
+        self.is_closed()
+    }
+}
+
+/// An implementor of [`WillClose`] that always closed.
+pub struct Closed;
+
+impl Closed {
+    /// Always returns `true`.
+    pub const fn is_closed(&self) -> bool {
+        true
+    }
+}
+
+impl Sealed for Closed {}
+
+impl WillClose for Closed {
+    #[inline(always)]
+    fn is_closed(&self) -> bool {
+        self.is_closed()
     }
 }
 

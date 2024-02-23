@@ -55,6 +55,7 @@ mod callback;
 pub mod conn;
 mod consts;
 mod event;
+pub(super) mod handler;
 pub mod marker;
 mod node;
 mod transport;
