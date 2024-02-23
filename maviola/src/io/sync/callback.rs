@@ -3,7 +3,6 @@ use std::sync::Arc;
 use crate::io::broadcast::{BroadcastScope, OutgoingFrame};
 use crate::io::sync::conn::FrameSender;
 use crate::io::ChannelInfo;
-use crate::protocol::{Frame, MaybeVersioned};
 use crate::utils::UniqueId;
 
 use crate::prelude::*;

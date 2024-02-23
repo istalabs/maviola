@@ -3,7 +3,6 @@ use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use crate::io::sync::conn::{Connection, ConnectionBuilder};
 use crate::io::utils::resolve_socket_addr;
 use crate::io::{ChannelInfo, ConnectionInfo};
-use crate::protocol::MaybeVersioned;
 use crate::utils::SharedCloser;
 
 use crate::prelude::*;

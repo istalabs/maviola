@@ -5,7 +5,6 @@ use crate::io::asnc::conn::{AsyncChannelFactory, AsyncFrameReceiver, AsyncFrameS
 use crate::io::asnc::consts::CONN_BROADCAST_CHAN_CAPACITY;
 use crate::io::asnc::AsyncCallback;
 use crate::io::{ConnectionInfo, OutgoingFrame};
-use crate::protocol::{Frame, MaybeVersioned};
 use crate::utils::{Closable, SharedCloser};
 
 use crate::prelude::*;

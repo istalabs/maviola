@@ -3,8 +3,6 @@ use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 use std::sync::mpsc;
 use std::thread;
 
-use crate::protocol::MaybeVersioned;
-
 use crate::io::sync::conn::{Connection, ConnectionBuilder};
 use crate::io::sync::utils::{handle_listener_stop, MpscReader, MpscWriter};
 use crate::io::utils::resolve_socket_addr;

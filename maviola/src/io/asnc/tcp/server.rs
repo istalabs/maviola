@@ -6,7 +6,6 @@ use crate::io::asnc::conn::{AsyncConnection, AsyncConnectionBuilder};
 use crate::io::asnc::utils::handle_listener_stop;
 use crate::io::utils::resolve_socket_addr;
 use crate::io::{ChannelInfo, ConnectionInfo};
-use crate::protocol::MaybeVersioned;
 use crate::utils::Closer;
 
 use crate::prelude::*;

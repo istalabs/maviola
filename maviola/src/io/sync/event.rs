@@ -1,6 +1,5 @@
 use crate::io::sync::Callback;
 use crate::protocol::Peer;
-use crate::protocol::{Frame, MaybeVersioned};
 
 use crate::prelude::*;
 

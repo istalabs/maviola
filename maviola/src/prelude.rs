@@ -3,7 +3,9 @@
 pub use crate::dialects::Minimal;
 pub use crate::errors::{Error, Result};
 pub use crate::errors::{NodeError, SyncError};
-pub use crate::protocol::Dialect;
+pub use crate::protocol::{Dialect, Frame, Message, V1, V2};
+
+pub(crate) use crate::protocol::{MaybeVersioned, Versioned, Versionless};
 
 #[cfg(feature = "sync")]
 pub(crate) use crate::io::sync::utils::mpmc;

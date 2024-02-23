@@ -5,7 +5,6 @@ use tokio::net::TcpStream;
 use crate::io::asnc::conn::{AsyncConnection, AsyncConnectionBuilder};
 use crate::io::utils::resolve_socket_addr;
 use crate::io::{ChannelInfo, ConnectionInfo};
-use crate::protocol::MaybeVersioned;
 use crate::utils::SharedCloser;
 
 use crate::prelude::*;

@@ -1,8 +1,6 @@
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 
-use crate::protocol::MaybeVersioned;
-
 use crate::io::sync::conn::{Connection, ConnectionBuilder};
 use crate::io::{ChannelInfo, ConnectionInfo};
 use crate::utils::SharedCloser;

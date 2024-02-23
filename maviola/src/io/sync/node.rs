@@ -32,10 +32,9 @@ use crate::utils::SharedCloser;
 /// Create a TCP server node:
 ///
 /// ```rust
-/// use maviola::protocol::Peer;
 /// # #[cfg(feature = "sync")]
 /// # {
-/// use maviola::protocol::V2;
+/// use maviola::protocol::{Peer, V2};
 /// use maviola::{Event, Node, TcpServer};
 /// use maviola::dialects::Minimal;
 /// # use portpicker::pick_unused_port;

@@ -10,7 +10,6 @@ use crate::io::sync::consts::{
 };
 use crate::io::sync::Callback;
 use crate::io::{ChannelInfo, ConnectionInfo};
-use crate::protocol::MaybeVersioned;
 use crate::utils::{Closable, SharedCloser, UniqueId};
 
 use crate::prelude::*;

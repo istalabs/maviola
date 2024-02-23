@@ -2,8 +2,6 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 
-use crate::protocol::MaybeVersioned;
-
 use crate::io::sync::conn::{Connection, ConnectionBuilder};
 use crate::io::sync::utils::BusyReader;
 use crate::io::{ChannelInfo, ConnectionInfo};

@@ -10,7 +10,6 @@ use crate::io::asnc::consts::{
 };
 use crate::io::asnc::AsyncCallback;
 use crate::io::{ChannelInfo, ConnectionInfo};
-use crate::protocol::MaybeVersioned;
 use crate::utils::{Closable, SharedCloser, UniqueId};
 
 use crate::prelude::*;

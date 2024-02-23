@@ -1,8 +1,6 @@
 use std::net::{SocketAddr, TcpListener, ToSocketAddrs};
 use std::thread;
 
-use crate::protocol::MaybeVersioned;
-
 use crate::io::sync::conn::{Connection, ConnectionBuilder};
 use crate::io::sync::consts::{TCP_READ_TIMEOUT, TCP_WRITE_TIMEOUT};
 use crate::io::sync::utils::handle_listener_stop;

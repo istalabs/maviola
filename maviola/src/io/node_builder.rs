@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::time::Duration;
 
-use crate::protocol::{ComponentId, MaybeVersioned, SystemId, Versioned, Versionless};
+use crate::protocol::{ComponentId, SystemId};
 
 use crate::consts::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_TIMEOUT};
 use crate::io::marker::{

@@ -2,8 +2,6 @@ use std::os::unix::net::UnixListener;
 use std::path::{Path, PathBuf};
 use std::thread;
 
-use crate::protocol::MaybeVersioned;
-
 use crate::io::sync::conn::{Connection, ConnectionBuilder};
 use crate::io::sync::consts::{SOCK_ACCEPT_INTERVAL, SOCK_READ_TIMEOUT, SOCK_WRITE_TIMEOUT};
 use crate::io::sync::utils::handle_listener_stop;

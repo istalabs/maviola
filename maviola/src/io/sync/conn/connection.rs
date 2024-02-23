@@ -4,7 +4,6 @@ use std::sync::mpsc;
 use crate::io::sync::conn::{ChannelFactory, FrameReceiver, FrameSender};
 use crate::io::sync::Callback;
 use crate::io::{ConnectionInfo, OutgoingFrame};
-use crate::protocol::{Frame, MaybeVersioned};
 use crate::utils::{Closable, SharedCloser};
 
 use crate::prelude::*;

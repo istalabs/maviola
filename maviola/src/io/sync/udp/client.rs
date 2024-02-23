@@ -1,7 +1,5 @@
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 
-use crate::protocol::MaybeVersioned;
-
 use crate::consts::DEFAULT_UDP_HOST;
 use crate::io::sync::conn::{Connection, ConnectionBuilder};
 use crate::io::sync::udp::udp_rw::UdpRW;
