@@ -7,7 +7,8 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 
 use crate::protocol::{
-    ComponentId, Dialect, Frame, MavLinkVersion, MaybeVersioned, SystemId, Versioned, Versionless,
+    ComponentId, Dialect, Frame, MavLinkVersion, MaybeVersioned, Message, SystemId, Versioned,
+    Versionless,
 };
 
 use crate::io::marker::{
@@ -440,7 +441,7 @@ impl<D: Dialect, V: Versioned + 'static> Node<Identified, D, V> {
     ///
     /// If you want to send messages within different MAVLink protocols simultaneously, you have
     /// to construct a [`Versionless`] node and use [`Node::send_versioned`]
-    pub fn send(&self, message: D) -> Result<()> {
+    pub fn send(&self, message: &impl Message) -> Result<()> {
         let frame = self.make_frame_from_message(message, self.version.clone())?;
         self.send_frame_internal(&frame)
     }
@@ -599,7 +600,7 @@ impl<D: Dialect, V: MaybeVersioned> Node<Identified, D, V> {
 
     fn make_frame_from_message<Version: Versioned>(
         &self,
-        message: D,
+        message: &impl Message,
         version: Version,
     ) -> Result<Frame<Version>> {
         let sequence = self.sequence.fetch_add(1, atomic::Ordering::Relaxed);
@@ -628,7 +629,7 @@ impl<D: Dialect> Node<Identified, D, Versionless> {
     ///
     /// If you want to restrict MAVLink protocol to a particular version, construct a [`Versioned`]
     /// node and simply send messages by calling [`Node::send`].
-    pub fn send_versioned<V: Versioned>(&self, message: D, version: V) -> Result<()> {
+    pub fn send_versioned<V: Versioned>(&self, message: &impl Message, version: V) -> Result<()> {
         let frame = self
             .make_frame_from_message(message, version)?
             .versionless();

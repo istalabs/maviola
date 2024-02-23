@@ -78,7 +78,7 @@ pub fn benchmark_unix_sockets(n_clients: u16, n_iter: usize) {
             };
 
             for _ in 0..n_iter {
-                if let Err(err) = client.send(message.clone().into()) {
+                if let Err(err) = client.send(&message) {
                     log::error!("[client #{i}] send error: {err:?}");
                     break;
                 }

@@ -98,7 +98,7 @@ fn messages_are_sent_and_received_server_clients() {
 
     for client_node in client_nodes.values() {
         let message = minimal::messages::Heartbeat::default();
-        client_node.send(message.into()).unwrap();
+        client_node.send(&message).unwrap();
     }
     wait();
 
@@ -108,7 +108,7 @@ fn messages_are_sent_and_received_server_clients() {
     }
 
     let message = minimal::messages::Heartbeat::default();
-    server_node.send(message.into()).unwrap();
+    server_node.send(&message).unwrap();
     wait_long();
 
     for (i, client_node) in client_nodes {
@@ -129,7 +129,7 @@ fn messages_are_sent_and_received_clients_server() {
 
     for client_node in client_nodes.values() {
         let message = minimal::messages::Heartbeat::default();
-        client_node.send(message.into()).unwrap();
+        client_node.send(&message).unwrap();
     }
     wait_long();
 
@@ -181,7 +181,7 @@ fn events_are_received() {
     wait();
 
     let message = minimal::messages::Heartbeat::default();
-    client_node.send(message.into()).unwrap();
+    client_node.send(&message).unwrap();
     wait_long();
 
     for _ in 0..2 {
@@ -237,7 +237,7 @@ fn node_no_id_no_dialect_no_version() {
     wait();
 
     server_node
-        .send(minimal::messages::Heartbeat::default().into())
+        .send(&minimal::messages::Heartbeat::default())
         .unwrap();
     wait_long();
 
@@ -282,7 +282,7 @@ fn node_no_id_no_version() {
     wait();
 
     server_node
-        .send(minimal::messages::Heartbeat::default().into())
+        .send(&minimal::messages::Heartbeat::default())
         .unwrap();
     wait_long();
 
@@ -305,7 +305,7 @@ fn node_no_id() {
     wait();
 
     server_node
-        .send(minimal::messages::Heartbeat::default().into())
+        .send(&minimal::messages::Heartbeat::default())
         .unwrap();
     wait();
 
@@ -330,7 +330,7 @@ fn node_no_version() {
     wait();
 
     client_node
-        .send_versioned(minimal::messages::Heartbeat::default().into(), V2)
+        .send_versioned(&minimal::messages::Heartbeat::default(), V2)
         .unwrap();
     wait_long();
 

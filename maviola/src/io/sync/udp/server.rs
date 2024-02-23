@@ -95,6 +95,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServer {
 
                 let (bytes_read, peer_addr) = udp_socket.recv_from(buf.as_mut_slice())?;
 
+                #[allow(clippy::map_entry)]
                 if !peers.contains_key(&peer_addr) {
                     let udp_socket = udp_socket.try_clone()?;
 
