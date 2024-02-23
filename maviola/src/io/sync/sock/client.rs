@@ -24,7 +24,6 @@ use crate::prelude::*;
 /// # {
 /// # use maviola::protocol::V2;
 /// use maviola::{Event, Node, SockClient};
-/// # use maviola::dialects::minimal;
 ///
 /// let path = "/tmp/maviola.sock";
 ///
@@ -35,7 +34,6 @@ use crate::prelude::*;
 /// #         .version(V2)
 /// #         .system_id(1)
 /// #         .component_id(1)
-/// #         .dialect(minimal::dialect())
 ///         .connection(
 ///             SockClient::new(path)    // Configure socket server connection
 ///                 .unwrap()

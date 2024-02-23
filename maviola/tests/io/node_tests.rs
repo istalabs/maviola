@@ -1,3 +1,4 @@
+use mavio::dialects::Minimal;
 use std::collections::HashMap;
 use std::sync::Once;
 use std::thread;
@@ -9,7 +10,7 @@ use maviola::dialects::minimal;
 use maviola::io::marker::Identified;
 use maviola::io::sync::{TcpClient, TcpServer};
 use maviola::io::{Event, Node};
-use maviola::protocol::{ComponentId, HasDialect, MavLinkVersion, SystemId, V2};
+use maviola::protocol::{ComponentId, MavLinkVersion, SystemId, V2};
 
 static INIT: Once = Once::new();
 static INIT_LOGGER: Once = Once::new();
@@ -52,27 +53,24 @@ fn initialize() {
     INIT.call_once(|| init_logger());
 }
 
-pub fn make_tcp_server_node(port: Port) -> Node<Identified, HasDialect<minimal::Minimal>, V2> {
+pub fn make_tcp_server_node(port: Port) -> Node<Identified, Minimal, V2> {
     Node::try_from(
         Node::builder()
             .system_id(DEFAULT_TCP_SERVER_SYS_ID)
             .component_id(DEFAULT_TCP_SERVER_COMP_ID)
-            .dialect(minimal::dialect())
+            .dialect::<Minimal>()
             .version(V2)
             .connection(TcpServer::new(make_addr(port)).unwrap()),
     )
     .unwrap()
 }
 
-pub fn make_tcp_client_node(
-    port: Port,
-    component_id: u8,
-) -> Node<Identified, HasDialect<minimal::Minimal>, V2> {
+pub fn make_tcp_client_node(port: Port, component_id: u8) -> Node<Identified, Minimal, V2> {
     Node::try_from(
         Node::builder()
             .system_id(DEFAULT_TCP_CLIENT_SYS_ID)
             .component_id(component_id)
-            .dialect(minimal::dialect())
+            .dialect::<Minimal>()
             .version(V2)
             .connection(TcpClient::new(make_addr(port)).unwrap()),
     )
@@ -82,7 +80,7 @@ pub fn make_tcp_client_node(
 fn make_client_nodes(
     port: portpicker::Port,
     count: u8,
-) -> HashMap<u8, Node<Identified, HasDialect<minimal::Minimal>, V2>> {
+) -> HashMap<u8, Node<Identified, Minimal, V2>> {
     (0..count)
         .map(|i| (i, make_tcp_client_node(port, i)))
         .collect()
@@ -172,7 +170,7 @@ fn events_are_received() {
         Node::builder()
             .system_id(1)
             .component_id(1)
-            .dialect(minimal::dialect())
+            .dialect::<Minimal>()
             .version(V2)
             .connection(TcpServer::new(make_addr(port)).unwrap())
             .heartbeat_timeout(WAIT_DURATION),
@@ -210,7 +208,7 @@ fn heartbeats_are_sent() {
         Node::builder()
             .system_id(1)
             .component_id(1)
-            .dialect(minimal::dialect())
+            .dialect::<Minimal>()
             .version(V2)
             .connection(TcpServer::new(make_addr(port)).unwrap())
             .heartbeat_timeout(WAIT_DURATION.mul_f32(2.0))
@@ -277,7 +275,7 @@ fn node_no_id_no_version() {
     let server_node = make_tcp_server_node(port);
     let client_node = Node::try_from(
         Node::builder()
-            .dialect(minimal::dialect())
+            .dialect::<Minimal>()
             .connection(TcpClient::new(make_addr(port)).unwrap()),
     )
     .unwrap();
@@ -299,7 +297,7 @@ fn node_no_id() {
     let server_node = make_tcp_server_node(port);
     let client_node = Node::try_from(
         Node::builder()
-            .dialect(minimal::dialect())
+            .dialect::<Minimal>()
             .version(V2)
             .connection(TcpClient::new(make_addr(port)).unwrap()),
     )
@@ -325,7 +323,7 @@ fn node_no_version() {
         Node::builder()
             .system_id(42)
             .component_id(142)
-            .dialect(minimal::dialect())
+            .dialect::<Minimal>()
             .connection(TcpClient::new(make_addr(port)).unwrap()),
     )
     .unwrap();

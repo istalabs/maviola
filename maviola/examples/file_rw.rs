@@ -1,3 +1,4 @@
+use mavio::dialects::Minimal;
 use std::fs::remove_file;
 use std::path::PathBuf;
 use std::sync::atomic;
@@ -52,7 +53,7 @@ fn run(path: PathBuf) {
             .system_id(17)
             .component_id(42)
             .version(V2)
-            .dialect(dialect::dialect())
+            .dialect::<Minimal>()
             .connection(FileWriter::new(path.as_path()).unwrap()),
     )
     .unwrap();
@@ -70,7 +71,7 @@ fn run(path: PathBuf) {
             .system_id(17)
             .component_id(42)
             .version(V2)
-            .dialect(dialect::dialect())
+            .dialect::<Minimal>()
             .heartbeat_interval(HEARTBEAT_INTERVAL)
             .heartbeat_timeout(HEARTBEAT_TIMEOUT)
             .connection(FileReader::new(path.as_path()).unwrap()),

@@ -7,14 +7,11 @@
 //! [`crate::core::protocol`] ad [`crate::core::consts`] module.
 
 pub mod consts;
-mod marker;
 mod peer;
 mod signature;
 
 pub use peer::Peer;
 pub use signature::{SignConf, SignConfBuilder, SignStrategy};
-
-pub use marker::{Dialectless, HasDialect, MaybeDialect};
 
 /// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
 #[doc(inline)]

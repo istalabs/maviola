@@ -30,7 +30,6 @@ use crate::prelude::*;
 /// # {
 /// # use maviola::protocol::V2;
 /// use maviola::{Event, Node, UdpClient};
-/// # use maviola::dialects::minimal;
 /// # use portpicker::pick_unused_port;
 ///
 /// let addr = "127.0.0.1:5600";
@@ -44,7 +43,6 @@ use crate::prelude::*;
 /// #         .version(V2)
 /// #         .system_id(1)
 /// #         .component_id(1)
-/// #         .dialect(minimal::dialect())
 ///         .connection(
 ///             UdpClient::new(addr)    // Configure UDP client connection
 ///                 .unwrap()

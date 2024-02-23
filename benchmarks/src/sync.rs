@@ -4,10 +4,11 @@ use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
-use maviola::dialects::minimal;
 use maviola::dialects::minimal::enums::{MavAutopilot, MavModeFlag, MavState, MavType};
+use maviola::dialects::minimal::messages::Heartbeat;
+use maviola::dialects::Minimal;
 use maviola::io::marker::Identified;
-use maviola::protocol::{HasDialect, V2};
+use maviola::protocol::{Dialect, V2};
 use maviola::{Node, SockClient, SockServer};
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(50);
@@ -18,13 +19,12 @@ fn wait() {
     thread::sleep(WAIT_DURATION);
 }
 
-fn make_sock_server(path: PathBuf) -> Node<Identified, HasDialect<minimal::Minimal>, V2> {
+fn make_sock_server(path: PathBuf) -> Node<Identified, Minimal, V2> {
     Node::try_from(
         Node::builder()
             .system_id(1)
             .component_id(0)
             .version(V2)
-            .dialect(minimal::dialect())
             .heartbeat_interval(HEARTBEAT_INTERVAL)
             .heartbeat_timeout(HEARTBEAT_TIMEOUT)
             .connection(SockServer::new(path.as_path()).unwrap()),
@@ -32,7 +32,7 @@ fn make_sock_server(path: PathBuf) -> Node<Identified, HasDialect<minimal::Minim
     .unwrap()
 }
 
-fn make_sock_client(path: PathBuf, id: u16) -> Node<Identified, HasDialect<minimal::Minimal>, V2> {
+fn make_sock_client(path: PathBuf, id: u16) -> Node<Identified, Minimal, V2> {
     let bytes: [u8; 2] = id.to_le_bytes();
     let system_id = bytes[0];
     let component_id = bytes[1];
@@ -42,7 +42,6 @@ fn make_sock_client(path: PathBuf, id: u16) -> Node<Identified, HasDialect<minim
             .system_id(system_id)
             .component_id(component_id)
             .version(V2)
-            .dialect(minimal::dialect())
             .heartbeat_interval(HEARTBEAT_INTERVAL)
             .heartbeat_timeout(HEARTBEAT_TIMEOUT)
             .connection(SockClient::new(path.as_path()).unwrap()),
@@ -69,13 +68,13 @@ pub fn benchmark_unix_sockets(n_clients: u16, n_iter: usize) {
             barrier.wait();
             let client = make_sock_client(path, i);
 
-            let message = minimal::messages::Heartbeat {
+            let message = Heartbeat {
                 type_: MavType::Generic,
                 autopilot: MavAutopilot::Generic,
                 base_mode: MavModeFlag::all(),
                 custom_mode: 0,
                 system_status: MavState::Active,
-                mavlink_version: minimal::spec().version().unwrap(),
+                mavlink_version: Minimal::version().unwrap(),
             };
 
             for _ in 0..n_iter {

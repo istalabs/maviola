@@ -1,8 +1,7 @@
+use std::marker::PhantomData;
 use std::time::Duration;
 
-use crate::protocol::{
-    ComponentId, DialectImpl, DialectMessage, MaybeVersioned, SystemId, Versioned, Versionless,
-};
+use crate::protocol::{ComponentId, MaybeVersioned, SystemId, Versioned, Versionless};
 
 use crate::consts::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_TIMEOUT};
 use crate::io::marker::{
@@ -10,7 +9,8 @@ use crate::io::marker::{
     MaybeSystemId, NoComponentId, NoConnConf, NoSystemId, Unidentified,
 };
 use crate::io::NodeConf;
-use crate::protocol::{Dialectless, HasDialect, MaybeDialect};
+
+use crate::prelude::*;
 
 #[cfg(feature = "sync")]
 use crate::io::sync::conn::ConnectionBuilder;
@@ -22,35 +22,35 @@ use crate::io::sync::marker::ConnConf;
 pub struct NodeBuilder<
     S: MaybeSystemId,
     C: MaybeComponentId,
-    D: MaybeDialect,
+    D: Dialect,
     V: MaybeVersioned,
     CC: MaybeConnConf,
 > {
     pub(super) system_id: S,
     pub(super) component_id: C,
-    pub(super) dialect: D,
     pub(super) version: V,
     pub(super) conn_conf: CC,
     pub(super) heartbeat_timeout: Duration,
     pub(super) heartbeat_interval: Duration,
+    pub(super) _dialect: PhantomData<D>,
 }
 
-impl NodeBuilder<NoSystemId, NoComponentId, Dialectless, Versionless, NoConnConf> {
+impl NodeBuilder<NoSystemId, NoComponentId, Minimal, Versionless, NoConnConf> {
     /// Instantiate an empty [`NodeBuilder`].
     pub fn new() -> Self {
         Self {
             system_id: NoSystemId,
             component_id: NoComponentId,
-            dialect: Dialectless,
             conn_conf: NoConnConf,
             version: Versionless,
             heartbeat_timeout: DEFAULT_HEARTBEAT_TIMEOUT,
             heartbeat_interval: DEFAULT_HEARTBEAT_INTERVAL,
+            _dialect: PhantomData,
         }
     }
 }
 
-impl<C: MaybeComponentId, D: MaybeDialect, V: MaybeVersioned, CC: MaybeConnConf>
+impl<C: MaybeComponentId, D: Dialect, V: MaybeVersioned, CC: MaybeConnConf>
     NodeBuilder<NoSystemId, C, D, V, CC>
 {
     /// Set [`NodeConf::system_id`].
@@ -58,16 +58,16 @@ impl<C: MaybeComponentId, D: MaybeDialect, V: MaybeVersioned, CC: MaybeConnConf>
         NodeBuilder {
             system_id: HasSystemId(system_id),
             component_id: self.component_id,
-            dialect: self.dialect,
             version: self.version,
             conn_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            _dialect: self._dialect,
         }
     }
 }
 
-impl<S: MaybeSystemId, D: MaybeDialect, V: MaybeVersioned, CC: MaybeConnConf>
+impl<S: MaybeSystemId, D: Dialect, V: MaybeVersioned, CC: MaybeConnConf>
     NodeBuilder<S, NoComponentId, D, V, CC>
 {
     /// Set [`NodeConf::component_id`].
@@ -78,39 +78,34 @@ impl<S: MaybeSystemId, D: MaybeDialect, V: MaybeVersioned, CC: MaybeConnConf>
         NodeBuilder {
             system_id: self.system_id,
             component_id: HasComponentId(component_id),
-            dialect: self.dialect,
             version: self.version,
             conn_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            _dialect: self._dialect,
         }
     }
 }
 
-impl<
-        S: MaybeSystemId,
-        C: MaybeComponentId,
-        D: MaybeDialect,
-        V: MaybeVersioned,
-        CC: MaybeConnConf,
-    > NodeBuilder<S, C, D, V, CC>
+impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, V: MaybeVersioned, CC: MaybeConnConf>
+    NodeBuilder<S, C, D, V, CC>
 {
     /// Set [`NodeConf::heartbeat_timeout`].
     pub fn heartbeat_timeout(self, heartbeat_timeout: Duration) -> NodeBuilder<S, C, D, V, CC> {
         NodeBuilder {
             system_id: self.system_id,
             component_id: self.component_id,
-            dialect: self.dialect,
             version: self.version,
             conn_conf: self.conn_conf,
             heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            _dialect: self._dialect,
         }
     }
 }
 
 #[cfg(feature = "sync")]
-impl<S: MaybeSystemId, C: MaybeComponentId, D: MaybeDialect, V: MaybeVersioned>
+impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, V: MaybeVersioned>
     NodeBuilder<S, C, D, V, NoConnConf>
 {
     /// Set synchronous [`NodeConf::connection`].
@@ -121,39 +116,46 @@ impl<S: MaybeSystemId, C: MaybeComponentId, D: MaybeDialect, V: MaybeVersioned>
         NodeBuilder {
             system_id: self.system_id,
             component_id: self.component_id,
-            dialect: self.dialect,
             version: self.version,
             conn_conf: ConnConf(Box::new(conn_conf)),
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            _dialect: self._dialect,
         }
     }
 }
 
-impl<S: MaybeSystemId, C: MaybeComponentId, V: MaybeVersioned, CC: MaybeConnConf>
-    NodeBuilder<S, C, Dialectless, V, CC>
+impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, V: MaybeVersioned, CC: MaybeConnConf>
+    NodeBuilder<S, C, D, V, CC>
 {
-    /// Set [`NodeConf::dialect`].
-    pub fn dialect<M: DialectMessage>(
-        self,
-        dialect: &'static dyn DialectImpl<Message = M>,
-    ) -> NodeBuilder<S, C, HasDialect<M>, V, CC> {
+    /// Set dialect.
+    ///
+    /// The dialect is a generic parameter, therefore you have to use
+    /// [turbofish](https://turbo.fish/about) syntax:
+    ///
+    /// ```rust
+    /// # use maviola::Node;
+    /// use maviola::dialects::Minimal;
+    ///
+    /// Node::builder().dialect::<Minimal>();
+    /// ```
+    pub fn dialect<Dial: Dialect>(self) -> NodeBuilder<S, C, Dial, V, CC> {
         NodeBuilder {
             system_id: self.system_id,
             component_id: self.component_id,
-            dialect: HasDialect(dialect),
             version: self.version,
             conn_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            _dialect: PhantomData,
         }
     }
 }
 
-impl<S: MaybeSystemId, C: MaybeComponentId, D: MaybeDialect, CC: MaybeConnConf>
+impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, CC: MaybeConnConf>
     NodeBuilder<S, C, D, Versionless, CC>
 {
-    /// Set [`NodeConf::dialect`].
+    /// Set [`NodeConf::version`].
     pub fn version<Version: Versioned>(
         self,
         version: Version,
@@ -161,17 +163,17 @@ impl<S: MaybeSystemId, C: MaybeComponentId, D: MaybeDialect, CC: MaybeConnConf>
         NodeBuilder {
             system_id: self.system_id,
             component_id: self.component_id,
-            dialect: self.dialect,
             version,
             conn_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            _dialect: self._dialect,
         }
     }
 }
 
-impl<V: Versioned, CC: MaybeConnConf, M: DialectMessage>
-    NodeBuilder<HasSystemId, HasComponentId, HasDialect<M>, V, CC>
+impl<V: Versioned, CC: MaybeConnConf, D: Dialect>
+    NodeBuilder<HasSystemId, HasComponentId, D, V, CC>
 {
     /// Set [`NodeConf::heartbeat_interval`].
     ///
@@ -186,20 +188,20 @@ impl<V: Versioned, CC: MaybeConnConf, M: DialectMessage>
     pub fn heartbeat_interval(
         self,
         heartbeat_interval: Duration,
-    ) -> NodeBuilder<HasSystemId, HasComponentId, HasDialect<M>, V, CC> {
+    ) -> NodeBuilder<HasSystemId, HasComponentId, D, V, CC> {
         NodeBuilder {
             system_id: self.system_id,
             component_id: self.component_id,
-            dialect: self.dialect,
             version: self.version,
             conn_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval,
+            _dialect: self._dialect,
         }
     }
 }
 
-impl<D: MaybeDialect, V: MaybeVersioned, CC: HasConnConf>
+impl<D: Dialect, V: MaybeVersioned, CC: HasConnConf>
     NodeBuilder<NoSystemId, NoComponentId, D, V, CC>
 {
     /// Build and instance of [`NodeConf`] without defined [`NodeConf::system_id`] and
@@ -207,16 +209,16 @@ impl<D: MaybeDialect, V: MaybeVersioned, CC: HasConnConf>
     pub fn conf(self) -> NodeConf<Unidentified, D, V, CC> {
         NodeConf {
             id: Unidentified,
-            dialect: self.dialect,
             version: self.version,
             connection_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            _dialect: self._dialect,
         }
     }
 }
 
-impl<D: MaybeDialect, V: MaybeVersioned, CC: HasConnConf>
+impl<D: Dialect, V: MaybeVersioned, CC: HasConnConf>
     NodeBuilder<HasSystemId, HasComponentId, D, V, CC>
 {
     /// Build and instance of [`NodeConf`] with defined [`NodeConf::system_id`] and
@@ -227,11 +229,11 @@ impl<D: MaybeDialect, V: MaybeVersioned, CC: HasConnConf>
                 system_id: self.system_id.0,
                 component_id: self.component_id.0,
             },
-            dialect: self.dialect,
             connection_conf: self.conn_conf,
             version: self.version,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            _dialect: self._dialect,
         }
     }
 }

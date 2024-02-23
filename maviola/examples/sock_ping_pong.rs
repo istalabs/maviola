@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 
-use maviola::dialects::minimal as dialect;
+use maviola::dialects::Minimal;
 use maviola::io::{Event, Node};
 use maviola::protocol::{ComponentId, Frame, MaybeVersioned, V2};
 use maviola::{SockClient, SockServer};
@@ -35,7 +35,7 @@ fn spawn_client(path: PathBuf, component_id: ComponentId) {
                 .system_id(31)
                 .component_id(component_id)
                 .version(V2)
-                .dialect(dialect::dialect())
+                .dialect::<Minimal>()
                 .heartbeat_interval(HEARTBEAT_INTERVAL)
                 .heartbeat_timeout(HEARTBEAT_TIMEOUT)
                 .connection(SockClient::new(path).unwrap()),
@@ -71,7 +71,7 @@ fn run(path: PathBuf) {
             .system_id(17)
             .component_id(42)
             .version(V2)
-            .dialect(dialect::dialect())
+            .dialect::<Minimal>()
             .heartbeat_interval(HEARTBEAT_INTERVAL)
             .heartbeat_timeout(HEARTBEAT_TIMEOUT)
             .connection(SockServer::new(path.as_path()).unwrap()),

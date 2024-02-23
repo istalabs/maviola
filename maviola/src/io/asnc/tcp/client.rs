@@ -14,43 +14,6 @@ use crate::prelude::*;
 ///
 /// Provides connection configuration for a node that connects to a TCP port as a client. Use
 /// [`TcpServerConf`](super::server::AsyncTcpServer) to create a TCP server node.
-///
-/// # Usage
-///
-/// Create a TCP client node:
-///
-/// ```rust
-/// # use maviola::protocol::Peer;
-/// # #[cfg(feature = "sync")]
-/// # {
-/// # use maviola::protocol::V2;
-/// # use maviola::AsyncTcpServer;
-/// use maviola::{Event, Node, AsyncTcpClient};
-/// # use maviola::dialects::minimal;
-/// # use portpicker::pick_unused_port;
-///
-/// let addr = "127.0.0.1:5600";
-/// # let addr = format!("127.0.0.1:{}", pick_unused_port().unwrap());
-///
-/// // Create a TCP client node
-/// let node = Node::try_from(
-///     Node::builder()
-///         /* define other node parameters */
-/// #         .version(V2)
-/// #         .system_id(1)
-/// #         .component_id(1)
-/// #         .dialect(minimal::dialect())
-///         .connection(
-/// # {
-/// #           let _addr = addr.clone();
-///             AsyncTcpClient::new(addr)    // Configure TCP client connection
-/// #           ;AsyncTcpServer::new(_addr)
-/// # }
-///                 .unwrap()
-///         )
-/// ).unwrap();
-/// # }
-/// ```
 #[derive(Clone, Debug)]
 pub struct AsyncTcpClient {
     addr: SocketAddr,
