@@ -7,10 +7,14 @@ use std::time::Duration;
 use portpicker::Port;
 
 use maviola::core::marker::Identified;
+use maviola::core::Node;
 use maviola::dialects::minimal;
-use maviola::protocol::{ComponentId, MavLinkVersion, SystemId, V2};
-use maviola::sync::{Event, Node};
+use maviola::protocol::{ComponentId, SystemId};
+use maviola::sync::node::SyncApi;
+use maviola::sync::Event;
 use maviola::sync::{TcpClient, TcpServer};
+
+use maviola::prelude::*;
 
 static INIT: Once = Once::new();
 static INIT_LOGGER: Once = Once::new();
@@ -53,7 +57,7 @@ fn initialize() {
     INIT.call_once(|| init_logger());
 }
 
-pub fn make_tcp_server_node(port: Port) -> Node<Identified, Minimal, V2> {
+pub fn make_tcp_server_node(port: Port) -> Node<Identified, Minimal, V2, SyncApi<V2>> {
     Node::try_from(
         Node::builder()
             .system_id(DEFAULT_TCP_SERVER_SYS_ID)
@@ -65,7 +69,10 @@ pub fn make_tcp_server_node(port: Port) -> Node<Identified, Minimal, V2> {
     .unwrap()
 }
 
-pub fn make_tcp_client_node(port: Port, component_id: u8) -> Node<Identified, Minimal, V2> {
+pub fn make_tcp_client_node(
+    port: Port,
+    component_id: u8,
+) -> Node<Identified, Minimal, V2, SyncApi<V2>> {
     Node::try_from(
         Node::builder()
             .system_id(DEFAULT_TCP_CLIENT_SYS_ID)
@@ -80,7 +87,7 @@ pub fn make_tcp_client_node(port: Port, component_id: u8) -> Node<Identified, Mi
 fn make_client_nodes(
     port: portpicker::Port,
     count: u8,
-) -> HashMap<u8, Node<Identified, Minimal, V2>> {
+) -> HashMap<u8, Node<Identified, Minimal, V2, SyncApi<V2>>> {
     (0..count)
         .map(|i| (i, make_tcp_client_node(port, i)))
         .collect()

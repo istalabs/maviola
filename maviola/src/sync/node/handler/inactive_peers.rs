@@ -10,15 +10,15 @@ use crate::sync::Event;
 
 use crate::prelude::*;
 
-pub(crate) struct InactivePeersHandler<V: MaybeVersioned> {
-    pub(crate) info: ConnectionInfo,
-    pub(crate) peers: Arc<RwLock<HashMap<PeerId, Peer>>>,
-    pub(crate) timeout: Duration,
-    pub(crate) events_tx: mpmc::Sender<Event<V>>,
+pub(in crate::sync::node) struct InactivePeersHandler<V: MaybeVersioned> {
+    pub(in crate::sync::node) info: ConnectionInfo,
+    pub(in crate::sync::node) peers: Arc<RwLock<HashMap<PeerId, Peer>>>,
+    pub(in crate::sync::node) timeout: Duration,
+    pub(in crate::sync::node) events_tx: mpmc::Sender<Event<V>>,
 }
 
 impl<V: MaybeVersioned + 'static> InactivePeersHandler<V> {
-    pub(crate) fn spawn(self, state: Closable) {
+    pub(in crate::sync::node) fn spawn(self, state: Closable) {
         thread::spawn(move || {
             let info = &self.info;
 

@@ -5,11 +5,13 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 
 use maviola::core::marker::Identified;
+use maviola::core::Node;
 use maviola::dialects::minimal::enums::{MavAutopilot, MavModeFlag, MavState, MavType};
 use maviola::dialects::minimal::messages::Heartbeat;
-use maviola::dialects::Minimal;
-use maviola::protocol::{Dialect, V2};
-use maviola::sync::{Node, SockClient, SockServer};
+use maviola::sync::node::SyncApi;
+use maviola::sync::{SockClient, SockServer};
+
+use maviola::prelude::*;
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(50);
 const HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(75);
@@ -19,7 +21,7 @@ fn wait() {
     thread::sleep(WAIT_DURATION);
 }
 
-fn make_sock_server(path: PathBuf) -> Node<Identified, Minimal, V2> {
+fn make_sock_server(path: PathBuf) -> Node<Identified, Minimal, V2, SyncApi<V2>> {
     Node::try_from(
         Node::builder()
             .system_id(1)
@@ -32,21 +34,20 @@ fn make_sock_server(path: PathBuf) -> Node<Identified, Minimal, V2> {
     .unwrap()
 }
 
-fn make_sock_client(path: PathBuf, id: u16) -> Node<Identified, Minimal, V2> {
+fn make_sock_client(path: PathBuf, id: u16) -> Node<Identified, Minimal, V2, SyncApi<V2>> {
     let bytes: [u8; 2] = id.to_le_bytes();
     let system_id = bytes[0];
     let component_id = bytes[1];
 
-    Node::try_from(
-        Node::builder()
-            .system_id(system_id)
-            .component_id(component_id)
-            .version(V2)
-            .heartbeat_interval(HEARTBEAT_INTERVAL)
-            .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-            .connection(SockClient::new(path.as_path()).unwrap()),
-    )
-    .unwrap()
+    Node::builder()
+        .system_id(system_id)
+        .component_id(component_id)
+        .version(V2)
+        .heartbeat_interval(HEARTBEAT_INTERVAL)
+        .heartbeat_timeout(HEARTBEAT_TIMEOUT)
+        .connection(SockClient::new(path.as_path()).unwrap())
+        .build()
+        .unwrap()
 }
 
 pub fn benchmark_unix_sockets(n_clients: u16, n_iter: usize) {

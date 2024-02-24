@@ -11,15 +11,15 @@ use crate::protocol::{Peer, PeerId};
 
 use crate::prelude::*;
 
-pub(crate) struct InactivePeersHandler<V: MaybeVersioned> {
-    pub(crate) info: ConnectionInfo,
-    pub(crate) peers: Arc<RwLock<HashMap<PeerId, Peer>>>,
-    pub(crate) timeout: Duration,
-    pub(crate) events_tx: broadcast::Sender<AsyncEvent<V>>,
+pub(in crate::asnc::node) struct InactivePeersHandler<V: MaybeVersioned> {
+    pub(in crate::asnc::node) info: ConnectionInfo,
+    pub(in crate::asnc::node) peers: Arc<RwLock<HashMap<PeerId, Peer>>>,
+    pub(in crate::asnc::node) timeout: Duration,
+    pub(in crate::asnc::node) events_tx: broadcast::Sender<AsyncEvent<V>>,
 }
 
 impl<V: MaybeVersioned + 'static> InactivePeersHandler<V> {
-    pub(crate) async fn spawn(self, state: Closable) {
+    pub(in crate::asnc::node) async fn spawn(self, state: Closable) {
         tokio::spawn(async move {
             let info = &self.info;
 

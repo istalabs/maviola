@@ -10,15 +10,15 @@ use crate::sync::Event;
 
 use crate::prelude::*;
 
-pub(crate) struct IncomingFramesHandler<V: MaybeVersioned + 'static> {
-    pub(crate) info: ConnectionInfo,
-    pub(crate) peers: Arc<RwLock<HashMap<PeerId, Peer>>>,
-    pub(crate) receiver: ConnReceiver<V>,
-    pub(crate) events_tx: mpmc::Sender<Event<V>>,
+pub(in crate::sync::node) struct IncomingFramesHandler<V: MaybeVersioned + 'static> {
+    pub(in crate::sync::node) info: ConnectionInfo,
+    pub(in crate::sync::node) peers: Arc<RwLock<HashMap<PeerId, Peer>>>,
+    pub(in crate::sync::node) receiver: ConnReceiver<V>,
+    pub(in crate::sync::node) events_tx: mpmc::Sender<Event<V>>,
 }
 
 impl<V: MaybeVersioned + 'static> IncomingFramesHandler<V> {
-    pub(crate) fn spawn(self, state: Closable) {
+    pub(in crate::sync::node) fn spawn(self, state: Closable) {
         thread::spawn(move || {
             let info = &self.info;
 

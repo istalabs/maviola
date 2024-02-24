@@ -55,6 +55,8 @@ pub enum ConnectionInfo {
         /// Server address.
         path: PathBuf,
     },
+    /// Unknown connection.
+    Unknown,
 }
 
 /// Information about a channel within a particular connection.
@@ -122,4 +124,6 @@ pub enum ChannelInfo {
         /// Server address.
         path: PathBuf,
     },
+    /// Unknown channel
+    Unknown,
 }

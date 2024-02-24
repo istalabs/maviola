@@ -21,22 +21,21 @@ use crate::prelude::*;
 /// # #[cfg(feature = "sync")]
 /// # {
 /// # use maviola::protocol::V2;
-/// use maviola::sync::{Event, Node, FileReader};
+/// use maviola::sync::{Event, FileReader};
+/// use maviola::core::Node;
 ///
 /// let path = "/tmp/maviola.bin";
 ///
 /// // Create a node that reads binary input from a file
-/// let node = Node::try_from(
-///     Node::builder()
+/// let node = Node::builder()
 ///         /* define other node parameters */
-/// #         .version(V2)
-/// #         .system_id(1)
-/// #         .component_id(1)
+/// #       .version(V2)
+/// #       .system_id(1)
+/// #       .component_id(1)
 ///         .connection(
 ///             FileReader::new(path)    // Configure file reader connection
 ///                 .unwrap()
-///         )
-/// ).unwrap();
+///         ).build().unwrap();
 /// # }
 /// ```
 #[derive(Clone, Debug)]

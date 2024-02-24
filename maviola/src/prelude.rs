@@ -5,7 +5,7 @@
 pub use crate::core::error::{Error, Result};
 pub use crate::core::error::{NodeError, SyncError};
 pub use crate::dialects::Minimal;
-pub use crate::protocol::{Dialect, Frame, Message, V1, V2};
+pub use crate::protocol::{Dialect, Frame, MavLinkVersion, Message, V1, V2};
 
 pub(crate) use crate::protocol::{MaybeVersioned, Versioned, Versionless};
 

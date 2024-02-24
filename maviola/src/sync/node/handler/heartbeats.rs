@@ -1,30 +1,31 @@
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicU8;
 use std::sync::{atomic, Arc};
+use std::thread;
 use std::time::Duration;
 
-use crate::asnc::conn::AsyncConnSender;
 use crate::core::io::ConnectionInfo;
 use crate::core::marker::Identified;
 use crate::core::utils::{make_heartbeat_message, Guarded, SharedCloser, Switch};
+use crate::sync::conn::ConnSender;
 
 use crate::prelude::*;
 
-pub(crate) struct HeartbeatEmitter<D: Dialect, V: Versioned + 'static> {
-    pub(crate) info: ConnectionInfo,
-    pub(crate) id: Identified,
-    pub(crate) interval: Duration,
-    pub(crate) version: V,
-    pub(crate) sender: AsyncConnSender<V>,
-    pub(crate) sequence: Arc<AtomicU8>,
-    pub(crate) _dialect: PhantomData<D>,
+pub(in crate::sync::node) struct HeartbeatEmitter<D: Dialect, V: Versioned + 'static> {
+    pub(in crate::sync::node) info: ConnectionInfo,
+    pub(in crate::sync::node) id: Identified,
+    pub(in crate::sync::node) interval: Duration,
+    pub(in crate::sync::node) sender: ConnSender<V>,
+    pub(in crate::sync::node) sequence: Arc<AtomicU8>,
+    pub(in crate::sync::node) _version: PhantomData<V>,
+    pub(in crate::sync::node) _dialect: PhantomData<D>,
 }
 
 impl<D: Dialect, V: Versioned + 'static> HeartbeatEmitter<D, V> {
-    pub(crate) async fn spawn(self, mut is_active: Guarded<SharedCloser, Switch>) {
+    pub(in crate::sync::node) fn spawn(self, mut is_active: Guarded<SharedCloser, Switch>) {
         let heartbeat_message = make_heartbeat_message::<D>();
 
-        tokio::spawn(async move {
+        thread::spawn(move || {
             let info = &self.info;
 
             while is_active.is() {
@@ -33,7 +34,7 @@ impl<D: Dialect, V: Versioned + 'static> HeartbeatEmitter<D, V> {
                     .sequence(sequence)
                     .system_id(self.id.system_id)
                     .component_id(self.id.component_id)
-                    .version(self.version.clone())
+                    .version(V::v())
                     .message(&heartbeat_message)
                     .unwrap()
                     .build();
@@ -45,7 +46,7 @@ impl<D: Dialect, V: Versioned + 'static> HeartbeatEmitter<D, V> {
                     break;
                 }
 
-                tokio::time::sleep(self.interval).await;
+                thread::sleep(self.interval);
             }
             log::debug!("[{info:?}] heartbeats emitter stopped");
         });

@@ -1,3 +1,5 @@
+//! # 🔒 Transport implementations
+
 mod file;
 #[cfg(unix)]
 mod sock;

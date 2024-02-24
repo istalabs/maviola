@@ -22,19 +22,19 @@ use crate::prelude::*;
 /// # {
 /// # use maviola::protocol::V2;
 /// # use maviola::sync::TcpServer;
-/// use maviola::sync::{Event, Node, TcpClient};
+/// use maviola::sync::{Event, TcpClient};
+/// use maviola::core::Node;
 /// # use portpicker::pick_unused_port;
 ///
 /// let addr = "127.0.0.1:5600";
 /// # let addr = format!("127.0.0.1:{}", pick_unused_port().unwrap());
 ///
 /// // Create a TCP client node
-/// let node = Node::try_from(
-///     Node::builder()
+/// let node = Node::builder()
 ///         /* define other node parameters */
-/// #         .version(V2)
-/// #         .system_id(1)
-/// #         .component_id(1)
+/// #       .version(V2)
+/// #       .system_id(1)
+/// #       .component_id(1)
 ///         .connection(
 /// # {
 /// #           let _addr = addr.clone();
@@ -42,8 +42,7 @@ use crate::prelude::*;
 /// #           ;TcpServer::new(_addr)
 /// # }
 ///                 .unwrap()
-///         )
-/// ).unwrap();
+///         ).build().unwrap();
 /// # }
 /// ```
 #[derive(Clone, Debug)]

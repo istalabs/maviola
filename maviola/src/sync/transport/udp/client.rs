@@ -27,7 +27,8 @@ use crate::prelude::*;
 /// # #[cfg(feature = "sync")]
 /// # {
 /// # use maviola::protocol::V2;
-/// use maviola::sync::{Event, Node, UdpClient};
+/// use maviola::sync::{Event, UdpClient};
+/// use maviola::core::Node;
 /// # use portpicker::pick_unused_port;
 ///
 /// let addr = "127.0.0.1:5600";
@@ -35,19 +36,17 @@ use crate::prelude::*;
 /// # let addr = format!("127.0.0.1:{}", pick_unused_port().unwrap());
 ///
 /// // Create a UDP client node
-/// let node = Node::try_from(
-///     Node::builder()
+/// let node = Node::builder()
 ///         /* define other node parameters */
-/// #         .version(V2)
-/// #         .system_id(1)
-/// #         .component_id(1)
+/// #       .version(V2)
+/// #       .system_id(1)
+/// #       .component_id(1)
 ///         .connection(
 ///             UdpClient::new(addr)    // Configure UDP client connection
 ///                 .unwrap()
 ///                 .with_host(host)        // set bind host (random port will be used for bind addr)
 ///                 .unwrap()
-///         )
-/// ).unwrap();
+///         ).build().unwrap();
 /// # }
 /// ```
 #[derive(Clone, Debug)]

@@ -28,7 +28,6 @@
 # Cargo
 !Cargo.lock
 !Cargo.toml
-!build.rs
 
 # Docs
 !/README.md

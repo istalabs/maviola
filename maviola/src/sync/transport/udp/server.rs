@@ -32,24 +32,23 @@ use crate::prelude::*;
 /// # #[cfg(feature = "sync")]
 /// # {
 /// # use maviola::protocol::V2;
-/// use maviola::sync::{Event, Node, UdpServer};
+/// use maviola::sync::{Event, UdpServer};
+/// use maviola::core::Node;
 /// # use portpicker::pick_unused_port;
 ///
 /// let addr = "127.0.0.1:5600";
 /// # let addr = format!("127.0.0.1:{}", pick_unused_port().unwrap());
 ///
 /// // Create a UDP server node
-/// let node = Node::try_from(
-///     Node::builder()
+/// let node = Node::builder()
 ///         /* define other node parameters */
-/// #         .version(V2)
-/// #         .system_id(1)
-/// #         .component_id(1)
+/// #       .version(V2)
+/// #       .system_id(1)
+/// #       .component_id(1)
 ///         .connection(
 ///             UdpServer::new(addr)    // Configure UDP server connection
 ///                 .unwrap()
-///         )
-/// ).unwrap();
+///         ).build().unwrap();
 /// # }
 /// ```
 #[derive(Clone, Debug)]

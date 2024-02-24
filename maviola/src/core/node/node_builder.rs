@@ -12,12 +12,7 @@ use crate::core::NodeConf;
 
 use crate::prelude::*;
 
-#[cfg(feature = "sync")]
-use crate::sync::conn::ConnectionBuilder;
-#[cfg(feature = "sync")]
-use crate::sync::marker::ConnConf;
-
-/// Builder for [`Node`](crate::sync::Node) and [`NodeConf`].
+/// Builder for [`Node`](crate::core::Node) and [`NodeConf`].
 #[derive(Clone, Debug, Default)]
 pub struct NodeBuilder<
     S: MaybeSystemId,
@@ -104,27 +99,6 @@ impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, V: MaybeVersioned, CC: M
     }
 }
 
-#[cfg(feature = "sync")]
-impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, V: MaybeVersioned>
-    NodeBuilder<S, C, D, V, NoConnConf>
-{
-    /// Set synchronous [`NodeConf::connection`].
-    pub fn connection(
-        self,
-        conn_conf: impl ConnectionBuilder<V> + 'static,
-    ) -> NodeBuilder<S, C, D, V, ConnConf<V>> {
-        NodeBuilder {
-            system_id: self.system_id,
-            component_id: self.component_id,
-            version: self.version,
-            conn_conf: ConnConf(Box::new(conn_conf)),
-            heartbeat_timeout: self.heartbeat_timeout,
-            heartbeat_interval: self.heartbeat_interval,
-            _dialect: self._dialect,
-        }
-    }
-}
-
 impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, V: MaybeVersioned, CC: MaybeConnConf>
     NodeBuilder<S, C, D, V, CC>
 {
@@ -134,7 +108,7 @@ impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, V: MaybeVersioned, CC: M
     /// [turbofish](https://turbo.fish/about) syntax:
     ///
     /// ```rust
-    /// # use maviola::sync::Node;
+    /// # use maviola::core::Node;
     /// use maviola::dialects::Minimal;
     ///
     /// Node::builder().dialect::<Minimal>();

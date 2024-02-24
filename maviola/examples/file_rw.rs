@@ -1,4 +1,5 @@
 use mavio::dialects::Minimal;
+use maviola::core::Node;
 use std::fs::remove_file;
 use std::path::PathBuf;
 use std::sync::atomic;
@@ -8,7 +9,7 @@ use std::time::Duration;
 
 use maviola::dialects::minimal as dialect;
 use maviola::protocol::{Frame, MaybeVersioned, V2};
-use maviola::sync::{Event, Node};
+use maviola::sync::Event;
 use maviola::sync::{FileReader, FileWriter};
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(50);

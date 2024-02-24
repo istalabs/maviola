@@ -1,7 +1,7 @@
 //! # Maviola synchronous I/O
 //!
-//! Synchronous API is built around MAVlink [`Node`] abstraction. Upon construction, each node
-//! operates on a particular connection. The latter is owned by a node and defines underlying
+//! Synchronous API is built around MAVlink [`Node`](crate::core::Node). Upon construction, each
+//! node operates on a particular connection. The latter is owned by a node and defines underlying
 //! transport (e.g. TCP, UDP, Unix socket). Each connection spawns one or several channels.
 //! For example, TCP server creates a channel per each incoming connection. Abstractions related to
 //! channels and connections are defined in the [`conn`] module.
@@ -19,12 +19,12 @@
 //!
 //! ## Events
 //!
-//! The suggested approach for handling several MAVLink devices, is to use [`Node::events`]. This
-//! method provides an iterator over all node events. Incoming frames are emitted as
-//! [`Event::Frame`]. Such events contain a [`Frame`](crate::protocol::Frame) / [`Callback`] pair
-//! The latter can be used to respond to a channel from which frame was received or broadcast it to
-//! all channels (or, alternatively, to all channels except the one which delivered the original
-//! frame).
+//! The suggested approach for handling several MAVLink devices, is to use
+//! [`Node::events`](crate::core::Node::events). This method provides an iterator over all node
+//! events. Incoming frames are emitted as [`Event::Frame`]. Such events contain a
+//! [`Frame`](crate::protocol::Frame) / [`Callback`] pair The latter can be used to respond to a
+//! channel from which frame was received or broadcast it to all channels (or, alternatively, to all
+//! channels except the one which delivered the original frame).
 //!
 //! ### Peers
 //!
@@ -34,8 +34,8 @@
 //! an [`Event::NewPeer`] event is emitted. When peers is lost due to missing heartbeats, then
 //! [`Event::PeerLost`] is emitted.
 //!
-//! It is possible to get a list of active peers by [`Node::peers`] or check for peers availability
-//! using [`Node::has_peers`].
+//! It is possible to get a list of active peers by [`Node::peers`](crate::core::Node::peers) or
+//! check for peers availability using [`Node::has_peers`](crate::core::Node::has_peers).
 //!
 //! ## Custom connections
 //!
@@ -55,15 +55,17 @@ mod callback;
 pub mod conn;
 mod consts;
 mod event;
-pub(super) mod handler;
 pub mod marker;
-mod node;
+pub mod node;
 mod transport;
 pub mod utils;
 
+/// <sup>[`sync`](crate::sync)</sup>
 pub use callback::Callback;
+/// <sup>[`sync`](crate::sync)</sup>
 pub use event::Event;
-pub use node::Node;
+/// <sup>[`sync`](crate::sync)</sup>
 pub use transport::{FileReader, FileWriter, TcpClient, TcpServer, UdpClient, UdpServer};
 #[cfg(unix)]
+/// <sup>[`sync`](crate::sync)</sup>
 pub use transport::{SockClient, SockServer};

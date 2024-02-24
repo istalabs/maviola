@@ -1,4 +1,4 @@
-//! # Core node handlers
+//! # 🔒 Core node handlers
 
 mod heartbeats;
 mod inactive_peers;

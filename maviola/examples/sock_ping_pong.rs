@@ -1,3 +1,4 @@
+use maviola::core::Node;
 use std::fs::remove_file;
 use std::path::PathBuf;
 use std::thread;
@@ -5,7 +6,7 @@ use std::time::Duration;
 
 use maviola::dialects::Minimal;
 use maviola::protocol::{ComponentId, Frame, MaybeVersioned, V2};
-use maviola::sync::{Event, Node};
+use maviola::sync::Event;
 use maviola::sync::{SockClient, SockServer};
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(50);

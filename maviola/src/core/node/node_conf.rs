@@ -12,13 +12,6 @@ use crate::protocol::{
     ComponentId, MavLinkVersion, MaybeVersioned, SystemId, Versioned, Versionless,
 };
 
-#[cfg(feature = "sync")]
-use crate::sync::conn::ConnectionBuilder;
-#[cfg(feature = "sync")]
-use crate::sync::marker::ConnConf;
-#[cfg(feature = "sync")]
-use crate::sync::Node;
-
 use crate::prelude::*;
 
 /// MAVLink node configuration.
@@ -29,8 +22,8 @@ use crate::prelude::*;
 /// [`NodeBuilder`] populated with current settings.
 ///
 /// The main reason to use [`NodeConf`] instead of directly creating a node is that
-/// configurations are dormant and can be cloned. While nodes are dynamic and handle connection
-/// context other runtime-specific entities that can't be cloned.
+/// configurations are dormant and can be cloned. While nodes are dynamic, they own connections
+/// and poses other runtime-specific entities that can't be cloned.
 #[derive(Clone, Debug)]
 pub struct NodeConf<I: MaybeIdentified, D: Dialect, V: MaybeVersioned, C: MaybeConnConf> {
     pub(crate) id: I,
@@ -107,14 +100,6 @@ impl<D: Dialect, V: MaybeVersioned, C: HasConnConf> NodeConf<Identified, D, V, C
     }
 }
 
-#[cfg(feature = "sync")]
-impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned> NodeConf<I, D, V, ConnConf<V>> {
-    /// Synchronous connection configuration.
-    pub fn connection(&self) -> &dyn ConnectionBuilder<V> {
-        self.connection_conf.0.as_ref()
-    }
-}
-
 impl<I: MaybeIdentified, D: Dialect, V: Versioned, C: HasConnConf> NodeConf<I, D, V, C> {
     /// MAVLink version.
     pub fn version(&self) -> MavLinkVersion {
@@ -172,13 +157,6 @@ impl<D: Dialect, V: MaybeVersioned, C: HasConnConf> NodeConf<Unidentified, D, V,
             heartbeat_interval: self.heartbeat_timeout,
             _dialect: self._dialect,
         }
-    }
-}
-
-impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned> NodeConf<I, D, V, ConnConf<V>> {
-    /// Creates a [`Node`] initialised with current configuration.
-    pub fn build(self) -> Result<Node<I, D, V>> {
-        Node::try_from_conf(self)
     }
 }
 

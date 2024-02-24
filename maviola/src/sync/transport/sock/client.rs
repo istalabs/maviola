@@ -21,22 +21,21 @@ use crate::prelude::*;
 /// # #[cfg(unix)]
 /// # {
 /// # use maviola::protocol::V2;
-/// use maviola::sync::{Event, Node, SockClient};
+/// use maviola::sync::{Event, SockClient};
+/// use maviola::core::Node;
 ///
 /// let path = "/tmp/maviola.sock";
 ///
 /// // Create a Unix-socket client node
-/// let node = Node::try_from(
-///     Node::builder()
+/// let node = Node::builder()
 ///         /* define other node parameters */
-/// #         .version(V2)
-/// #         .system_id(1)
-/// #         .component_id(1)
+/// #       .version(V2)
+/// #       .system_id(1)
+/// #       .component_id(1)
 ///         .connection(
 ///             SockClient::new(path)    // Configure socket server connection
 ///                 .unwrap()
-///         )
-/// ).unwrap();
+///         ).build().unwrap();
 /// # }
 /// ```
 #[derive(Clone, Debug)]
