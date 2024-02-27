@@ -3,17 +3,17 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
-use crate::asnc::conn::AsyncConnReceiver;
-use crate::asnc::AsyncEvent;
+use crate::asnc::io::AsyncConnReceiver;
+use crate::asnc::node::AsyncEvent;
 use crate::core::io::ConnectionInfo;
 use crate::core::utils::Closable;
-use crate::protocol::{Peer, PeerId};
+use crate::protocol::Peer;
 
 use crate::prelude::*;
 
 pub(in crate::asnc::node) struct IncomingFramesHandler<V: MaybeVersioned + 'static> {
     pub(in crate::asnc::node) info: ConnectionInfo,
-    pub(in crate::asnc::node) peers: Arc<RwLock<HashMap<PeerId, Peer>>>,
+    pub(in crate::asnc::node) peers: Arc<RwLock<HashMap<MavLinkId, Peer>>>,
     pub(in crate::asnc::node) receiver: AsyncConnReceiver<V>,
     pub(in crate::asnc::node) events_tx: broadcast::Sender<AsyncEvent<V>>,
 }

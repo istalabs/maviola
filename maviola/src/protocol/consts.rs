@@ -7,4 +7,5 @@
 //! MAVLink abstractions.
 
 /// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
+#[doc(inline)]
 pub use crate::core::consts::*;

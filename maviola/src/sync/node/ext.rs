@@ -1,40 +1,36 @@
 //! # 🔒 Synchronous I/O extensions for node
 
 use std::marker::PhantomData;
-use std::sync::atomic::AtomicU8;
-use std::sync::Arc;
 
-use crate::core::marker::{Identified, MaybeIdentified};
+use crate::core::marker::{Edge, NodeKind};
+use crate::core::node::NodeConf;
 use crate::core::utils::Guarded;
-use crate::core::{Node, NodeConf};
 use crate::protocol::Peer;
 use crate::sync::marker::ConnConf;
-use crate::sync::node::api::SyncApi;
-use crate::sync::{Callback, Event};
 
 use crate::prelude::*;
+use crate::sync::prelude::*;
 
-impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static> Node<I, D, V, SyncApi<V>> {
+impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, SyncApi<V>> {
     /// <sup>[`sync`](crate::sync)</sup>
     /// Instantiates node from node configuration.
     ///
     /// Creates ona instance of [`Node`] from [`NodeConf`]. It is also possible to use [`TryFrom`]
     /// and create a node with [`Node::try_from`].
-    pub fn try_from_conf(conf: NodeConf<I, D, V, ConnConf<V>>) -> Result<Self> {
+    pub fn try_from_conf(conf: NodeConf<K, D, V, ConnConf<V>>) -> Result<Self> {
         let api = SyncApi::new(conf.connection().build()?);
         let state = api.share_state();
         let is_active = Guarded::from(&state);
 
         let node = Self {
-            id: conf.id,
-            version: conf.version,
+            kind: conf.kind,
             api,
             state,
             is_active,
-            sequence: Arc::new(AtomicU8::new(0)),
             heartbeat_timeout: conf.heartbeat_timeout,
             heartbeat_interval: conf.heartbeat_interval,
             _dialect: PhantomData,
+            _version: PhantomData,
         };
 
         node.api.start_default_handlers(node.heartbeat_timeout);
@@ -92,7 +88,7 @@ impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static> Node<I, D, V, 
     /// * [`link_id`](Frame::link_id)
     /// * [`timestamp`](Frame::timestamp)
     ///
-    /// To send MAVLink messages instead of raw frames, construct an [`Identified`] node and use
+    /// To send MAVLink messages instead of raw frames, construct an [`Edge`] node and use
     /// messages [`Node::send_versioned`] for node which is [`Versionless`] and [`Node::send`] for
     /// [`Versioned`] nodes. In the latter case, message will be encoded according to MAVLink
     /// protocol version defined for a node.
@@ -135,14 +131,14 @@ impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static> Node<I, D, V, 
     }
 }
 
-impl<D: Dialect, V: Versioned + 'static> Node<Identified, D, V, SyncApi<V>> {
+impl<D: Dialect, V: Versioned + 'static> Node<Edge<V>, D, V, SyncApi<V>> {
     /// <sup>[`sync`](crate::sync)</sup>
     /// Activates the node.
     ///
     /// Active nodes emit heartbeats and perform other operations which do not depend on user
     /// initiative directly.
     ///
-    /// This method is available only for nodes which are [`Identified`].
+    /// This method is available only for nodes which are [`Edge`].
     ///
     /// [`Node::activate`] is idempotent while node is connected. Otherwise, it will return
     /// [`NodeError::Inactive`] variant of [`Error::Node`].
@@ -158,9 +154,8 @@ impl<D: Dialect, V: Versioned + 'static> Node<Identified, D, V, SyncApi<V>> {
         self.is_active.set(true);
 
         self.api.start_sending_heartbeats::<D>(
-            self.id.clone(),
+            self.kind.endpoint.clone(),
             self.heartbeat_interval,
-            self.sequence.clone(),
             self.is_active.clone(),
         );
 

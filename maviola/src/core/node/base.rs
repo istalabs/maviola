@@ -1,18 +1,13 @@
 use std::marker::PhantomData;
-use std::sync::atomic::AtomicU8;
-use std::sync::{atomic, Arc};
 use std::time::Duration;
 
 use crate::core::io::ConnectionInfo;
-use crate::core::marker::{
-    Identified, MaybeIdentified, NoComponentId, NoConnConf, NoSystemId, Unidentified,
-};
+use crate::core::marker::{Edge, NoComponentId, NoConnConf, NoSystemId, NodeKind, Proxy};
 use crate::core::node::api::{NoApi, NodeApi};
+use crate::core::node::NodeBuilder;
 use crate::core::utils::{Guarded, SharedCloser, Switch};
-use crate::core::NodeBuilder;
 use crate::protocol::{
-    ComponentId, Dialect, Frame, MavLinkVersion, MaybeVersioned, Message, SystemId, Versioned,
-    Versionless,
+    ComponentId, Dialect, MavLinkVersion, MaybeVersioned, Message, SystemId, Versioned, Versionless,
 };
 
 use crate::prelude::*;
@@ -26,10 +21,9 @@ use crate::prelude::*;
 /// ```rust
 /// # #[cfg(feature = "sync")]
 /// # {
-/// use maviola::protocol::{Peer, V2};
-/// use maviola::sync::{Event, TcpServer};
-/// use maviola::core::Node;
-/// use maviola::dialects::Minimal;
+/// use maviola::prelude::*;
+/// use maviola::sync::prelude::*;
+/// # use maviola::protocol::Peer;
 /// # use portpicker::pick_unused_port;
 ///
 /// let addr = "127.0.0.1:5600";
@@ -71,26 +65,25 @@ use crate::prelude::*;
 /// }
 /// # }
 /// ```
-pub struct Node<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> {
-    pub(crate) id: I,
-    pub(crate) version: V,
+pub struct Node<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> {
+    pub(crate) kind: K,
     pub(crate) api: A,
-    pub(crate) sequence: Arc<AtomicU8>,
     pub(crate) state: SharedCloser,
     pub(crate) is_active: Guarded<SharedCloser, Switch>,
     pub(crate) heartbeat_timeout: Duration,
     pub(crate) heartbeat_interval: Duration,
     pub(crate) _dialect: PhantomData<D>,
+    pub(crate) _version: PhantomData<V>,
 }
 
-impl Node<Unidentified, Minimal, Versionless, NoApi> {
+impl Node<Proxy, Minimal, Versionless, NoApi> {
     /// Instantiates an empty [`NodeBuilder`].
     pub fn builder() -> NodeBuilder<NoSystemId, NoComponentId, Minimal, Versionless, NoConnConf> {
         NodeBuilder::new()
     }
 }
 
-impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> Node<I, D, V, A> {
+impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> Node<K, D, V, A> {
     /// Information about this node's connection.
     pub fn info(&self) -> &ConnectionInfo {
         self.api.info()
@@ -122,7 +115,7 @@ impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>>
     }
 }
 
-impl<D: Dialect, V: Versioned + 'static, A: NodeApi<V>> Node<Identified, D, V, A> {
+impl<D: Dialect, V: Versioned + 'static, A: NodeApi<V>> Node<Edge<V>, D, V, A> {
     /// <sup>[`sync`](crate::sync)</sup>
     /// Send MAVLink message.
     ///
@@ -132,7 +125,7 @@ impl<D: Dialect, V: Versioned + 'static, A: NodeApi<V>> Node<Identified, D, V, A
     /// If you want to send messages within different MAVLink protocols simultaneously, you have
     /// to construct a [`Versionless`] node and use [`Node::send_versioned`]
     pub fn send(&self, message: &impl Message) -> Result<()> {
-        let frame = self.make_frame_from_message(message, self.version.clone())?;
+        let frame = self.kind.endpoint.next_frame(message)?;
         self.api.send_frame(&frame)
     }
 
@@ -170,75 +163,52 @@ impl<D: Dialect, V: Versioned + 'static, A: NodeApi<V>> Node<Identified, D, V, A
     /// directly requested by user. They will still receive incoming frames and emit corresponding
     /// events.
     ///
-    /// [`Node::deactivate`] is idempotent while node is connected. Otherwise, it will return
-    /// [`NodeError::Inactive`] variant of [`Error::Node`].
-    pub fn deactivate(&mut self) -> Result<()> {
+    /// [`Node::deactivate`] is idempotent.
+    pub fn deactivate(&mut self) {
         if self.state.is_closed() {
-            return Err(Error::Node(NodeError::Inactive));
+            return;
         }
 
         if !self.is_active.is() {
-            return Ok(());
+            return;
         }
 
         self.is_active.set(false);
-
-        Ok(())
     }
 }
 
-impl<D: Dialect, V: MaybeVersioned, A: NodeApi<V>> Node<Identified, D, V, A> {
+impl<D: Dialect, V: MaybeVersioned, A: NodeApi<V>> Node<Edge<V>, D, V, A> {
     /// MAVLink system ID.
     pub fn system_id(&self) -> SystemId {
-        self.id.system_id
+        self.kind.endpoint.system_id()
     }
 
     /// MAVLink component ID.
     pub fn component_id(&self) -> ComponentId {
-        self.id.component_id
-    }
-
-    pub(crate) fn make_frame_from_message<Version: Versioned>(
-        &self,
-        message: &impl Message,
-        version: Version,
-    ) -> Result<Frame<Version>> {
-        let sequence = self.sequence.fetch_add(1, atomic::Ordering::Relaxed);
-        let payload = message.encode(Version::version())?;
-        let frame = Frame::builder()
-            .sequence(sequence)
-            .system_id(self.id.system_id)
-            .component_id(self.id.component_id)
-            .payload(payload)
-            .crc_extra(message.crc_extra())
-            .version(version)
-            .build();
-        Ok(frame)
+        self.kind.endpoint.component_id()
     }
 }
 
-impl<I: MaybeIdentified, D: Dialect, V: Versioned, A: NodeApi<V>> Node<I, D, V, A> {
+impl<K: NodeKind, D: Dialect, V: Versioned, A: NodeApi<V>> Node<K, D, V, A> {
     /// MAVLink version.
     pub fn version(&self) -> MavLinkVersion {
         V::version()
     }
 }
 
-impl<D: Dialect, A: NodeApi<Versionless>> Node<Identified, D, Versionless, A> {
+impl<D: Dialect, A: NodeApi<Versionless>> Node<Edge<Versionless>, D, Versionless, A> {
     /// Send MAVLink frame with a specified MAVLink protocol version.
     ///
     /// If you want to restrict MAVLink protocol to a particular version, construct a [`Versioned`]
     /// node and simply send messages by calling [`Node::send`].
-    pub fn send_versioned<V: Versioned>(&self, message: &impl Message, version: V) -> Result<()> {
-        let frame = self
-            .make_frame_from_message(message, version)?
-            .versionless();
+    pub fn send_versioned<V: Versioned>(&self, message: &impl Message) -> Result<()> {
+        let frame = self.kind.endpoint.next_frame::<V>(message)?.versionless();
         self.api.send_frame(&frame)
     }
 }
 
-impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> Drop
-    for Node<I, D, V, A>
+impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> Drop
+    for Node<K, D, V, A>
 {
     fn drop(&mut self) {
         self.state.close();

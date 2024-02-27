@@ -1,13 +1,13 @@
 //! # 🔒 Build extensions for MAVLink bode
 
 use crate::core::marker::{
-    HasComponentId, HasSystemId, Identified, MaybeComponentId, MaybeIdentified, MaybeSystemId,
-    NoComponentId, NoConnConf, NoSystemId, Unidentified,
+    HasComponentId, HasSystemId, MaybeComponentId, MaybeSystemId, NoComponentId, NoConnConf,
+    NoSystemId, NodeKind,
 };
-use crate::core::{Node, NodeBuilder, NodeConf};
-use crate::sync::conn::ConnectionBuilder;
+use crate::core::node::{Node, NodeBuilder, NodeConf};
+use crate::sync::io::ConnectionBuilder;
 use crate::sync::marker::ConnConf;
-use crate::sync::node::SyncApi;
+use crate::sync::node::{EdgeNode, ProxyNode, SyncApi};
 
 use crate::prelude::*;
 
@@ -32,7 +32,7 @@ impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, V: MaybeVersioned>
     }
 }
 
-impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned> NodeConf<I, D, V, ConnConf<V>> {
+impl<K: NodeKind, D: Dialect, V: MaybeVersioned> NodeConf<K, D, V, ConnConf<V>> {
     /// <sup>[`sync`](crate::sync)</sup>
     /// Synchronous connection configuration.
     pub fn connection(&self) -> &dyn ConnectionBuilder<V> {
@@ -40,10 +40,10 @@ impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned> NodeConf<I, D, V, ConnCo
     }
 }
 
-impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned> NodeConf<I, D, V, ConnConf<V>> {
+impl<K: NodeKind, D: Dialect, V: MaybeVersioned> NodeConf<K, D, V, ConnConf<V>> {
     /// <sup>[`sync`](crate::sync)</sup>
     /// Creates a [`Node`] initialised with current configuration.
-    pub fn build(self) -> Result<Node<I, D, V, SyncApi<V>>> {
+    pub fn build(self) -> Result<Node<K, D, V, SyncApi<V>>> {
         Node::try_from_conf(self)
     }
 }
@@ -51,8 +51,9 @@ impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned> NodeConf<I, D, V, ConnCo
 impl<D: Dialect, V: MaybeVersioned + 'static>
     NodeBuilder<NoSystemId, NoComponentId, D, V, ConnConf<V>>
 {
-    /// Creates an unidentified [`Node`] with synchronous API.
-    pub fn build(self) -> Result<Node<Unidentified, D, V, SyncApi<V>>> {
+    /// <sup>[`sync`](crate::sync)</sup>
+    /// Creates a [`ProxyNode`] with synchronous API.
+    pub fn build(self) -> Result<ProxyNode<D, V>> {
         Node::try_from_conf(self.conf())
     }
 }
@@ -60,8 +61,9 @@ impl<D: Dialect, V: MaybeVersioned + 'static>
 impl<D: Dialect, V: MaybeVersioned + 'static>
     NodeBuilder<HasSystemId, HasComponentId, D, V, ConnConf<V>>
 {
-    /// Creates an identified [`Node`] with synchronous API.
-    pub fn build(self) -> Result<Node<Identified, D, V, SyncApi<V>>> {
+    /// <sup>[`sync`](crate::sync)</sup>
+    /// Creates an [`EdgeNode`] with synchronous API.
+    pub fn build(self) -> Result<EdgeNode<D, V>> {
         Node::try_from_conf(self.conf())
     }
 }

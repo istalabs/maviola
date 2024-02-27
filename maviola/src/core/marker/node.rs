@@ -1,41 +1,39 @@
 //! Markers for MAVLink [`Node`](crate::io::Node).
 
-use crate::protocol::{ComponentId, SystemId};
 use std::fmt::Debug;
 
 use crate::core::utils::Sealed;
+use crate::protocol::{ComponentId, Endpoint, MaybeVersioned, SystemId};
 
 /// <sup>🔒</sup>
-/// Marker for a node with or without `system_id` and `component_id`.
+/// All kinds of nodes are falling ander this trait.
 ///
 /// ⚠ This trait is sealed ⚠
 ///
 /// Variants:
 ///
-/// * [`Unidentified`]
-/// * [`Identified`]
-pub trait MaybeIdentified: Clone + Debug + Sync + Send + Sealed {}
+/// * [`Proxy`]
+/// * [`Edge`]
+pub trait NodeKind: Clone + Debug + Sync + Send + Sealed {}
 
-/// Variant of a node without `system_id` and `component_id`.
+/// Variant of a node that proxies existing messages.
 ///
-/// This node can't produce messages and can be used only as a proxy.
+/// This node can't produce messages and can be used only as a proxy with an optional message
+/// signing capability.
 #[derive(Clone, Copy, Debug)]
-pub struct Unidentified;
-impl Sealed for Unidentified {}
-impl MaybeIdentified for Unidentified {}
+pub struct Proxy;
+impl Sealed for Proxy {}
+impl NodeKind for Proxy {}
 
 /// Variant of a node with `system_id` and `component_id` being defined.
 ///
 /// This node can produce messages.
 #[derive(Clone, Debug)]
-pub struct Identified {
-    /// MAVLink system `ID`
-    pub system_id: SystemId,
-    /// MAVLink component `ID`
-    pub component_id: ComponentId,
+pub struct Edge<V: MaybeVersioned> {
+    pub(crate) endpoint: Endpoint<V>,
 }
-impl Sealed for Identified {}
-impl MaybeIdentified for Identified {}
+impl<V: MaybeVersioned> Sealed for Edge<V> {}
+impl<V: MaybeVersioned> NodeKind for Edge<V> {}
 
 /// <sup>🔒</sup>
 /// Variant of a node configuration which may or may not have a connection config.

@@ -15,5 +15,3 @@ pub use signature::{SignConf, SignConfBuilder, SignStrategy};
 /// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
 #[doc(inline)]
 pub use mavio::protocol::*;
-
-pub(crate) use peer::PeerId;

@@ -4,15 +4,15 @@ use std::thread;
 
 use crate::core::io::ConnectionInfo;
 use crate::core::utils::Closable;
-use crate::protocol::{Peer, PeerId};
-use crate::sync::conn::ConnReceiver;
-use crate::sync::Event;
+use crate::protocol::Peer;
+use crate::sync::io::ConnReceiver;
+use crate::sync::node::Event;
 
 use crate::prelude::*;
 
 pub(in crate::sync::node) struct IncomingFramesHandler<V: MaybeVersioned + 'static> {
     pub(in crate::sync::node) info: ConnectionInfo,
-    pub(in crate::sync::node) peers: Arc<RwLock<HashMap<PeerId, Peer>>>,
+    pub(in crate::sync::node) peers: Arc<RwLock<HashMap<MavLinkId, Peer>>>,
     pub(in crate::sync::node) receiver: ConnReceiver<V>,
     pub(in crate::sync::node) events_tx: mpmc::Sender<Event<V>>,
 }

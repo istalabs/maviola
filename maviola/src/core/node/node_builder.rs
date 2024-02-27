@@ -5,14 +5,14 @@ use crate::protocol::{ComponentId, SystemId};
 
 use crate::core::consts::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_TIMEOUT};
 use crate::core::marker::{
-    HasComponentId, HasConnConf, HasSystemId, Identified, MaybeComponentId, MaybeConnConf,
-    MaybeSystemId, NoComponentId, NoConnConf, NoSystemId, Unidentified,
+    Edge, HasComponentId, HasConnConf, HasSystemId, MaybeComponentId, MaybeConnConf, MaybeSystemId,
+    NoComponentId, NoConnConf, NoSystemId, Proxy,
 };
-use crate::core::NodeConf;
+use crate::core::node::NodeConf;
 
 use crate::prelude::*;
 
-/// Builder for [`Node`](crate::core::Node) and [`NodeConf`].
+/// Builder for [`Node`] and [`NodeConf`].
 #[derive(Clone, Debug, Default)]
 pub struct NodeBuilder<
     S: MaybeSystemId,
@@ -108,7 +108,7 @@ impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, V: MaybeVersioned, CC: M
     /// [turbofish](https://turbo.fish/about) syntax:
     ///
     /// ```rust
-    /// # use maviola::core::Node;
+    /// use maviola::core::node::Node;
     /// use maviola::dialects::Minimal;
     ///
     /// Node::builder().dialect::<Minimal>();
@@ -180,9 +180,9 @@ impl<D: Dialect, V: MaybeVersioned, CC: HasConnConf>
 {
     /// Build and instance of [`NodeConf`] without defined [`NodeConf::system_id`] and
     /// [`NodeConf::component_id`].
-    pub fn conf(self) -> NodeConf<Unidentified, D, V, CC> {
+    pub fn conf(self) -> NodeConf<Proxy, D, V, CC> {
         NodeConf {
-            id: Unidentified,
+            kind: Proxy,
             version: self.version,
             connection_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
@@ -197,11 +197,10 @@ impl<D: Dialect, V: MaybeVersioned, CC: HasConnConf>
 {
     /// Build and instance of [`NodeConf`] with defined [`NodeConf::system_id`] and
     /// [`NodeConf::component_id`].
-    pub fn conf(self) -> NodeConf<Identified, D, V, CC> {
+    pub fn conf(self) -> NodeConf<Edge<V>, D, V, CC> {
         NodeConf {
-            id: Identified {
-                system_id: self.system_id.0,
-                component_id: self.component_id.0,
+            kind: Edge {
+                endpoint: Endpoint::new(MavLinkId::new(self.system_id.0, self.component_id.0)),
             },
             connection_conf: self.conn_conf,
             version: self.version,

@@ -1,27 +1,25 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::sync::atomic::AtomicU8;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use crate::core::io::ConnectionInfo;
-use crate::core::marker::Identified;
-use crate::core::node::api::NodeApi;
+use crate::core::node::NodeApi;
 use crate::core::utils::{Guarded, Sealed, SharedCloser, Switch};
-use crate::protocol::{Peer, PeerId};
-use crate::sync::conn::Connection;
-use crate::sync::event::EventsIterator;
+use crate::protocol::{Endpoint, Peer};
+use crate::sync::io::{Callback, Connection};
+use crate::sync::node::event::EventsIterator;
 use crate::sync::node::handler::{HeartbeatEmitter, InactivePeersHandler, IncomingFramesHandler};
-use crate::sync::{Callback, Event};
+use crate::sync::node::Event;
 
 use crate::prelude::*;
 
 /// <sup>[`sync`](crate::sync)</sup>
-/// Synchronous API for MAVLink [`Node`](crate::core::Node).
+/// Synchronous API for MAVLink [`Node`].
 pub struct SyncApi<V: MaybeVersioned + 'static> {
     state: SharedCloser,
     connection: Connection<V>,
-    peers: Arc<RwLock<HashMap<PeerId, Peer>>>,
+    peers: Arc<RwLock<HashMap<MavLinkId, Peer>>>,
     events_tx: mpmc::Sender<Event<V>>,
     events_rx: mpmc::Receiver<Event<V>>,
 }
@@ -137,17 +135,15 @@ impl<V: MaybeVersioned + 'static> SyncApi<V> {
 impl<V: Versioned> SyncApi<V> {
     pub(crate) fn start_sending_heartbeats<D: Dialect>(
         &self,
-        id: Identified,
+        endpoint: Endpoint<V>,
         interval: Duration,
-        sequence: Arc<AtomicU8>,
         is_active: Guarded<SharedCloser, Switch>,
     ) {
         let emitter = HeartbeatEmitter {
             info: self.info().clone(),
-            id,
+            endpoint,
             interval,
             sender: self.connection.sender(),
-            sequence,
             _version: PhantomData::<V>,
             _dialect: PhantomData::<D>,
         };

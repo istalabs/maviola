@@ -5,6 +5,6 @@
 mod node;
 
 pub use node::{
-    HasComponentId, HasConnConf, HasSystemId, Identified, MaybeComponentId, MaybeConnConf,
-    MaybeIdentified, MaybeSystemId, NoComponentId, NoConnConf, NoSystemId, Unidentified,
+    Edge, HasComponentId, HasConnConf, HasSystemId, MaybeComponentId, MaybeConnConf, MaybeSystemId,
+    NoComponentId, NoConnConf, NoSystemId, NodeKind, Proxy,
 };

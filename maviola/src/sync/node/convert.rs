@@ -1,28 +1,26 @@
 //! # Conversions for synchronous node
 
 use crate::core::marker::{
-    HasComponentId, HasSystemId, Identified, MaybeIdentified, NoComponentId, NoSystemId,
-    Unidentified,
+    HasComponentId, HasSystemId, NoComponentId, NoSystemId, NodeKind, Proxy,
 };
-use crate::core::{Node, NodeBuilder, NodeConf};
+use crate::core::node::{Node, NodeBuilder, NodeConf};
 use crate::sync::marker::ConnConf;
-use crate::sync::node::api::SyncApi;
+use crate::sync::node::{EdgeNode, SyncApi};
 
 use crate::prelude::*;
 
-impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned + 'static>
-    TryFrom<NodeConf<I, D, V, ConnConf<V>>> for Node<I, D, V, SyncApi<V>>
+impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> TryFrom<NodeConf<K, D, V, ConnConf<V>>>
+    for Node<K, D, V, SyncApi<V>>
 {
     type Error = Error;
 
-    fn try_from(value: NodeConf<I, D, V, ConnConf<V>>) -> Result<Self> {
+    fn try_from(value: NodeConf<K, D, V, ConnConf<V>>) -> Result<Self> {
         Self::try_from_conf(value)
     }
 }
 
 impl<D: Dialect, V: MaybeVersioned>
-    TryFrom<NodeBuilder<HasSystemId, HasComponentId, D, V, ConnConf<V>>>
-    for Node<Identified, D, V, SyncApi<V>>
+    TryFrom<NodeBuilder<HasSystemId, HasComponentId, D, V, ConnConf<V>>> for EdgeNode<D, V>
 {
     type Error = Error;
 
@@ -35,7 +33,7 @@ impl<D: Dialect, V: MaybeVersioned>
 
 impl<D: Dialect, V: MaybeVersioned>
     TryFrom<NodeBuilder<NoSystemId, NoComponentId, D, V, ConnConf<V>>>
-    for Node<Unidentified, D, V, SyncApi<V>>
+    for Node<Proxy, D, V, SyncApi<V>>
 {
     type Error = Error;
 

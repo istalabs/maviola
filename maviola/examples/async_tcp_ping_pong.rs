@@ -2,9 +2,8 @@ use std::sync::atomic;
 use std::sync::atomic::AtomicU8;
 use std::time::Duration;
 
-use maviola::asnc::conn::AsyncConnection;
-use maviola::asnc::conn::AsyncConnectionBuilder;
-use maviola::asnc::{AsyncTcpClient, AsyncTcpServer};
+use maviola::asnc::io::{AsyncConnection, AsyncConnectionBuilder};
+use maviola::asnc::io::{AsyncTcpClient, AsyncTcpServer};
 use maviola::dialects::minimal as dialect;
 use maviola::protocol::{Frame, MaybeVersioned, V2};
 

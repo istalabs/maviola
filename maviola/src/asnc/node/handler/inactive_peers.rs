@@ -4,16 +4,16 @@ use std::time::{Duration, SystemTime};
 
 use tokio::sync::RwLock;
 
-use crate::asnc::AsyncEvent;
+use crate::asnc::node::AsyncEvent;
 use crate::core::io::ConnectionInfo;
 use crate::core::utils::Closable;
-use crate::protocol::{Peer, PeerId};
+use crate::protocol::Peer;
 
 use crate::prelude::*;
 
 pub(in crate::asnc::node) struct InactivePeersHandler<V: MaybeVersioned> {
     pub(in crate::asnc::node) info: ConnectionInfo,
-    pub(in crate::asnc::node) peers: Arc<RwLock<HashMap<PeerId, Peer>>>,
+    pub(in crate::asnc::node) peers: Arc<RwLock<HashMap<MavLinkId, Peer>>>,
     pub(in crate::asnc::node) timeout: Duration,
     pub(in crate::asnc::node) events_tx: broadcast::Sender<AsyncEvent<V>>,
 }

@@ -1,13 +1,12 @@
 use std::thread;
 use std::time::Duration;
 
-use maviola::core::Node;
 use portpicker::{pick_unused_port, Port};
 
-use maviola::dialects::Minimal;
-use maviola::protocol::{ComponentId, Frame, MaybeVersioned, V2};
-use maviola::sync::Event;
-use maviola::sync::{TcpClient, TcpServer};
+use maviola::protocol::ComponentId;
+
+use maviola::prelude::*;
+use maviola::sync::prelude::*;
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(50);
 const HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(75);

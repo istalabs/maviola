@@ -1,4 +1,3 @@
-use mavio::dialects::Minimal;
 use std::collections::HashMap;
 use std::sync::Once;
 use std::thread;
@@ -6,15 +5,13 @@ use std::time::Duration;
 
 use portpicker::Port;
 
-use maviola::core::marker::Identified;
-use maviola::core::Node;
+use maviola::core::marker::Edge;
 use maviola::dialects::minimal;
 use maviola::protocol::{ComponentId, SystemId};
-use maviola::sync::node::SyncApi;
-use maviola::sync::Event;
-use maviola::sync::{TcpClient, TcpServer};
+use maviola::sync::node::Event;
 
 use maviola::prelude::*;
+use maviola::sync::prelude::*;
 
 static INIT: Once = Once::new();
 static INIT_LOGGER: Once = Once::new();
@@ -57,7 +54,7 @@ fn initialize() {
     INIT.call_once(|| init_logger());
 }
 
-pub fn make_tcp_server_node(port: Port) -> Node<Identified, Minimal, V2, SyncApi<V2>> {
+pub fn make_tcp_server_node(port: Port) -> Node<Edge<V2>, Minimal, V2, SyncApi<V2>> {
     Node::try_from(
         Node::builder()
             .system_id(DEFAULT_TCP_SERVER_SYS_ID)
@@ -72,7 +69,7 @@ pub fn make_tcp_server_node(port: Port) -> Node<Identified, Minimal, V2, SyncApi
 pub fn make_tcp_client_node(
     port: Port,
     component_id: u8,
-) -> Node<Identified, Minimal, V2, SyncApi<V2>> {
+) -> Node<Edge<V2>, Minimal, V2, SyncApi<V2>> {
     Node::try_from(
         Node::builder()
             .system_id(DEFAULT_TCP_CLIENT_SYS_ID)
@@ -84,10 +81,7 @@ pub fn make_tcp_client_node(
     .unwrap()
 }
 
-fn make_client_nodes(
-    port: portpicker::Port,
-    count: u8,
-) -> HashMap<u8, Node<Identified, Minimal, V2, SyncApi<V2>>> {
+fn make_client_nodes(port: Port, count: u8) -> HashMap<u8, EdgeNode<Minimal, V2>> {
     (0..count)
         .map(|i| (i, make_tcp_client_node(port, i)))
         .collect()
@@ -145,28 +139,6 @@ fn messages_are_sent_and_received_clients_server() {
         log::info!("[server] received #{i}");
     }
 }
-
-// #[test]
-// fn closed_connections_are_dropped() {
-//     initialize();
-//
-//     let port = unused_port();
-//     let server_node = make_tcp_server_node(port);
-//     let client_node = make_tcp_client_node(port, 0);
-//     wait();
-//
-//     client_node.close().unwrap();
-//     wait();
-//
-//     let message = minimal::messages::Heartbeat::default();
-//     server_node.send(message.into()).unwrap();
-//     wait();
-//
-//     {
-//         let n_con = server_node.info().n_conn().unwrap();
-//         assert_eq!(n_con, 0);
-//     }
-// }
 
 #[test]
 fn events_are_received() {
@@ -260,6 +232,7 @@ fn node_no_id_no_dialect_no_version() {
         .version(V2)
         .message(&minimal::messages::Heartbeat::default())
         .unwrap()
+        .build()
         .versionless();
 
     for _ in 0..5 {
@@ -337,7 +310,7 @@ fn node_no_version() {
     wait();
 
     client_node
-        .send_versioned(&minimal::messages::Heartbeat::default(), V2)
+        .send_versioned::<V2>(&minimal::messages::Heartbeat::default())
         .unwrap();
     wait_long();
 

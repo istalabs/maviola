@@ -4,8 +4,8 @@ use std::marker::PhantomData;
 use std::time::Duration;
 
 use crate::core::marker::{
-    HasComponentId, HasConnConf, HasSystemId, Identified, MaybeConnConf, MaybeIdentified,
-    NoComponentId, NoConnConf, NoSystemId, Unidentified,
+    Edge, HasComponentId, HasConnConf, HasSystemId, MaybeConnConf, NoComponentId, NoConnConf,
+    NoSystemId, NodeKind, Proxy,
 };
 use crate::core::node::NodeBuilder;
 use crate::protocol::{
@@ -25,8 +25,8 @@ use crate::prelude::*;
 /// configurations are dormant and can be cloned. While nodes are dynamic, they own connections
 /// and poses other runtime-specific entities that can't be cloned.
 #[derive(Clone, Debug)]
-pub struct NodeConf<I: MaybeIdentified, D: Dialect, V: MaybeVersioned, C: MaybeConnConf> {
-    pub(crate) id: I,
+pub struct NodeConf<K: NodeKind, D: Dialect, V: MaybeVersioned, C: MaybeConnConf> {
+    pub(crate) kind: K,
     pub(crate) version: V,
     pub(crate) connection_conf: C,
     pub(crate) heartbeat_timeout: Duration,
@@ -34,7 +34,7 @@ pub struct NodeConf<I: MaybeIdentified, D: Dialect, V: MaybeVersioned, C: MaybeC
     pub(crate) _dialect: PhantomData<D>,
 }
 
-impl NodeConf<Unidentified, Minimal, Versionless, NoConnConf> {
+impl NodeConf<Proxy, Minimal, Versionless, NoConnConf> {
     /// Creates an empty [`NodeBuilder`].
     ///
     /// # Usage
@@ -42,8 +42,8 @@ impl NodeConf<Unidentified, Minimal, Versionless, NoConnConf> {
     /// Create node configuration that explicitly speaks `minimal` dialect.
     ///
     /// ```rust
-    /// use maviola::core::NodeConf;
-    /// use maviola::sync::TcpClient;
+    /// use maviola::core::node::NodeConf;
+    /// use maviola::sync::io::TcpClient;
     /// use maviola::dialects::Minimal;
     ///
     /// let node = NodeConf::builder()
@@ -60,8 +60,8 @@ impl NodeConf<Unidentified, Minimal, Versionless, NoConnConf> {
     /// Create node configuration with default minimal dialect.
     ///
     /// ```rust
-    /// use maviola::core::NodeConf;
-    /// use maviola::sync::TcpClient;
+    /// use maviola::core::node::NodeConf;
+    /// use maviola::sync::io::TcpClient;
     ///
     /// let node = NodeConf::builder()
     ///     .system_id(10)
@@ -76,8 +76,8 @@ impl NodeConf<Unidentified, Minimal, Versionless, NoConnConf> {
     /// Create a configuration for unidentified node with default minimal dialect.
     ///
     /// ```rust
-    /// use maviola::core::NodeConf;
-    /// use maviola::sync::TcpClient;
+    /// use maviola::core::node::NodeConf;
+    /// use maviola::sync::io::TcpClient;
     ///
     /// let node = NodeConf::builder()
     ///     .connection(TcpClient::new("localhost:5600").unwrap())
@@ -88,26 +88,28 @@ impl NodeConf<Unidentified, Minimal, Versionless, NoConnConf> {
     }
 }
 
-impl<D: Dialect, V: MaybeVersioned, C: HasConnConf> NodeConf<Identified, D, V, C> {
+impl<D: Dialect, V: MaybeVersioned, C: HasConnConf> NodeConf<Edge<V>, D, V, C> {
     /// MAVLink system ID.
+    #[inline(always)]
     pub fn system_id(&self) -> SystemId {
-        self.id.system_id
+        self.kind.endpoint.system_id()
     }
 
     /// MAVLink component ID.
+    #[inline(always)]
     pub fn component_id(&self) -> ComponentId {
-        self.id.component_id
+        self.kind.endpoint.component_id()
     }
 }
 
-impl<I: MaybeIdentified, D: Dialect, V: Versioned, C: HasConnConf> NodeConf<I, D, V, C> {
+impl<K: NodeKind, D: Dialect, V: Versioned, C: HasConnConf> NodeConf<K, D, V, C> {
     /// MAVLink version.
     pub fn version(&self) -> MavLinkVersion {
         V::version()
     }
 }
 
-impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned, C: HasConnConf> NodeConf<I, D, V, C> {
+impl<K: NodeKind, D: Dialect, V: MaybeVersioned, C: HasConnConf> NodeConf<K, D, V, C> {
     /// Timeout for MAVLink heartbeats.
     ///
     /// If peer hasn't been sent heartbeats for as long as specified duration, it will be considered
@@ -119,7 +121,7 @@ impl<I: MaybeIdentified, D: Dialect, V: MaybeVersioned, C: HasConnConf> NodeConf
     }
 }
 
-impl<D: Dialect, V: Versioned, C: HasConnConf> NodeConf<Identified, D, V, C> {
+impl<D: Dialect, V: Versioned, C: HasConnConf> NodeConf<Edge<V>, D, V, C> {
     /// Interval for MAVLink heartbeats.
     ///
     /// Node will send heartbeats within this interval.
@@ -130,12 +132,12 @@ impl<D: Dialect, V: Versioned, C: HasConnConf> NodeConf<Identified, D, V, C> {
     }
 }
 
-impl<D: Dialect, V: MaybeVersioned, C: HasConnConf> NodeConf<Identified, D, V, C> {
+impl<D: Dialect, V: MaybeVersioned, C: HasConnConf> NodeConf<Edge<V>, D, V, C> {
     /// Creates a [`NodeBuilder`] initialised with current configuration.
     pub fn update(self) -> NodeBuilder<HasSystemId, HasComponentId, D, V, C> {
         NodeBuilder {
-            system_id: HasSystemId(self.id.system_id),
-            component_id: HasComponentId(self.id.component_id),
+            system_id: HasSystemId(self.kind.endpoint.system_id()),
+            component_id: HasComponentId(self.kind.endpoint.component_id()),
             version: self.version,
             conn_conf: self.connection_conf,
             heartbeat_timeout: self.heartbeat_timeout,
@@ -145,7 +147,7 @@ impl<D: Dialect, V: MaybeVersioned, C: HasConnConf> NodeConf<Identified, D, V, C
     }
 }
 
-impl<D: Dialect, V: MaybeVersioned, C: HasConnConf> NodeConf<Unidentified, D, V, C> {
+impl<D: Dialect, V: MaybeVersioned, C: HasConnConf> NodeConf<Proxy, D, V, C> {
     /// Creates a [`NodeBuilder`] initialised with current configuration.
     pub fn update(self) -> NodeBuilder<NoSystemId, NoComponentId, D, V, C> {
         NodeBuilder {
@@ -163,7 +165,7 @@ impl<D: Dialect, V: MaybeVersioned, C: HasConnConf> NodeConf<Unidentified, D, V,
 #[cfg(test)]
 mod tests {
     use crate::core::io::ConnectionInfo;
-    use crate::sync::TcpClient;
+    use crate::sync::io::TcpClient;
 
     use super::*;
 

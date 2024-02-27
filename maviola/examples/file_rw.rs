@@ -1,5 +1,3 @@
-use mavio::dialects::Minimal;
-use maviola::core::Node;
 use std::fs::remove_file;
 use std::path::PathBuf;
 use std::sync::atomic;
@@ -8,11 +6,10 @@ use std::thread;
 use std::time::Duration;
 
 use maviola::dialects::minimal as dialect;
-use maviola::protocol::{Frame, MaybeVersioned, V2};
-use maviola::sync::Event;
-use maviola::sync::{FileReader, FileWriter};
 
-const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(50);
+use maviola::prelude::*;
+use maviola::sync::prelude::*;
+
 const HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(75);
 const N_ITER: u16 = 100;
 
@@ -73,7 +70,6 @@ fn run(path: PathBuf) {
             .component_id(42)
             .version(V2)
             .dialect::<Minimal>()
-            .heartbeat_interval(HEARTBEAT_INTERVAL)
             .heartbeat_timeout(HEARTBEAT_TIMEOUT)
             .connection(FileReader::new(path.as_path()).unwrap()),
     )

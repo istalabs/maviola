@@ -1,20 +1,13 @@
 use std::cmp::Ordering;
 use std::fmt::{Debug, Formatter};
-use std::hash::Hash;
 use std::time::SystemTime;
 
-use crate::protocol::{ComponentId, SystemId};
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct PeerId {
-    pub(crate) system_id: SystemId,
-    pub(crate) component_id: ComponentId,
-}
+use crate::protocol::{ComponentId, MavLinkId, SystemId};
 
 /// MAVLink device with [`system_id`](Peer::system_id) and [`component_id`](Peer::component_id).
 #[derive(Clone, Eq)]
 pub struct Peer {
-    pub(crate) id: PeerId,
+    pub(crate) id: MavLinkId,
     pub(crate) last_active: SystemTime,
 }
 
@@ -22,9 +15,9 @@ impl Peer {
     /// Creates a new Peer with specified `system_id` and `component_id`.
     pub fn new(system_id: SystemId, component_id: ComponentId) -> Self {
         Self {
-            id: PeerId {
-                system_id,
-                component_id,
+            id: MavLinkId {
+                system: system_id,
+                component: component_id,
             },
             last_active: SystemTime::now(),
         }
@@ -33,13 +26,13 @@ impl Peer {
     /// MAVLink system `ID`.
     #[inline]
     pub fn system_id(&self) -> SystemId {
-        self.id.system_id
+        self.id.system
     }
 
     /// MAVLink component `ID`.
     #[inline]
     pub fn component_id(&self) -> ComponentId {
-        self.id.component_id
+        self.id.component
     }
 
     /// Time when this peer sent the last message.
@@ -87,33 +80,33 @@ mod peer_tests {
     #[test]
     fn peer_comparisons() {
         let peer_1_old = Peer {
-            id: PeerId {
-                system_id: 42,
-                component_id: 17,
+            id: MavLinkId {
+                system: 42,
+                component: 17,
             },
             last_active: UNIX_EPOCH,
         };
 
         let peer_1_new = Peer {
-            id: PeerId {
-                system_id: 42,
-                component_id: 17,
+            id: MavLinkId {
+                system: 42,
+                component: 17,
             },
             last_active: SystemTime::now(),
         };
 
         let peer_2_old = Peer {
-            id: PeerId {
-                system_id: 1,
-                component_id: 10,
+            id: MavLinkId {
+                system: 1,
+                component: 10,
             },
             last_active: UNIX_EPOCH,
         };
 
         let peer_2_new = Peer {
-            id: PeerId {
-                system_id: 1,
-                component_id: 10,
+            id: MavLinkId {
+                system: 1,
+                component: 10,
             },
             last_active: peer_1_new.last_active,
         };

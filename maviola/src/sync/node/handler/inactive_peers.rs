@@ -5,14 +5,14 @@ use std::time::{Duration, SystemTime};
 
 use crate::core::io::ConnectionInfo;
 use crate::core::utils::Closable;
-use crate::protocol::{Peer, PeerId};
-use crate::sync::Event;
+use crate::protocol::Peer;
+use crate::sync::node::Event;
 
 use crate::prelude::*;
 
 pub(in crate::sync::node) struct InactivePeersHandler<V: MaybeVersioned> {
     pub(in crate::sync::node) info: ConnectionInfo,
-    pub(in crate::sync::node) peers: Arc<RwLock<HashMap<PeerId, Peer>>>,
+    pub(in crate::sync::node) peers: Arc<RwLock<HashMap<MavLinkId, Peer>>>,
     pub(in crate::sync::node) timeout: Duration,
     pub(in crate::sync::node) events_tx: mpmc::Sender<Event<V>>,
 }
