@@ -1,5 +1,5 @@
-//! # Common imports for asynchronous I/O.
+//! # Common imports for asynchronous API
 
-pub use crate::asnc::io::AsyncCallback;
-pub use crate::asnc::io::{AsyncTcpClient, AsyncTcpServer};
-pub use crate::asnc::node::AsyncEvent;
+pub use crate::asnc::io::Callback;
+pub use crate::asnc::io::{FileReader, FileWriter, TcpClient, TcpServer};
+pub use crate::asnc::node::{AsyncApi, EdgeNode, Event, ProxyNode};

@@ -1,4 +1,4 @@
-//! # 🔒 Build extensions for MAVLink bode
+//! # 🔒 Build extensions for synchronous MAVLink node
 
 use crate::core::marker::{
     HasComponentId, HasSystemId, MaybeComponentId, MaybeSystemId, NoComponentId, NoConnConf,
@@ -11,7 +11,7 @@ use crate::sync::node::{EdgeNode, ProxyNode, SyncApi};
 
 use crate::prelude::*;
 
-impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, V: MaybeVersioned>
+impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, V: MaybeVersioned + 'static>
     NodeBuilder<S, C, D, V, NoConnConf>
 {
     /// <sup>[`sync`](crate::sync)</sup>

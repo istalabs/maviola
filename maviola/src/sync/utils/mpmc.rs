@@ -1,4 +1,4 @@
-//! # Multiple producers / multiple consumers broadcast channel
+//! # <sup>`⍚` | [`sync`](crate::sync)</sup> Multiple producers / multiple consumers broadcast channel
 //!
 //! This module provides MPMC primitives which allow to broadcast messages over the channel from
 //! multiple producers to multiple consumers:
@@ -10,18 +10,13 @@
 //!
 //! A [`Sender`] is used to broadcast messages to single or multiple instances of [`Receiver`].
 //! These primitives behave almost identical to their [`mpsc`] counterparts, except that
-//! [`Receiver`] can be cloned. A cloned receiver becomes an independent listener for channel
+//! [`Receiver`] can be cloned. A cloned receiver becomes an independent listener for channel's
 //! messages.
-//!
-//! In addition, both sender and receiver implement a `disconnect` method which severs connection to
-//! the channel. Disconnected senders and receivers will return standard [`mpsc`] errors on
-//! send / receive attempts.
 //!
 //! # Examples
 //!
 //! ```rust
-//! # #[cfg(feature = "sync")]
-//! # {
+//! # #[cfg(feature = "unstable")]{
 //! use maviola::sync::utils::mpmc;
 //!
 //! let (tx_1, rx_1) = mpmc::channel();
@@ -46,6 +41,7 @@ use std::thread;
 
 use crate::core::utils::{Closable, Closer, UniqueId};
 
+/// <sup>`⍚` | [`sync`](crate::sync)</sup>
 /// MPMC sender.
 ///
 /// Behaves almost identical to [`mpsc::Sender`]. The latter [`mpsc`] sender can be obtained through
@@ -85,6 +81,7 @@ impl<T> Sender<T> {
     }
 }
 
+/// <sup>`⍚` | [`sync`](crate::sync)</sup>
 /// MPMC receiver.
 ///
 /// Behaves almost identical to [`mpsc::Receiver`] except that it can be cloned. The underlying
@@ -130,8 +127,7 @@ impl<T: Clone + Sync + Send + 'static> Receiver<T> {
     /// Guard is present, the receiver can accept messages:
     ///
     /// ```rust
-    /// # #[cfg(feature = "sync")]
-    /// # {
+    /// # #[cfg(feature = "unstable")]{
     /// use std::thread;
     /// use std::sync::mpsc;
     /// use maviola::sync::utils::mpmc;
@@ -149,8 +145,7 @@ impl<T: Clone + Sync + Send + 'static> Receiver<T> {
     /// Guard is dropped, the receiver is no longer connected to the bus:
     ///
     /// ```rust
-    /// # #[cfg(feature = "sync")]
-    /// # {
+    /// # #[cfg(feature = "unstable")]{
     /// use std::thread;
     /// use std::sync::mpsc;
     /// use maviola::sync::utils::mpmc;
@@ -186,6 +181,7 @@ impl<T: Clone + Sync + Send + 'static> Clone for Receiver<T> {
     }
 }
 
+/// <sup>`⍚` | [`sync`](crate::sync)</sup>
 /// Guards connection for the [`Receiver`].
 ///
 /// When receiver is obtained from an inner [`mpsc::Receiver`] by calling [`Receiver::into_inner`],
@@ -284,6 +280,7 @@ impl<T> Drop for BroadcastBus<T> {
     }
 }
 
+/// <sup>`⍚` | [`sync`](crate::sync)</sup>
 /// Creates a new asynchronous channel, returning the sender/receiver halves.
 ///
 /// All data sent on the [`Sender`] will become available on the [`Receiver`] in

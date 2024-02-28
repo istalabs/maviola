@@ -32,11 +32,6 @@ impl<V: MaybeVersioned + 'static> NodeApi<V> for SyncApi<V> {
     }
 
     #[inline(always)]
-    fn has_peers(&self) -> bool {
-        self.has_peers()
-    }
-
-    #[inline(always)]
     fn send_frame(&self, frame: &Frame<V>) -> Result<()> {
         self.send_frame(frame)
     }
@@ -144,8 +139,8 @@ impl<V: Versioned> SyncApi<V> {
             endpoint,
             interval,
             sender: self.connection.sender(),
-            _version: PhantomData::<V>,
             _dialect: PhantomData::<D>,
+            _version: PhantomData::<V>,
         };
         emitter.spawn(is_active);
     }

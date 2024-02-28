@@ -2,6 +2,7 @@ use std::cmp::min;
 use std::io::{Read, Write};
 use std::sync::mpsc;
 
+/// <sup>`⍚` | [`sync`](crate::sync)</sup>
 /// Wrapper around [`mpsc::Receiver`] that implements [`Read`].
 ///
 /// When channel is closed, [`MpscReader`] returns
@@ -47,6 +48,7 @@ impl Read for MpscReader {
     }
 }
 
+/// <sup>`⍚` | [`sync`](crate::sync)</sup>
 /// Wrapper around [`mpsc::Sender`] that implements [`Write`].
 ///
 /// When channel is closed, [`MpscWriter`] returns

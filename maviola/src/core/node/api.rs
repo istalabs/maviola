@@ -10,9 +10,6 @@ pub trait NodeApi<V: MaybeVersioned + 'static>: Sealed {
         &ConnectionInfo::Unknown
     }
 
-    /// Returns `true` if node has active peers.
-    fn has_peers(&self) -> bool;
-
     /// Send a MAVLink frame.
     fn send_frame(&self, frame: &Frame<V>) -> Result<()>;
 }
@@ -21,10 +18,6 @@ pub trait NodeApi<V: MaybeVersioned + 'static>: Sealed {
 pub struct NoApi;
 impl Sealed for NoApi {}
 impl<V: MaybeVersioned + 'static> NodeApi<V> for NoApi {
-    fn has_peers(&self) -> bool {
-        unimplemented!()
-    }
-
     fn send_frame(&self, _: &Frame<V>) -> Result<()> {
         unimplemented!()
     }

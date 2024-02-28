@@ -1,30 +1,31 @@
 use std::sync::Arc;
 
 use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::sync::broadcast::error::RecvError;
 
 use crate::asnc::consts::{
     PEER_CONN_STOP_JOIN_ATTEMPTS, PEER_CONN_STOP_JOIN_POOLING_INTERVAL,
     PEER_CONN_STOP_POOLING_INTERVAL,
 };
-use crate::asnc::io::{AsyncCallback, AsyncFrameProducer, AsyncFrameSendHandler, AsyncFrameSender};
-use crate::core::io::{AsyncReceiver, AsyncSender};
+use crate::asnc::io::{Callback, FrameProducer, FrameSendHandler, FrameSender};
+use crate::core::io::{AsyncReceiver, AsyncSender, OutgoingFrame};
 use crate::core::io::{ChannelInfo, ConnectionInfo};
 use crate::core::utils::{Closable, SharedCloser, UniqueId};
 
 use crate::prelude::*;
 
 /// <sup>[`async`](crate::asnc)</sup>
-/// Factory that produces a channels withing associated [`AsyncConnection`](super::AsyncConnection).
+/// Factory that produces a channels withing associated [`AsyncConnection`](super::Connection).
 #[derive(Debug)]
-pub struct AsyncChannelFactory<V: MaybeVersioned + 'static> {
+pub struct ChannelFactory<V: MaybeVersioned + 'static> {
     pub(crate) info: ConnectionInfo,
     pub(crate) state: Closable,
-    pub(crate) sender: AsyncFrameSender<V>,
-    pub(crate) send_handler: AsyncFrameSendHandler<V>,
-    pub(crate) producer: AsyncFrameProducer<V>,
+    pub(crate) sender: FrameSender<V>,
+    pub(crate) send_handler: FrameSendHandler<V>,
+    pub(crate) producer: FrameProducer<V>,
 }
 
-impl<V: MaybeVersioned> AsyncChannelFactory<V> {
+impl<V: MaybeVersioned> ChannelFactory<V> {
     /// Builds a channel associated with the corresponding.
     #[must_use]
     pub fn build<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
@@ -32,8 +33,8 @@ impl<V: MaybeVersioned> AsyncChannelFactory<V> {
         info: ChannelInfo,
         reader: R,
         writer: W,
-    ) -> AsyncChannel<V, R, W> {
-        AsyncChannel {
+    ) -> Channel<V, R, W> {
+        Channel {
             conn_state: self.state.clone(),
             info,
             reader,
@@ -58,41 +59,40 @@ impl<V: MaybeVersioned> AsyncChannelFactory<V> {
 /// <sup>[`async`](crate::asnc)</sup>
 /// AsyncChannel associated with a particular connection.
 ///
-/// Channels are constructed by [`AsyncChannelFactory`] bound to a particular
-/// [`AsyncConnection`](super::AsyncConnection).
-pub struct AsyncChannel<V: MaybeVersioned + 'static, R: AsyncRead, W: AsyncWrite> {
+/// Channels are constructed by [`ChannelFactory`] bound to a particular
+/// [`AsyncConnection`](super::Connection).
+pub struct Channel<V: MaybeVersioned + 'static, R: AsyncRead, W: AsyncWrite> {
     conn_state: Closable,
     info: ChannelInfo,
     reader: R,
     writer: W,
-    sender: AsyncFrameSender<V>,
-    send_handler: AsyncFrameSendHandler<V>,
-    producer: AsyncFrameProducer<V>,
+    sender: FrameSender<V>,
+    send_handler: FrameSendHandler<V>,
+    producer: FrameProducer<V>,
 }
 
 impl<
         V: MaybeVersioned + 'static,
         R: AsyncRead + Send + Unpin + 'static,
         W: AsyncWrite + Send + Unpin + 'static,
-    > AsyncChannel<V, R, W>
+    > Channel<V, R, W>
 {
     /// Spawn this channel.
     ///
     /// Returns [`SharedCloser`] which can be used to control channel state. The state of the
-    /// channel depends on the state of the associated [`AsyncConnection`](super::AsyncConnection). However,
+    /// channel depends on the state of the associated [`AsyncConnection`](super::Connection). However,
     /// it is not guaranteed, that channel will immediately close once connection is closed. There
     /// could be a lag relating to blocking nature of the underlying reader and writer.
     ///
     /// If caller is not interested in managing this channel, then it is required to drop returned
     /// [`SharedCloser`] or replace it with the corresponding [`Closable`].
-    #[must_use]
     pub async fn spawn(self) -> SharedCloser {
         let id = UniqueId::new();
         let info = Arc::new(self.info);
         let conn_state = self.conn_state.clone();
         let state = SharedCloser::new();
 
-        log::trace!("[{info:?}] spawning peer connection");
+        log::trace!("[{info:?}] spawning connection channel");
 
         let write_handler = {
             let send_handler = self.send_handler;
@@ -128,11 +128,17 @@ impl<
 
     async fn write_handler(
         id: UniqueId,
-        mut send_handler: AsyncFrameSendHandler<V>,
+        mut send_handler: FrameSendHandler<V>,
         mut frame_writer: AsyncSender<W, V>,
     ) -> Result<()> {
         loop {
-            let out_frame = send_handler.recv().await?;
+            let out_frame = match send_handler.recv().await {
+                Ok(out_frame) => out_frame,
+                Err(err) => {
+                    frame_writer.flush().await.map_err(Error::from)?;
+                    return Err(Error::from(err));
+                }
+            };
 
             if !out_frame.should_send_to(id) {
                 continue;
@@ -155,8 +161,8 @@ impl<
         conn_state: Closable,
         id: UniqueId,
         info: Arc<ChannelInfo>,
-        sender: AsyncFrameSender<V>,
-        producer: AsyncFrameProducer<V>,
+        sender: FrameSender<V>,
+        producer: FrameProducer<V>,
         mut frame_reader: AsyncReceiver<R, V>,
     ) -> Result<()> {
         loop {
@@ -181,7 +187,7 @@ impl<
             let info = info.clone();
             let send_tx = sender.clone();
 
-            let response = AsyncCallback {
+            let response = Callback {
                 sender_id: id,
                 sender_info: info.clone(),
                 broadcast_tx: send_tx,

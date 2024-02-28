@@ -1,4 +1,4 @@
-//! # Conversions for synchronous node
+//! # 🔒 Conversions for synchronous node
 
 use crate::core::marker::{
     HasComponentId, HasSystemId, NoComponentId, NoSystemId, NodeKind, Proxy,

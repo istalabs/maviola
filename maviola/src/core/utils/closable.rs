@@ -108,6 +108,7 @@ pub trait WillClose: Sealed {
 ///```
 ///
 #[derive(Debug)]
+#[must_use]
 pub struct Closer(Arc<AtomicBool>);
 
 impl Closer {
@@ -164,7 +165,6 @@ impl Closer {
     /// let closer = Closer::new();
     /// let _ = closer.to_shared();
     /// ```
-    #[must_use]
     pub fn to_shared(&self) -> SharedCloser {
         SharedCloser {
             flag: self.0.clone(),
@@ -176,7 +176,6 @@ impl Closer {
     /// Transforms into a shared closer.
     ///
     /// Takes an instance of [`Closer`] by value and transforms it into a [`SharedCloser`].
-    #[must_use]
     pub fn into_shared(mut self) -> SharedCloser {
         let mut flag = Arc::new(AtomicBool::new(false));
         mem::swap(&mut self.0, &mut flag);
@@ -235,6 +234,7 @@ impl Drop for Closer {
 /// closed, when either original [`Closer`] is gone, or all copies of the dependent [`SharedCloser`]
 /// have been destroyed.
 #[derive(Debug)]
+#[must_use]
 pub struct SharedCloser {
     flag: Arc<AtomicBool>,
     owners: Arc<AtomicUsize>,
@@ -328,6 +328,7 @@ impl Drop for SharedCloser {
 /// [`Closable`] can be obtained by [`Closer::to_closable`] or [`SharedCloser::to_closable`].
 /// This creates a read-only version of resource state.
 #[derive(Clone, Debug)]
+#[must_use]
 pub struct Closable(Arc<AtomicBool>);
 
 impl Closable {
@@ -349,7 +350,7 @@ impl WillClose for Closable {
     }
 }
 
-/// An implementor of [`WillClose`] that always closed.
+/// An implementor of [`WillClose`], that always closed.
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Closed;
 

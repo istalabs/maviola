@@ -1,18 +1,19 @@
 use std::fs::remove_file;
 use std::path::PathBuf;
-use std::thread;
 use std::time::Duration;
+
+use tokio_stream::StreamExt;
 
 use maviola::dialects::minimal as dialect;
 
+use maviola::asnc::prelude::*;
 use maviola::prelude::*;
-use maviola::sync::prelude::*;
 
-const HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(75);
+const HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(50);
 const N_ITER: u16 = 100;
 
-fn wait() {
-    thread::sleep(Duration::from_millis(100));
+async fn wait() {
+    tokio::time::sleep(Duration::from_millis(100)).await;
 }
 
 fn report_frame<V: MaybeVersioned>(frame: &Frame<V>) {
@@ -24,57 +25,55 @@ fn report_frame<V: MaybeVersioned>(frame: &Frame<V>) {
     )
 }
 
-fn run(path: PathBuf) {
-    let writer = Node::try_from(
-        Node::builder()
-            .system_id(17)
-            .component_id(42)
-            .version(V2)
-            .dialect::<Minimal>()
-            .connection(FileWriter::new(path.as_path()).unwrap()),
-    )
-    .unwrap();
-
+async fn run(path: PathBuf) {
+    let writer = Node::builder()
+        .version(V2)
+        .dialect::<Minimal>()
+        .system_id(17)
+        .component_id(42)
+        .async_connection(FileWriter::new(path.as_path()).unwrap())
+        .build()
+        .await
+        .unwrap();
     log::warn!("[writer] started");
-    wait();
+
     for _ in 0..N_ITER {
         writer
             .send(&dialect::messages::Heartbeat::default())
             .unwrap();
     }
     drop(writer);
-    wait();
     log::warn!("[writer] finished");
 
-    let reader = Node::try_from(
-        Node::builder()
-            .system_id(17)
-            .component_id(42)
-            .version(V2)
-            .dialect::<Minimal>()
-            .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-            .connection(FileReader::new(path.as_path()).unwrap()),
-    )
-    .unwrap();
+    let reader = Node::builder()
+        .version(V2)
+        .dialect::<Minimal>()
+        .system_id(17)
+        .component_id(42)
+        .heartbeat_timeout(HEARTBEAT_TIMEOUT)
+        .async_connection(FileReader::new(path.as_path()).unwrap())
+        .build()
+        .await
+        .unwrap();
+    log::warn!("[reader] started");
 
-    for event in reader.events() {
+    let mut events = reader.events().unwrap();
+    while let Some(event) = events.next().await {
         match event {
             Event::NewPeer(peer) => log::warn!("[reader] new peer: {peer:?}"),
             Event::Frame(frame, _) => report_frame(&frame),
             Event::PeerLost(peer) => {
                 log::warn!("[reader] disconnected: {peer:?}");
-                if !reader.has_peers() {
-                    log::warn!("[reader] all peers disconnected, exiting");
-                    break;
-                }
+                break;
             }
         }
     }
 
-    wait();
+    log::warn!("[reader] finished");
 }
 
-fn main() {
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
     // Setup logger
     env_logger::builder()
         .filter_level(log::LevelFilter::Info) // Suppress everything below `info` for third-party modules.
@@ -85,21 +84,21 @@ fn main() {
     if path.exists() {
         remove_file(path.as_path()).unwrap();
     }
-    run(path);
+    run(path).await;
 }
 
 #[cfg(test)]
-#[test]
-fn file_rw() {
-    let path = PathBuf::from("/tmp/maviola_file_rw.bin");
+#[tokio::test]
+async fn file_rw() {
+    let path = PathBuf::from("/tmp/maviola_async_file_rw.bin");
     if path.exists() {
         remove_file(path.as_path()).unwrap();
     }
-    let handler = thread::spawn(move || {
-        run(path);
+    let handler = tokio::spawn(async move {
+        run(path).await;
     });
 
-    thread::sleep(Duration::from_secs(5));
+    tokio::time::sleep(Duration::from_secs(5)).await;
     if !handler.is_finished() {
         panic!("[file_rw] test took too long")
     }

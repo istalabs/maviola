@@ -1,9 +1,20 @@
-//! # AsyncConnection and channels
+//! # Asynchronous I/O primitives
 //!
-//! This module contains abstractions for connections and channels. [`AsyncConnection`] represents an
-//! interface to an underlying transport, while [`AsyncChannel`] is an individual stream withing a
-//! connection. Connections are created by implementors of [`AsyncConnectionBuilder`] trait and channels
-//! are constructed by [`AsyncChannelFactory`] which is bounded to a particular connection.
+//! ## Transport
+//!
+//! The following transports are currently available:
+//!
+//! * TCP: [`TcpServer`] / [`TcpClient`]
+//!
+//! ## Connections & Channels
+//!
+//! > ⚠ This part of the API allows to create custom transports. It is still considered experimental
+//! > and available only under the `unstable` feature (such entities are marked with <sup>`⍚`</sup>).
+//!
+//! I/O is based on two main abstraction: connections and channels. [`Connection`] represents an
+//! interface to an underlying transport, while [`Channel`] is an individual stream withing a
+//! connection. Connections are created by implementors of [`ConnectionBuilder`] trait and channels
+//! are constructed by [`ChannelFactory`] which is bounded to a particular connection.
 //!
 //! In most cases channels and connections are hidden to library user. Dealing with these
 //! abstractions is necessary only to those who are interested in creating custom connections.
@@ -14,10 +25,24 @@ mod connection;
 mod transport;
 mod types;
 
-pub use callback::AsyncCallback;
-pub use channel::{AsyncChannel, AsyncChannelFactory};
-pub use connection::{AsyncConnection, AsyncConnectionBuilder};
-pub use transport::{AsyncTcpClient, AsyncTcpServer};
-pub use types::{AsyncFrameProducer, AsyncFrameReceiver, AsyncFrameSendHandler, AsyncFrameSender};
+pub use callback::Callback;
+pub use transport::{FileReader, FileWriter, TcpClient, TcpServer};
 
-pub(crate) use connection::{AsyncConnReceiver, AsyncConnSender};
+/// <sup>`⍚` |</sup>
+#[cfg(feature = "unstable")]
+pub use channel::{Channel, ChannelFactory};
+/// <sup>`⍚` |</sup>
+#[cfg(feature = "unstable")]
+pub use connection::{Connection, ConnectionBuilder};
+/// <sup>`⍚` |</sup>
+#[cfg(feature = "unstable")]
+pub use types::{FrameProducer, FrameReceiver, FrameSendHandler, FrameSender};
+
+#[cfg(not(feature = "unstable"))]
+pub(crate) use channel::{Channel, ChannelFactory};
+#[cfg(not(feature = "unstable"))]
+pub(crate) use connection::{Connection, ConnectionBuilder};
+#[cfg(not(feature = "unstable"))]
+pub(crate) use types::{FrameProducer, FrameReceiver, FrameSendHandler, FrameSender};
+
+pub(crate) use connection::{ConnReceiver, ConnSender};

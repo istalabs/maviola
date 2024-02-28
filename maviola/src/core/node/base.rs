@@ -14,55 +14,70 @@ use crate::prelude::*;
 
 /// MAVLink node.
 ///
+/// A node is a member of a MAVLink network that manages I/O connection and provides interface for
+/// communicating with other MAVLink devices. [`Node`] is API-agnostic, both synchronous and
+/// asynchronous API extend its functionality with specific methods and behavior relevant to the
+/// underlying concurrency model. Asynchronous API is based on [Tokio](https://tokio.rs).
+///
+/// There are two fundamental kinds of a node defined by [`NodeKind`] generic parameter:
+///
+/// * Edge node ([`asnc::node::EdgeNode`](crate::asnc::node::EdgeNode) /
+///   [`sync::node::EdgeNode`](crate::sync::node::EdgeNode)) is a MAVlink device with defined system
+///   `ID` and component `ID`. It can send and receive MAVLink messages, emit automatic heartbeats
+///   and perform other active tasks. This is the kind of node you are mostly interested in.
+/// * Proxy node ([`asnc::node::ProxyNode`](crate::asnc::node::ProxyNode) /
+///   [`sync::node::ProxyNode`](crate::sync::node::ProxyNode)), on the other hand, does not have a
+///   specified `ID` and component `ID`. It only can receive and proxy MAVLink frames. This node
+///   can't perform active tasks and is used to pass frames between different parts of a MAVLink
+///   network.
+///
 /// # Examples
 ///
-/// Create a TCP server node:
+/// Create a synchronous TCP server node:
 ///
-/// ```rust
-/// # #[cfg(feature = "sync")]
-/// # {
+/// ```no_run
 /// use maviola::prelude::*;
 /// use maviola::sync::prelude::*;
-/// # use maviola::protocol::Peer;
-/// # use portpicker::pick_unused_port;
 ///
 /// let addr = "127.0.0.1:5600";
-/// # let addr = format!("127.0.0.1:{}", pick_unused_port().unwrap());
 ///
-/// // Create a node from configuration.
-/// let mut node = Node::try_from(
-///     Node::builder()
-///         .version(V2)                // restrict node to MAVLink2 protocol version
-///         .system_id(1)               // System `ID`
-///         .component_id(1)            // Component `ID`
-///         .dialect::<Minimal>()       // Dialect is set to `minimal`
-///         .connection(
-///             TcpServer::new(addr)    // Configure TCP server connection
-///                 .unwrap()
-///         )
-/// ).unwrap();
+/// // Create a node from configuration
+/// let mut node = Node::builder()
+///     .version(V2)                // restrict node to MAVLink2 protocol version
+///     .system_id(1)               // System `ID`
+///     .component_id(1)            // Component `ID`
+///     .dialect::<Minimal>()       // Dialect is set to `minimal`
+///     .connection(
+///         TcpServer::new(addr)    // Configure TCP server connection
+///             .unwrap()
+///     ).build().unwrap();
 ///
-/// // Activate node to start sending heartbeats.
+/// // Activate node to start sending heartbeats
 /// node.activate().unwrap();
-/// # struct __Struct(); impl __Struct { fn events(&self) -> Vec<Event<V2>> { vec![Event::NewPeer(Peer::new(0, 0))] } }
-/// # let node = __Struct();
+/// ```
 ///
-/// for event in node.events() {
-///     match event {
-///         Event::NewPeer(peer) => {
-///             /* handle a new peer */
-/// #           drop(peer);
-///         }
-///         Event::PeerLost(peer) => {
-///             /* handle a peer, that becomes inactive */
-/// #           drop(peer);
-///         }
-///         Event::Frame(frame, res) => {
-///             // Send back any incoming frame directly to sender.
-///             res.respond(&frame).unwrap();
-///         }
-///     }
-/// }
+/// Create an asynchronous TCP server node:
+///
+/// ```no_run
+/// # #[tokio::main(flavor = "current_thread")] async fn main() {
+/// use maviola::prelude::*;
+/// use maviola::asnc::prelude::*;
+///
+/// let addr = "127.0.0.1:5600";
+///
+/// // Create a node from configuration
+/// let mut node = Node::builder()
+///     .version(V2)                // restrict node to MAVLink2 protocol version
+///     .system_id(1)               // System `ID`
+///     .component_id(1)            // Component `ID`
+///     .dialect::<Minimal>()       // Dialect is set to `minimal`
+///     .async_connection(
+///         TcpServer::new(addr)    // Configure TCP server connection
+///             .unwrap()
+///     ).build().await.unwrap();
+///
+/// // Activate node to start sending heartbeats
+/// node.activate().await.unwrap();
 /// # }
 /// ```
 pub struct Node<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> {
@@ -89,13 +104,6 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> Node<K
         self.api.info()
     }
 
-    /// Returns `true` if node has connected MAVLink peers.
-    ///
-    /// Disconnected node will always return `false`.
-    pub fn has_peers(&self) -> bool {
-        self.api.has_peers()
-    }
-
     /// Heartbeat timeout.
     ///
     /// For peers that overdue to send the next heartbeat within this interval will be considered
@@ -116,7 +124,6 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> Node<K
 }
 
 impl<D: Dialect, V: Versioned + 'static, A: NodeApi<V>> Node<Edge<V>, D, V, A> {
-    /// <sup>[`sync`](crate::sync)</sup>
     /// Send MAVLink message.
     ///
     /// The message will be encoded according to the node's dialect specification and MAVLink

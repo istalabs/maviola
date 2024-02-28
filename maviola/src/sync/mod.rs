@@ -1,10 +1,10 @@
-//! # Maviola synchronous I/O
+//! # Maviola synchronous API
 //!
-//! Synchronous API is built around MAVlink [`Node`]. Upon construction, each node operates on a
-//! particular connection. The latter is owned by a node and defines underlying transport (e.g. TCP,
-//! UDP, Unix socket). Each connection spawns one or several channels. For example, TCP server
-//! creates a channel per each incoming connection. Abstractions related to channels and connections
-//! are defined in the [`io`] module.
+//! Synchronous API is built around MAVlink [`Node`] with [`SyncApi`]. Upon construction, each node
+//! operates on a particular connection. The latter is owned by a node and defines underlying
+//! transport (e.g. TCP, UDP, Unix socket). Each connection spawns one or several channels. For
+//! example, TCP server creates a channel per each incoming connection. Abstractions related to
+//! channels and connections are defined in the [`io`] module.
 //!
 //! Available transports:
 //!
@@ -19,9 +19,9 @@
 //!
 //! ## Events
 //!
-//! The suggested approach for handling several MAVLink devices, is to use
+//! The suggested approach for handling several MAVLink devices is subscribing for
 //! [`Node::events`]. This method provides an iterator over all node events. Incoming frames are
-//! emitted as [`Event::Frame`]. Such events contain a [`Frame`] / [`Callback`] pair The latter can
+//! emitted as [`Event::Frame`]. Such events contain a [`Frame`] / [`Callback`] pair. The latter can
 //! be used to respond to a channel from which frame was received or broadcast it to all channels
 //! (or, alternatively, to all channels except the one which delivered the original frame).
 //!
@@ -60,4 +60,8 @@ pub mod io;
 pub mod marker;
 pub mod node;
 pub mod prelude;
+
+#[cfg(not(feature = "unstable"))]
+pub(crate) mod utils;
+#[cfg(feature = "unstable")]
 pub mod utils;

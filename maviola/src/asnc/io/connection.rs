@@ -4,50 +4,50 @@ use std::sync::mpsc;
 use async_trait::async_trait;
 
 use crate::asnc::consts::CONN_BROADCAST_CHAN_CAPACITY;
-use crate::asnc::io::{AsyncCallback, AsyncChannelFactory, AsyncFrameReceiver, AsyncFrameSender};
+use crate::asnc::io::{Callback, ChannelFactory, FrameReceiver, FrameSender};
 use crate::core::io::{ConnectionInfo, OutgoingFrame};
 use crate::core::utils::{Closable, SharedCloser};
 
 use crate::prelude::*;
 
 /// <sup>[`async`](crate::asnc)</sup>
-/// Connection builder used to create a [`AsyncConnection`].
+/// Connection builder used to create a [`Connection`].
 #[async_trait]
-pub trait AsyncConnectionBuilder<V: MaybeVersioned + 'static>: Debug + Send {
+pub trait ConnectionBuilder<V: MaybeVersioned + 'static>: Debug + Send {
     /// Provides information about connection.
     fn info(&self) -> &ConnectionInfo;
 
-    /// Builds [`AsyncConnection`] from provided configuration.
-    async fn build(&self) -> Result<AsyncConnection<V>>;
+    /// Builds [`Connection`] from provided configuration.
+    async fn build(&self) -> Result<Connection<V>>;
 }
 
 /// <sup>[`async`](crate::asnc)</sup>
 /// Asynchronous MAVLink connection.
 #[derive(Debug)]
-pub struct AsyncConnection<V: MaybeVersioned + 'static> {
+pub struct Connection<V: MaybeVersioned + 'static> {
     info: ConnectionInfo,
-    sender: AsyncConnSender<V>,
-    receiver: AsyncConnReceiver<V>,
+    sender: ConnSender<V>,
+    receiver: ConnReceiver<V>,
     state: SharedCloser,
 }
 
-impl<V: MaybeVersioned> AsyncConnection<V> {
-    /// Creates a new connection and associated [`AsyncChannelFactory`].
-    pub fn new(info: ConnectionInfo, state: SharedCloser) -> (Self, AsyncChannelFactory<V>) {
+impl<V: MaybeVersioned> Connection<V> {
+    /// Creates a new connection and associated [`ChannelFactory`].
+    pub fn new(info: ConnectionInfo, state: SharedCloser) -> (Self, ChannelFactory<V>) {
         let (sender, send_handler) = broadcast::channel(CONN_BROADCAST_CHAN_CAPACITY);
         let (producer, receiver) = broadcast::channel(CONN_BROADCAST_CHAN_CAPACITY);
 
         let connection = Self {
             info,
-            sender: AsyncConnSender {
+            sender: ConnSender {
                 state: state.to_closable(),
                 sender: sender.clone(),
             },
-            receiver: AsyncConnReceiver { receiver },
+            receiver: ConnReceiver { receiver },
             state,
         };
 
-        let builder = AsyncChannelFactory {
+        let builder = ChannelFactory {
             info: connection.info.clone(),
             state: connection.state.to_closable(),
             sender,
@@ -73,35 +73,38 @@ impl<V: MaybeVersioned> AsyncConnection<V> {
     ///
     /// Await until frame received.
     #[inline]
-    pub async fn recv(&mut self) -> Result<(Frame<V>, AsyncCallback<V>)> {
+    pub async fn recv(&mut self) -> Result<(Frame<V>, Callback<V>)> {
         self.receiver.recv().await
     }
 
     /// Attempts to receive MAVLink frame without blocking.
     #[inline]
-    pub fn try_recv(&mut self) -> Result<(Frame<V>, AsyncCallback<V>)> {
+    pub fn try_recv(&mut self) -> Result<(Frame<V>, Callback<V>)> {
         self.receiver.try_recv()
     }
 
-    /// Close connection.
-    pub fn close(&mut self) {
+    pub(crate) fn share_state(&self) -> SharedCloser {
+        self.state.clone()
+    }
+
+    pub(crate) fn sender(&self) -> ConnSender<V> {
+        self.sender.clone()
+    }
+
+    pub(crate) fn receiver(&self) -> ConnReceiver<V> {
+        self.receiver.clone()
+    }
+
+    fn close(&mut self) {
         if self.state.is_closed() {
             return;
         }
         self.state.close();
         log::debug!("[{:?}] connection closed", self.info);
     }
-
-    pub(crate) fn sender(&self) -> AsyncConnSender<V> {
-        self.sender.clone()
-    }
-
-    pub(crate) fn receiver(&self) -> AsyncConnReceiver<V> {
-        self.receiver.clone()
-    }
 }
 
-impl<V: MaybeVersioned> Drop for AsyncConnection<V> {
+impl<V: MaybeVersioned> Drop for Connection<V> {
     fn drop(&mut self) {
         self.close();
     }
@@ -112,12 +115,12 @@ impl<V: MaybeVersioned> Drop for AsyncConnection<V> {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug)]
-pub(crate) struct AsyncConnSender<V: MaybeVersioned + 'static> {
-    sender: AsyncFrameSender<V>,
+pub(crate) struct ConnSender<V: MaybeVersioned + 'static> {
+    sender: FrameSender<V>,
     state: Closable,
 }
 
-impl<V: MaybeVersioned> AsyncConnSender<V> {
+impl<V: MaybeVersioned> ConnSender<V> {
     pub(crate) fn send(&self, frame: &Frame<V>) -> Result<usize> {
         if self.state.is_closed() {
             return Err(Error::from(mpsc::SendError(frame)));
@@ -130,11 +133,11 @@ impl<V: MaybeVersioned> AsyncConnSender<V> {
 }
 
 #[derive(Debug)]
-pub(crate) struct AsyncConnReceiver<V: MaybeVersioned + 'static> {
-    receiver: AsyncFrameReceiver<V>,
+pub(crate) struct ConnReceiver<V: MaybeVersioned + 'static> {
+    receiver: FrameReceiver<V>,
 }
 
-impl<V: MaybeVersioned + 'static> Clone for AsyncConnReceiver<V> {
+impl<V: MaybeVersioned + 'static> Clone for ConnReceiver<V> {
     fn clone(&self) -> Self {
         Self {
             receiver: self.receiver.resubscribe(),
@@ -142,12 +145,12 @@ impl<V: MaybeVersioned + 'static> Clone for AsyncConnReceiver<V> {
     }
 }
 
-impl<V: MaybeVersioned> AsyncConnReceiver<V> {
-    pub(crate) async fn recv(&mut self) -> Result<(Frame<V>, AsyncCallback<V>)> {
+impl<V: MaybeVersioned> ConnReceiver<V> {
+    pub(crate) async fn recv(&mut self) -> Result<(Frame<V>, Callback<V>)> {
         self.receiver.recv().await.map_err(Error::from)
     }
 
-    pub(crate) fn try_recv(&mut self) -> Result<(Frame<V>, AsyncCallback<V>)> {
+    pub(crate) fn try_recv(&mut self) -> Result<(Frame<V>, Callback<V>)> {
         self.receiver.try_recv().map_err(Error::from)
     }
 }

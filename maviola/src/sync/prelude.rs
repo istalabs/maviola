@@ -1,4 +1,4 @@
-//! # Common imports for synchronous I/O.
+//! # Common imports for synchronous API
 
 pub use crate::sync::io::Callback;
 pub use crate::sync::io::{FileReader, FileWriter, TcpClient, TcpServer, UdpClient, UdpServer};

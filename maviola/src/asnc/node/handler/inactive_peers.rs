@@ -4,7 +4,7 @@ use std::time::{Duration, SystemTime};
 
 use tokio::sync::RwLock;
 
-use crate::asnc::node::AsyncEvent;
+use crate::asnc::node::Event;
 use crate::core::io::ConnectionInfo;
 use crate::core::utils::Closable;
 use crate::protocol::Peer;
@@ -15,7 +15,7 @@ pub(in crate::asnc::node) struct InactivePeersHandler<V: MaybeVersioned> {
     pub(in crate::asnc::node) info: ConnectionInfo,
     pub(in crate::asnc::node) peers: Arc<RwLock<HashMap<MavLinkId, Peer>>>,
     pub(in crate::asnc::node) timeout: Duration,
-    pub(in crate::asnc::node) events_tx: broadcast::Sender<AsyncEvent<V>>,
+    pub(in crate::asnc::node) events_tx: broadcast::Sender<Event<V>>,
 }
 
 impl<V: MaybeVersioned + 'static> InactivePeersHandler<V> {
@@ -45,7 +45,7 @@ impl<V: MaybeVersioned + 'static> InactivePeersHandler<V> {
 
                     for id in inactive_peers {
                         if let Some(peer) = peers.remove(&id) {
-                            if let Err(err) = self.events_tx.send(AsyncEvent::PeerLost(peer)) {
+                            if let Err(err) = self.events_tx.send(Event::PeerLost(peer)) {
                                 log::trace!("[{info:?}] failed to report lost peer event: {err}");
                                 break;
                             }

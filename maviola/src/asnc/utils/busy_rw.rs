@@ -1,8 +1,10 @@
-//! # Busy reader and writer
+//! # Asynchronous busy reader and writer
 //!
-//! Implementation for [`Read`] and [`Write`] that always returns [`ErrorKind::TimedOut`].
+//! Implementation for [`AsyncRead`] and [`AsyncWrite`] that always returns [`ErrorKind::TimedOut`].
 
-use std::io::{Error, ErrorKind, Read, Write};
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use tokio::io::{AsyncRead, AsyncWrite, Error, ErrorKind, ReadBuf};
 
 /// <sup>`⍚` | [`sync`](crate::sync)</sup>
 /// Reader that always returns a time-out error.
@@ -14,29 +16,21 @@ use std::io::{Error, ErrorKind, Read, Write};
 /// The writer counterpart is [`BusyWriter`].
 pub struct BusyReader;
 
-impl Read for BusyReader {
+impl AsyncRead for BusyReader {
     /// Always returns an error.
     ///
     /// # Errors
     ///
     /// Returns [`ErrorKind::TimedOut`] for all reading attempts.
-    fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
-        Err(Error::new(
+    fn poll_read(
+        self: Pin<&mut Self>,
+        _: &mut Context<'_>,
+        _: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        Poll::Ready(Err(Error::new(
             ErrorKind::TimedOut,
             "attempt to read from BusyReader",
-        ))
-    }
-
-    /// Always returns an error.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ErrorKind::TimedOut`] for all reading attempts.
-    fn read_exact(&mut self, _: &mut [u8]) -> std::io::Result<()> {
-        Err(Error::new(
-            ErrorKind::TimedOut,
-            "attempt to read from BusyReader",
-        ))
+        )))
     }
 }
 
@@ -50,30 +44,35 @@ impl Read for BusyReader {
 /// The reader counterpart is [`BusyReader`].
 pub struct BusyWriter;
 
-impl Write for BusyWriter {
-    /// Always returns a timed-out error.
+impl AsyncWrite for BusyWriter {
+    /// Always returns an error.
     ///
     /// # Errors
     ///
     /// Returns [`ErrorKind::TimedOut`] for all writing attempts.
-    fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
-        Err(Error::new(
+    fn poll_write(
+        self: Pin<&mut Self>,
+        _: &mut Context<'_>,
+        _: &[u8],
+    ) -> Poll<Result<usize, Error>> {
+        Poll::Ready(Err(Error::new(
             ErrorKind::TimedOut,
             "attempt to write to BusyWriter",
-        ))
+        )))
     }
 
     /// Flush this output stream, ensuring that all intermediately buffered contents reach their destination.
     ///
     /// Always returns [`Ok`] since [`BusyWriter`] never actually writes.
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
+    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Error>> {
+        Poll::Ready(Ok(()))
     }
 
-    fn by_ref(&mut self) -> &mut Self
-    where
-        Self: Sized,
-    {
-        self
+    /// Initiates or attempts to shut down this writer, returning success when the I/O connection
+    /// has completely shut down.
+    ///
+    /// Always returns [`Ok`] since [`BusyWriter`] is never connected.
+    fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Error>> {
+        Poll::Ready(Ok(()))
     }
 }

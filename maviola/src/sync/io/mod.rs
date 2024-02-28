@@ -1,4 +1,4 @@
-//! # Synchronous I/O
+//! # Synchronous I/O primitives
 //!
 //! ## Transport
 //!
@@ -10,6 +10,9 @@
 //! * Unix socket: [`SockServer`] / [`SockClient`] (only on Unix-like systems such as Linux or OS X)
 //!
 //! ## Connections & Channels
+//!
+//! > ⚠ This part of the API allows to create custom transports. It is still considered experimental
+//! > and available only under the `unstable` feature (such entities are marked with <sup>`⍚`</sup>).
 //!
 //! I/O is based on two main abstraction: connections and channels. [`Connection`] represents an
 //! interface to an underlying transport, while [`Channel`] is an individual stream withing a
@@ -26,11 +29,25 @@ mod transport;
 mod types;
 
 pub use callback::Callback;
-pub use channel::{Channel, ChannelFactory};
-pub use connection::{Connection, ConnectionBuilder};
 pub use transport::{FileReader, FileWriter, TcpClient, TcpServer, UdpClient, UdpServer};
 #[cfg(unix)]
 pub use transport::{SockClient, SockServer};
+
+/// <sup>`⍚` |</sup>
+#[cfg(feature = "unstable")]
+pub use channel::{Channel, ChannelFactory};
+/// <sup>`⍚` |</sup>
+#[cfg(feature = "unstable")]
+pub use connection::{Connection, ConnectionBuilder};
+/// <sup>`⍚` |</sup>
+#[cfg(feature = "unstable")]
 pub use types::{FrameProducer, FrameReceiver, FrameSendHandler, FrameSender};
+
+#[cfg(not(feature = "unstable"))]
+pub(crate) use channel::{Channel, ChannelFactory};
+#[cfg(not(feature = "unstable"))]
+pub(crate) use connection::{Connection, ConnectionBuilder};
+#[cfg(not(feature = "unstable"))]
+pub(crate) use types::{FrameProducer, FrameReceiver, FrameSendHandler, FrameSender};
 
 pub(crate) use connection::{ConnReceiver, ConnSender};

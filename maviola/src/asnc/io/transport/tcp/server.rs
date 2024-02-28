@@ -3,7 +3,7 @@ use std::net::{SocketAddr, ToSocketAddrs};
 use async_trait::async_trait;
 use tokio::net::TcpListener;
 
-use crate::asnc::io::{AsyncConnection, AsyncConnectionBuilder};
+use crate::asnc::io::{Connection, ConnectionBuilder};
 use crate::asnc::utils::handle_listener_stop;
 use crate::core::io::{ChannelInfo, ConnectionInfo};
 use crate::core::utils::net::resolve_socket_addr;
@@ -21,14 +21,14 @@ use crate::prelude::*;
 /// [`Callback::respond_others`](crate::sync::io::Callback::respond_others) to control which
 /// channels receive response messages.
 ///
-/// Use [`TcpClientConf`](super::client::AsyncTcpClient) to create a TCP client node.
+/// Use [`TcpClientConf`](super::client::TcpClient) to create a TCP client node.
 #[derive(Clone, Debug)]
-pub struct AsyncTcpServer {
+pub struct TcpServer {
     addr: SocketAddr,
     info: ConnectionInfo,
 }
 
-impl AsyncTcpServer {
+impl TcpServer {
     /// Instantiates a TCP server configuration.
     ///
     /// Accepts as `addr` anything that implements [`ToSocketAddrs`], prefers IPv4 addresses if
@@ -41,18 +41,17 @@ impl AsyncTcpServer {
 }
 
 #[async_trait]
-impl<V: MaybeVersioned + 'static> AsyncConnectionBuilder<V> for AsyncTcpServer {
+impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpServer {
     fn info(&self) -> &ConnectionInfo {
         &self.info
     }
 
-    async fn build(&self) -> Result<AsyncConnection<V>> {
+    async fn build(&self) -> Result<Connection<V>> {
         let server_addr = self.addr;
         let listener = TcpListener::bind(self.addr).await?;
 
         let conn_state = Closer::new();
-        let (connection, peer_builder) =
-            AsyncConnection::new(self.info.clone(), conn_state.to_shared());
+        let (connection, chan_factory) = Connection::new(self.info.clone(), conn_state.to_shared());
 
         let handler: tokio::task::JoinHandle<Result<Closer>> = tokio::spawn(async move {
             loop {
@@ -64,7 +63,7 @@ impl<V: MaybeVersioned + 'static> AsyncConnectionBuilder<V> for AsyncTcpServer {
 
                 let (reader, writer) = stream.into_split();
 
-                let peer_connection = peer_builder.build(
+                let channel = chan_factory.build(
                     ChannelInfo::TcpServer {
                         server_addr,
                         peer_addr,
@@ -72,7 +71,7 @@ impl<V: MaybeVersioned + 'static> AsyncConnectionBuilder<V> for AsyncTcpServer {
                     reader,
                     writer,
                 );
-                peer_connection.spawn().await.discard();
+                channel.spawn().await.discard();
             }
         });
 

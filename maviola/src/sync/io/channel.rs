@@ -82,7 +82,6 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
     ///
     /// If caller is not interested in managing this channel, then it is required to drop returned
     /// [`SharedCloser`] or replace it with the corresponding [`Closable`].
-    #[must_use]
     pub fn spawn(self) -> SharedCloser {
         let id = UniqueId::new();
         let info = Arc::new(self.info);

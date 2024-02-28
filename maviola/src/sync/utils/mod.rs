@@ -1,4 +1,11 @@
-//! # Synchronous I/O utils
+//! # <sup>`⍚`</sup> Synchronous utils
+//!
+//! > ⚠ This part of the API is exposed for those who want to implement [`ConnectionBuilder`] and
+//! > create custom connections. It is still considered experimental and available only under
+//! > `unstable` feature being enabled.
+
+#[cfg(doc)]
+use crate::sync::io::ConnectionBuilder;
 
 mod busy_rw;
 mod handlers;

@@ -24,18 +24,23 @@ path = "src/lib.rs"
 # Dependencies
 ###########################################################
 [dependencies]
-async-trait = { version = "0.1.77", optional = true }
 log = "0.4.20"
 mavio = { version = "0.2.0-rc2", path = "../../mavio/mavio", features = ["extras"] }
 portpicker = "0.1.1"
 serde = { version = "1.0.193", default-features = false, features = ["derive"], optional = true }
 serde_arrays = { version = "0.1.0", default-features = false, optional = true }
-tokio = { version = "1.36.0", default-features = false, features = ["sync", "rt", "net", "io-util", "time"], optional = true }
 thiserror = "1.0.56"
+
+# Async dependencies
+async-stream = { version = "0.3.5", optional = true }
+async-trait = { version = "0.1.77", optional = true }
+tokio = { version = "1.36.0", default-features = false, features = ["sync", "rt", "net", "fs", "io-util", "time"], optional = true }
+tokio-stream = { version = "0.1.14", features = ["sync"], optional = true }
+tokio-util = { version = "0.7.10", optional = true }
 
 [dev-dependencies]
 env_logger = "0.11.1"
-tokio = { version = "1.36.0", default-features = false, features = ["sync", "rt", "net", "io-util", "time", "test-util", "macros"] }
+tokio = { version = "1.36.0", default-features = false, features = ["sync", "rt", "rt-multi-thread", "net", "fs", "io-util", "time", "test-util", "macros"] }
 
 ###########################################################
 # Features
@@ -47,8 +52,11 @@ default = ["minimal", "sync", "async"]
 sync = []
 ## Enables asynchromous API via Tokio.
 async = [
-    "dep:tokio",
+    "dep:async-stream",
     "dep:async-trait",
+    "dep:tokio",
+    "dep:tokio-stream",
+    "dep:tokio-util",
     "mavio/tokio"
 ]
 ## Enables serde support.
@@ -137,6 +145,11 @@ required-features = ["sync"]
 name = "async_tcp_ping_pong"
 test = true
 required-features = ["async"]
+
+[[example]]
+name = "async_file_rw"
+test = true
+required-features = ["sync"]
 
 ###########################################################
 # Metadata

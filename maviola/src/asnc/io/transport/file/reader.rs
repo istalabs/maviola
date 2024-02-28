@@ -1,15 +1,17 @@
-use std::fs::File;
-use std::io::BufReader;
+use async_trait::async_trait;
 use std::path::{Path, PathBuf};
 
+use tokio::fs::File;
+use tokio::io::BufReader;
+
+use crate::asnc::io::{Connection, ConnectionBuilder};
+use crate::asnc::utils::BusyWriter;
 use crate::core::io::{ChannelInfo, ConnectionInfo};
 use crate::core::utils::SharedCloser;
-use crate::sync::io::{Connection, ConnectionBuilder};
-use crate::sync::utils::BusyWriter;
 
 use crate::prelude::*;
 
-/// <sup>[`sync`](crate::sync)</sup>
+/// <sup>[`async`](crate::asnc)</sup>
 /// Reads binary stream from existing file.
 ///
 /// Nodes built with [`FileReader`] can't perform write actions.
@@ -68,23 +70,24 @@ impl FileReader {
     }
 }
 
+#[async_trait]
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for FileReader {
     fn info(&self) -> &ConnectionInfo {
         &self.info
     }
 
-    fn build(&self) -> Result<Connection<V>> {
+    async fn build(&self) -> Result<Connection<V>> {
         let path = self.path.clone();
-        let file = File::open(path.as_path())?;
+        let file = File::open(path.as_path()).await?;
 
         let writer = BusyWriter;
         let reader = BufReader::new(file);
 
         let conn_state = SharedCloser::new();
-        let (connection, peer_builder) = Connection::new(self.info.clone(), conn_state);
+        let (connection, chan_factory) = Connection::new(self.info.clone(), conn_state);
 
-        let peer_connection = peer_builder.build(ChannelInfo::FileReader { path }, reader, writer);
-        peer_connection.spawn().discard();
+        let channel = chan_factory.build(ChannelInfo::FileReader { path }, reader, writer);
+        channel.spawn().await.discard();
 
         Ok(connection)
     }

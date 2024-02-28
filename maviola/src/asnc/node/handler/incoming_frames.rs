@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
-use crate::asnc::io::AsyncConnReceiver;
-use crate::asnc::node::AsyncEvent;
+use crate::asnc::io::ConnReceiver;
+use crate::asnc::node::Event;
 use crate::core::io::ConnectionInfo;
 use crate::core::utils::Closable;
 use crate::protocol::Peer;
@@ -14,8 +14,8 @@ use crate::prelude::*;
 pub(in crate::asnc::node) struct IncomingFramesHandler<V: MaybeVersioned + 'static> {
     pub(in crate::asnc::node) info: ConnectionInfo,
     pub(in crate::asnc::node) peers: Arc<RwLock<HashMap<MavLinkId, Peer>>>,
-    pub(in crate::asnc::node) receiver: AsyncConnReceiver<V>,
-    pub(in crate::asnc::node) events_tx: broadcast::Sender<AsyncEvent<V>>,
+    pub(in crate::asnc::node) receiver: ConnReceiver<V>,
+    pub(in crate::asnc::node) events_tx: broadcast::Sender<Event<V>>,
 }
 
 impl<V: MaybeVersioned + 'static> IncomingFramesHandler<V> {
@@ -49,7 +49,7 @@ impl<V: MaybeVersioned + 'static> IncomingFramesHandler<V> {
                         peers.insert(peer.id, peer.clone());
 
                         if !has_peer {
-                            if let Err(err) = self.events_tx.send(AsyncEvent::NewPeer(peer)) {
+                            if let Err(err) = self.events_tx.send(Event::NewPeer(peer)) {
                                 log::trace!("[{info:?}] failed to report new peer event: {err}");
                                 return;
                             }
@@ -57,10 +57,7 @@ impl<V: MaybeVersioned + 'static> IncomingFramesHandler<V> {
                     }
                 }
 
-                if let Err(err) = self
-                    .events_tx
-                    .send(AsyncEvent::Frame(frame.clone(), response))
-                {
+                if let Err(err) = self.events_tx.send(Event::Frame(frame.clone(), response)) {
                     log::trace!("[{info:?}] failed to report incoming frame event: {err}");
                     return;
                 }
