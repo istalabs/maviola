@@ -11,6 +11,10 @@ pub use crate::protocol::{
     Versionless, V1, V2,
 };
 
+pub use crate::core::io::{FileReader, FileWriter, TcpClient, TcpServer, UdpClient, UdpServer};
+#[cfg(unix)]
+pub use crate::core::io::{SockClient, SockServer};
+
 #[cfg(feature = "sync")]
 pub(crate) use crate::sync::utils::mpmc;
 

@@ -1,8 +1,7 @@
 use std::os::unix::net::UnixListener;
-use std::path::{Path, PathBuf};
 use std::thread;
 
-use crate::core::io::{ChannelInfo, ConnectionInfo};
+use crate::core::io::ChannelInfo;
 use crate::core::utils::Closer;
 use crate::sync::consts::{SOCK_ACCEPT_INTERVAL, SOCK_READ_TIMEOUT, SOCK_WRITE_TIMEOUT};
 use crate::sync::io::{Connection, ConnectionBuilder};
@@ -10,78 +9,14 @@ use crate::sync::utils::handle_listener_stop;
 
 use crate::prelude::*;
 
-/// <sup>[`sync`](crate::sync)</sup>
-/// <sup>`unix`</sup>
-/// Unix socket server configuration.
-///
-/// Socket server creates a Unix socket on Unix-like systems and starts listening for incoming
-/// connections. Use [`SockClientConf`](super::client::SockClient) to create a Unix socket
-/// client node.
-///
-/// Each incoming connection will be considered as a separate channel. You can use
-/// [`Callback::respond`](crate::sync::io::Callback::respond) or
-/// [`Callback::respond_others`](crate::sync::io::Callback::respond_others) to control which channels
-/// receive response messages.
-///
-/// # Usage
-///
-/// Create a Unix-socket server node:
-///
-/// ```no_run
-/// use maviola::prelude::*;
-/// use maviola::sync::io::SockServer;
-///
-/// let path = "/tmp/maviola.sock";
-///
-/// // Create a Unix-socket server node
-/// let node = Node::builder()
-///         /* define other node parameters */
-/// #       .version(V2)
-/// #       .system_id(1)
-/// #       .component_id(1)
-///         .connection(
-///             SockServer::new(path)    // Configure socket server connection
-///                 .unwrap()
-///         ).build().unwrap();
-/// ```
-#[derive(Clone, Debug)]
-pub struct SockServer {
-    path: PathBuf,
-    info: ConnectionInfo,
-}
-
-impl SockServer {
-    /// Instantiates a Unix socket server configuration.
-    ///
-    /// Accepts as `path` anything that can be converted to [`PathBuf`], validates that path does
-    /// not exist.
-    pub fn new(path: impl Into<PathBuf>) -> Result<Self> {
-        let path: PathBuf = path.into();
-
-        if Path::exists(path.as_path()) {
-            return Err(Error::from(std::io::Error::new(
-                std::io::ErrorKind::AddrInUse,
-                format!("socket path already exists: {path:?}"),
-            )));
-        }
-
-        let info = ConnectionInfo::SockServer { path: path.clone() };
-        Ok(Self { path, info })
-    }
-}
-
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockServer {
-    fn info(&self) -> &ConnectionInfo {
-        &self.info
-    }
-
     fn build(&self) -> Result<Connection<V>> {
         let path = self.path.clone();
         let listener = UnixListener::bind(self.path.as_path())?;
         listener.set_nonblocking(true)?;
 
         let conn_state = Closer::new();
-        let (connection, peer_builder) = Connection::new(self.info.clone(), conn_state.to_shared());
+        let (connection, chan_factory) = Connection::new(self.info.clone(), conn_state.to_shared());
 
         let handler = thread::spawn(move || -> Result<Closer> {
             loop {
@@ -105,12 +40,12 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockServer {
                 writer.set_write_timeout(SOCK_WRITE_TIMEOUT)?;
                 reader.set_read_timeout(SOCK_READ_TIMEOUT)?;
 
-                let peer_connection = peer_builder.build(
+                let channel = chan_factory.build(
                     ChannelInfo::SockClient { path: path.clone() },
                     reader,
                     writer,
                 );
-                peer_connection.spawn().discard();
+                channel.spawn().discard();
             }
         });
 

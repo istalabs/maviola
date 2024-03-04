@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::sync::mpsc;
 
-use crate::core::io::{ConnectionInfo, OutgoingFrame};
+use crate::core::io::{ConnectionConf, ConnectionInfo, OutgoingFrame};
 use crate::core::utils::{Closable, SharedCloser};
 use crate::sync::io::{Callback, ChannelFactory, FrameReceiver, FrameSender};
 
@@ -9,10 +9,7 @@ use crate::prelude::*;
 
 /// <sup>[`sync`](crate::sync)</sup>
 /// Connection builder used to create a [`Connection`].
-pub trait ConnectionBuilder<V: MaybeVersioned>: Debug + Send {
-    /// Provides information about connection.
-    fn info(&self) -> &ConnectionInfo;
-
+pub trait ConnectionBuilder<V: MaybeVersioned>: ConnectionConf {
     /// Builds [`Connection`] from provided configuration.
     fn build(&self) -> Result<Connection<V>>;
 }

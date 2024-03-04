@@ -1,79 +1,22 @@
 use std::collections::HashMap;
-use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
+use std::net::{SocketAddr, UdpSocket};
 use std::sync::mpsc;
 use std::thread;
 
 use crate::core::io::{ChannelInfo, ConnectionInfo};
-use crate::core::utils::net::resolve_socket_addr;
 use crate::core::utils::{Closable, Closer};
 use crate::sync::io::{Connection, ConnectionBuilder};
 use crate::sync::utils::{handle_listener_stop, MpscReader, MpscWriter};
 
 use crate::prelude::*;
 
-/// <sup>[`sync`](crate::sync)</sup>
-/// TCP server configuration.
-///
-/// Provides connection configuration for a node that binds to a UDP port and communicates with
-/// remote UDP connections.
-///
-/// Each incoming connection will be considered as a separate channel. You can use
-/// [`Callback::respond`](crate::sync::io::Callback::respond) or
-/// [`Callback::respond_others`](crate::sync::io::Callback::respond_others) to control which channels
-/// receive response messages.
-///
-/// Use [`UdpClientConf`](super::client::UdpClient) to create a TCP client node.
-///
-/// # Usage
-///
-/// Create a UDP server node:
-///
-/// ```no_run
-/// use maviola::prelude::*;
-/// use maviola::sync::io::UdpServer;
-///
-/// let addr = "127.0.0.1:5600";
-///
-/// // Create a UDP server node
-/// let node = Node::builder()
-///         /* define other node parameters */
-/// #       .version(V2)
-/// #       .system_id(1)
-/// #       .component_id(1)
-///         .connection(
-///             UdpServer::new(addr)    // Configure UDP server connection
-///                 .unwrap()
-///         ).build().unwrap();
-/// ```
-#[derive(Clone, Debug)]
-pub struct UdpServer {
-    addr: SocketAddr,
-    info: ConnectionInfo,
-}
-
-impl UdpServer {
-    /// Instantiates a UDP server configuration.
-    ///
-    /// Accepts as `addr` anything that implements [`ToSocketAddrs`], prefers IPv4 addresses if
-    /// available.
-    pub fn new(addr: impl ToSocketAddrs) -> Result<Self> {
-        let addr = resolve_socket_addr(addr)?;
-        let info = ConnectionInfo::UdpServer { bind_addr: addr };
-        Ok(Self { addr, info })
-    }
-}
-
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServer {
-    fn info(&self) -> &ConnectionInfo {
-        &self.info
-    }
-
     fn build(&self) -> Result<Connection<V>> {
         let server_addr = self.addr;
         let udp_socket = UdpSocket::bind(server_addr)?;
 
         let conn_state = Closer::new();
-        let (connection, peer_builder) = Connection::new(self.info.clone(), conn_state.to_shared());
+        let (connection, chan_factory) = Connection::new(self.info.clone(), conn_state.to_shared());
 
         let handler = thread::spawn(move || -> Result<Closer> {
             let mut peers = HashMap::new();
@@ -98,7 +41,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServer {
                     let writer = MpscWriter::new(writer_tx);
                     let reader = MpscReader::new(reader_rx);
 
-                    let peer_connection = peer_builder.build(
+                    let channel = chan_factory.build(
                         ChannelInfo::UdpServer {
                             server_addr,
                             peer_addr,
@@ -106,11 +49,11 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServer {
                         reader,
                         writer,
                     );
-                    peer_connection.spawn().discard();
+                    channel.spawn().discard();
 
                     Self::handle_peer_sends(
                         conn_state.to_closable(),
-                        peer_builder.info().clone(),
+                        chan_factory.info().clone(),
                         peer_addr,
                         udp_socket,
                         writer_rx,

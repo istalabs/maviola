@@ -1,14 +1,5 @@
 //! # Synchronous I/O primitives
 //!
-//! ## Transport
-//!
-//! The following transports are currently available:
-//!
-//! * TCP: [`TcpServer`] / [`TcpClient`]
-//! * UDP: [`UdpServer`] / [`UdpClient`]
-//! * File: [`FileWriter`] / [`FileReader`]
-//! * Unix socket: [`SockServer`] / [`SockClient`] (only on Unix-like systems such as Linux or OS X)
-//!
 //! ## Connections & Channels
 //!
 //! > ⚠ This part of the API allows to create custom transports. It is still considered experimental
@@ -29,9 +20,6 @@ mod transport;
 mod types;
 
 pub use callback::Callback;
-pub use transport::{FileReader, FileWriter, TcpClient, TcpServer, UdpClient, UdpServer};
-#[cfg(unix)]
-pub use transport::{SockClient, SockServer};
 
 /// <sup>`⍚` |</sup>
 #[cfg(feature = "unstable")]

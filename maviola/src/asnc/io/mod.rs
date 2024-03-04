@@ -1,11 +1,5 @@
 //! # Asynchronous I/O primitives
 //!
-//! ## Transport
-//!
-//! The following transports are currently available:
-//!
-//! * TCP: [`TcpServer`] / [`TcpClient`]
-//!
 //! ## Connections & Channels
 //!
 //! > ⚠ This part of the API allows to create custom transports. It is still considered experimental
@@ -26,7 +20,6 @@ mod transport;
 mod types;
 
 pub use callback::Callback;
-pub use transport::{FileReader, FileWriter, TcpClient, TcpServer};
 
 /// <sup>`⍚` |</sup>
 #[cfg(feature = "unstable")]

@@ -12,10 +12,6 @@ use maviola::prelude::*;
 const HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(50);
 const N_ITER: u16 = 100;
 
-async fn wait() {
-    tokio::time::sleep(Duration::from_millis(100)).await;
-}
-
 fn report_frame<V: MaybeVersioned>(frame: &Frame<V>) {
     log::info!(
         "[reader] incoming frame #{} from {}:{}",

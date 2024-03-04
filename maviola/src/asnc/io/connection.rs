@@ -5,7 +5,7 @@ use async_trait::async_trait;
 
 use crate::asnc::consts::CONN_BROADCAST_CHAN_CAPACITY;
 use crate::asnc::io::{Callback, ChannelFactory, FrameReceiver, FrameSender};
-use crate::core::io::{ConnectionInfo, OutgoingFrame};
+use crate::core::io::{ConnectionConf, ConnectionInfo, OutgoingFrame};
 use crate::core::utils::{Closable, SharedCloser};
 
 use crate::prelude::*;
@@ -13,10 +13,7 @@ use crate::prelude::*;
 /// <sup>[`async`](crate::asnc)</sup>
 /// Connection builder used to create a [`Connection`].
 #[async_trait]
-pub trait ConnectionBuilder<V: MaybeVersioned + 'static>: Debug + Send {
-    /// Provides information about connection.
-    fn info(&self) -> &ConnectionInfo;
-
+pub trait ConnectionBuilder<V: MaybeVersioned + 'static>: ConnectionConf {
     /// Builds [`Connection`] from provided configuration.
     async fn build(&self) -> Result<Connection<V>>;
 }

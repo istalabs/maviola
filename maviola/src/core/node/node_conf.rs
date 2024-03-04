@@ -22,9 +22,11 @@ use crate::prelude::*;
 /// [`NodeBuilder`] populated with current settings.
 ///
 /// The main reason to use [`NodeConf`] instead of directly creating a node is that
-/// configurations are dormant and can be cloned. While nodes are dynamic, they own connections
-/// and poses other runtime-specific entities that can't be cloned.
+/// configurations are dormant and can be cloned. While nodes are dynamic, own connections, and
+/// poses other runtime-specific entities that can't be cloned. It is also possible to serialize and
+/// deserialize [`NodeConf`] using [Serde](https://serde.rs) if `serde` feature is enabled.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NodeConf<K: NodeKind, D: Dialect, V: MaybeVersioned, C: MaybeConnConf> {
     pub(crate) kind: K,
     pub(crate) version: V,
@@ -43,7 +45,7 @@ impl NodeConf<Proxy, Minimal, Versionless, NoConnConf> {
     ///
     /// ```rust
     /// use maviola::core::node::NodeConf;
-    /// use maviola::sync::io::TcpClient;
+    /// use maviola::core::io::TcpClient;
     /// use maviola::dialects::Minimal;
     ///
     /// let node = NodeConf::builder()
@@ -61,7 +63,7 @@ impl NodeConf<Proxy, Minimal, Versionless, NoConnConf> {
     ///
     /// ```rust
     /// use maviola::core::node::NodeConf;
-    /// use maviola::sync::io::TcpClient;
+    /// use maviola::core::io::TcpClient;
     ///
     /// let node = NodeConf::builder()
     ///     .system_id(10)
@@ -77,7 +79,7 @@ impl NodeConf<Proxy, Minimal, Versionless, NoConnConf> {
     ///
     /// ```rust
     /// use maviola::core::node::NodeConf;
-    /// use maviola::sync::io::TcpClient;
+    /// use maviola::core::io::TcpClient;
     ///
     /// let node = NodeConf::builder()
     ///     .connection(TcpClient::new("localhost:5600").unwrap())
@@ -165,7 +167,7 @@ impl<D: Dialect, V: MaybeVersioned, C: HasConnConf> NodeConf<Proxy, D, V, C> {
 #[cfg(test)]
 mod tests {
     use crate::core::io::ConnectionInfo;
-    use crate::sync::io::TcpClient;
+    use crate::core::io::TcpClient;
 
     use super::*;
 
