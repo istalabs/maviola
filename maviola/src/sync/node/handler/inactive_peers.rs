@@ -64,6 +64,13 @@ impl<V: MaybeVersioned + 'static> InactivePeersHandler<V> {
                 }
             }
 
+            if let Ok(mut peers) = self.peers.write() {
+                for peer in peers.values() {
+                    let _ = self.events_tx.send(Event::PeerLost(peer.clone()));
+                }
+                peers.clear();
+            }
+
             log::trace!("[{info:?}] inactive peers handler stopped");
         });
     }

@@ -121,6 +121,12 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> Node<K
     pub fn is_connected(&self) -> bool {
         !self.state.is_closed()
     }
+
+    fn close(&mut self) {
+        self.state.close();
+
+        log::debug!("{:?}: node is closed", self.info());
+    }
 }
 
 impl<D: Dialect, V: Versioned + 'static, A: NodeApi<V>> Node<Edge<V>, D, V, A> {
@@ -218,8 +224,6 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> Drop
     for Node<K, D, V, A>
 {
     fn drop(&mut self) {
-        self.state.close();
-
-        log::debug!("{:?}: node is dropped", self.info());
+        self.close()
     }
 }

@@ -1,8 +1,9 @@
 use std::fmt::Debug;
 use std::sync::mpsc;
+use std::thread::JoinHandle;
 
 use crate::core::io::{ConnectionConf, ConnectionInfo, OutgoingFrame};
-use crate::core::utils::{Closable, SharedCloser};
+use crate::core::utils::{Closable, Closer, SharedCloser};
 use crate::sync::io::{Callback, ChannelFactory, FrameReceiver, FrameSender};
 
 use crate::prelude::*;
@@ -11,7 +12,7 @@ use crate::prelude::*;
 /// Connection builder used to create a [`Connection`].
 pub trait ConnectionBuilder<V: MaybeVersioned>: ConnectionConf {
     /// Builds [`Connection`] from provided configuration.
-    fn build(&self) -> Result<Connection<V>>;
+    fn build(&self) -> Result<(Connection<V>, JoinHandle<Result<Closer>>)>;
 }
 
 /// <sup>[`sync`](crate::sync)</sup>

@@ -2,16 +2,17 @@ use std::collections::HashMap;
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::mpsc;
 use std::thread;
+use std::thread::JoinHandle;
 
 use crate::core::io::{ChannelInfo, ConnectionInfo};
 use crate::core::utils::{Closable, Closer};
 use crate::sync::io::{Connection, ConnectionBuilder};
-use crate::sync::utils::{handle_listener_stop, MpscReader, MpscWriter};
+use crate::sync::utils::{MpscReader, MpscWriter};
 
 use crate::prelude::*;
 
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServer {
-    fn build(&self) -> Result<Connection<V>> {
+    fn build(&self) -> Result<(Connection<V>, JoinHandle<Result<Closer>>)> {
         let server_addr = self.addr;
         let udp_socket = UdpSocket::bind(server_addr)?;
 
@@ -65,9 +66,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServer {
             }
         });
 
-        handle_listener_stop(handler, connection.info().clone());
-
-        Ok(connection)
+        Ok((connection, handler))
     }
 }
 

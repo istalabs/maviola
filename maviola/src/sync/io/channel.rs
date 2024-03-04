@@ -127,7 +127,13 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
         mut frame_writer: Sender<W, V>,
     ) -> Result<()> {
         loop {
-            let out_frame = send_handler.recv()?;
+            let out_frame = match send_handler.recv() {
+                Ok(out_frame) => out_frame,
+                Err(err) => {
+                    frame_writer.flush().map_err(Error::from)?;
+                    return Err(Error::from(err));
+                }
+            };
 
             if !out_frame.should_send_to(id) {
                 continue;

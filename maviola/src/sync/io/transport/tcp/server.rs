@@ -1,16 +1,16 @@
 use std::net::TcpListener;
 use std::thread;
+use std::thread::JoinHandle;
 
 use crate::core::io::ChannelInfo;
 use crate::core::utils::Closer;
 use crate::sync::consts::{TCP_READ_TIMEOUT, TCP_WRITE_TIMEOUT};
 use crate::sync::io::{Connection, ConnectionBuilder};
-use crate::sync::utils::handle_listener_stop;
 
 use crate::prelude::*;
 
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpServer {
-    fn build(&self) -> Result<Connection<V>> {
+    fn build(&self) -> Result<(Connection<V>, JoinHandle<Result<Closer>>)> {
         let server_addr = self.addr;
         let listener = TcpListener::bind(self.addr)?;
 
@@ -44,8 +44,6 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpServer {
             Ok(conn_state)
         });
 
-        handle_listener_stop(handler, connection.info().clone());
-
-        Ok(connection)
+        Ok((connection, handler))
     }
 }
