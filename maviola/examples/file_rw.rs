@@ -8,7 +8,6 @@ use maviola::dialects::minimal as dialect;
 use maviola::prelude::*;
 use maviola::sync::prelude::*;
 
-const HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(7500);
 const N_ITER: u16 = 100;
 
 fn wait() {
@@ -45,10 +44,10 @@ fn run(path: PathBuf) -> Result<()> {
         .version(V2)
         .system_id(17)
         .component_id(42)
-        .heartbeat_timeout(HEARTBEAT_TIMEOUT)
         .connection(FileReader::new(path.as_path())?)
         .build()?;
 
+    log::warn!("[reader] started");
     for event in reader.events() {
         match event {
             Event::NewPeer(peer) => log::warn!("[reader] new peer: {peer:?}"),
@@ -58,6 +57,7 @@ fn run(path: PathBuf) -> Result<()> {
             }
         }
     }
+    log::warn!("[reader] finished");
 
     Ok(())
 }

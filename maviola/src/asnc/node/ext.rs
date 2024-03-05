@@ -18,7 +18,8 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, AsyncAp
     ///
     /// Creates ona instance of [`Node`] from [`NodeConf`].
     pub async fn try_from_async_conf(conf: NodeConf<K, D, V, AsyncConnConf<V>>) -> Result<Self> {
-        let api = AsyncApi::new(conf.connection().build().await?);
+        let (conn, conn_handler) = conf.connection().build().await?;
+        let api = AsyncApi::new(conn);
         let state = api.share_state();
         let is_active = Guarded::from(&state);
 
@@ -36,6 +37,7 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, AsyncAp
         node.api
             .start_default_handlers(node.heartbeat_timeout)
             .await;
+        node.api.handle_conn_stop(conn_handler).await;
 
         Ok(node)
     }
@@ -127,10 +129,11 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, AsyncAp
     ///
     /// Returns a stream of node events.
     ///
-    /// ⚠ The result is wrapped with [`Behold`] since the returned stream will have access only to
-    /// events that were emitted close to the moment when the method is called and repetitive calls
-    /// may lead to undesired behavior. This is related to the nature of the asynchronous MPMC
-    /// channels, that able to operate only on a limited number of the past events.
+    /// ⚠ The result is wrapped with [`Behold`] as a reminder that the returned stream will have
+    /// access only to events that were emitted close to the moment when the method is called and
+    /// repetitive calls may lead to undesired behavior. This is related to the nature of the
+    /// asynchronous MPMC channels, that able to operate only on a limited number of the past
+    /// events.
     pub fn events(&self) -> Behold<impl Stream<Item = Event<V>>> {
         Behold::new(self.api.events())
     }

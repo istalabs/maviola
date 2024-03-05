@@ -37,16 +37,15 @@ async fn spawn_client(addr: &str, component_id: ComponentId) {
 
     tokio::spawn(async move {
         let mut client = Node::builder()
+            .version(V2)
             .system_id(31)
             .component_id(component_id)
-            .version(V2)
             .heartbeat_interval(HEARTBEAT_INTERVAL)
             .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-            .async_connection(TcpClient::new(client_addr).unwrap())
+            .async_connection(TcpClient::new(client_addr)?)
             .build()
-            .await
-            .unwrap();
-        client.activate().await.unwrap();
+            .await?;
+        client.activate().await?;
 
         log::warn!("[{whoami}] started as {:?}", client.info());
 
@@ -66,25 +65,23 @@ async fn spawn_client(addr: &str, component_id: ComponentId) {
             }
         }
 
-        log::warn!("[{whoami}] disconnected");
-        drop(client);
+        log::warn!("[{whoami}] finished");
+        Ok::<(), Error>(())
     });
 }
 
-async fn run(addr: &str) {
+async fn run(addr: &str) -> Result<()> {
     let server_addr = addr.to_string();
     let mut server = Node::builder()
+        .version(V2)
         .system_id(17)
         .component_id(42)
-        .version(V2)
-        .dialect::<Minimal>()
         .heartbeat_interval(HEARTBEAT_INTERVAL)
         .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-        .async_connection(TcpServer::new(server_addr).unwrap())
+        .async_connection(TcpServer::new(server_addr)?)
         .build()
-        .await
-        .unwrap();
-    server.activate().await.unwrap();
+        .await?;
+    server.activate().await?;
 
     log::warn!("[server] started as {:?}", server.info());
 
@@ -106,6 +103,8 @@ async fn run(addr: &str) {
             }
         }
     }
+
+    Ok(())
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -117,7 +116,7 @@ async fn main() {
         .init();
 
     let addr = addr(port());
-    run(addr.as_str()).await;
+    run(addr.as_str()).await.unwrap();
 }
 
 #[cfg(test)]
@@ -125,7 +124,7 @@ async fn main() {
 async fn tcp_ping_pong() {
     let addr = addr(port());
     let handler = tokio::spawn(async move {
-        run(addr.as_str()).await;
+        run(addr.as_str()).await.unwrap();
     });
 
     tokio::time::sleep(Duration::from_secs(5)).await;

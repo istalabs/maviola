@@ -4,8 +4,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::broadcast::error::RecvError;
 
 use crate::asnc::consts::{
-    PEER_CONN_STOP_JOIN_ATTEMPTS, PEER_CONN_STOP_JOIN_POOLING_INTERVAL,
-    PEER_CONN_STOP_POOLING_INTERVAL,
+    CHANNEL_STOP_JOIN_ATTEMPTS, CHANNEL_STOP_JOIN_POOLING_INTERVAL, CHANNEL_STOP_POOLING_INTERVAL,
 };
 use crate::asnc::io::{Callback, FrameProducer, FrameSendHandler, FrameSender};
 use crate::core::io::{AsyncReceiver, AsyncSender, OutgoingFrame};
@@ -209,16 +208,16 @@ impl<
             || write_handler.is_finished()
             || read_handler.is_finished())
         {
-            tokio::time::sleep(PEER_CONN_STOP_POOLING_INTERVAL).await;
+            tokio::time::sleep(CHANNEL_STOP_POOLING_INTERVAL).await;
         }
         state.close();
 
-        for i in 0..PEER_CONN_STOP_JOIN_ATTEMPTS {
+        for i in 0..CHANNEL_STOP_JOIN_ATTEMPTS {
             if write_handler.is_finished() && read_handler.is_finished() {
                 break;
             }
-            tokio::time::sleep(PEER_CONN_STOP_JOIN_POOLING_INTERVAL).await;
-            if i == PEER_CONN_STOP_JOIN_ATTEMPTS - 1 {
+            tokio::time::sleep(CHANNEL_STOP_JOIN_POOLING_INTERVAL).await;
+            if i == CHANNEL_STOP_JOIN_ATTEMPTS - 1 {
                 log::warn!(
                     "[{info:?}] write/read handlers are stuck, finished: write={}, read={}",
                     write_handler.is_finished(),

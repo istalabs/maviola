@@ -26,7 +26,7 @@ pub use callback::Callback;
 pub use channel::{Channel, ChannelFactory};
 /// <sup>`⍚` |</sup>
 #[cfg(feature = "unstable")]
-pub use connection::{Connection, ConnectionBuilder};
+pub use connection::{Connection, ConnectionBuilder, ConnectionHandler};
 /// <sup>`⍚` |</sup>
 #[cfg(feature = "unstable")]
 pub use types::{FrameProducer, FrameReceiver, FrameSendHandler, FrameSender};
@@ -34,7 +34,7 @@ pub use types::{FrameProducer, FrameReceiver, FrameSendHandler, FrameSender};
 #[cfg(not(feature = "unstable"))]
 pub(crate) use channel::{Channel, ChannelFactory};
 #[cfg(not(feature = "unstable"))]
-pub(crate) use connection::{Connection, ConnectionBuilder};
+pub(crate) use connection::{Connection, ConnectionBuilder, ConnectionHandler};
 #[cfg(not(feature = "unstable"))]
 pub(crate) use types::{FrameProducer, FrameReceiver, FrameSendHandler, FrameSender};
 

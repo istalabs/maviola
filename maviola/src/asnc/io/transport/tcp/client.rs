@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use tokio::net::TcpStream;
 
-use crate::asnc::io::{Connection, ConnectionBuilder};
+use crate::asnc::io::{Connection, ConnectionBuilder, ConnectionHandler};
 use crate::core::io::ChannelInfo;
 use crate::core::utils::SharedCloser;
 
@@ -9,17 +9,18 @@ use crate::prelude::*;
 
 #[async_trait]
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpClient {
-    async fn build(&self) -> Result<Connection<V>> {
+    async fn build(&self) -> Result<(Connection<V>, ConnectionHandler)> {
         let server_addr = self.addr;
         let stream = TcpStream::connect(server_addr).await?;
         let (reader, writer) = stream.into_split();
 
-        let conn_state = SharedCloser::new();
-        let (connection, chan_factory) = Connection::new(self.info.clone(), conn_state);
+        let (connection, chan_factory) = Connection::new(self.info.clone(), SharedCloser::new());
 
         let channel = chan_factory.build(ChannelInfo::TcpClient { server_addr }, reader, writer);
-        channel.spawn().await.discard();
+        let channel_state = channel.spawn().await;
 
-        Ok(connection)
+        let handler = ConnectionHandler::spawn_from_state(channel_state);
+
+        Ok((connection, handler))
     }
 }

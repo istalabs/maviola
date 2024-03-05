@@ -63,12 +63,10 @@ impl ConnectionHandler {
         let info = conn.info.clone();
 
         thread::spawn(move || {
-            while !self.inner.is_finished() {
-                thread::sleep(CONN_STOP_POOLING_INTERVAL);
-            }
+            let result = self.inner.join();
             state.close();
 
-            match self.inner.join() {
+            match result {
                 Ok(res) => match res {
                     Ok(_) => log::debug!("[{info:?}] connection stopped"),
                     Err(err) => log::debug!("[{info:?}] connection exited with error: {err:?}"),

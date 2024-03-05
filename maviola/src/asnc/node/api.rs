@@ -8,7 +8,7 @@ use tokio::sync::RwLock;
 use tokio_stream::Stream;
 
 use crate::asnc::consts::CONN_BROADCAST_CHAN_CAPACITY;
-use crate::asnc::io::{Callback, Connection};
+use crate::asnc::io::{Callback, Connection, ConnectionHandler};
 use crate::asnc::node::event::EventStream;
 use crate::asnc::node::handler::{HeartbeatEmitter, InactivePeersHandler, IncomingFramesHandler};
 use crate::asnc::node::Event;
@@ -22,7 +22,6 @@ use crate::prelude::*;
 /// <sup>[`async`](crate::asnc)</sup>
 /// Synchronous API for MAVLink [`Node`].
 pub struct AsyncApi<V: MaybeVersioned + 'static> {
-    state: SharedCloser,
     connection: Connection<V>,
     peers: Arc<RwLock<HashMap<MavLinkId, Peer>>>,
     events_tx: broadcast::Sender<Event<V>>,
@@ -47,7 +46,6 @@ impl<V: MaybeVersioned + 'static> AsyncApi<V> {
         let (events_tx, events_rx) = broadcast::channel(CONN_BROADCAST_CHAN_CAPACITY);
 
         AsyncApi {
-            state: connection.share_state(),
             connection,
             peers: Arc::new(Default::default()),
             events_tx,
@@ -84,12 +82,19 @@ impl<V: MaybeVersioned + 'static> AsyncApi<V> {
     }
 
     pub(super) fn events(&self) -> impl Stream<Item = Event<V>> {
-        EventStream::new(self.events_rx.resubscribe())
+        EventStream::new(
+            self.events_rx.resubscribe(),
+            self.connection.share_state().to_closable(),
+        )
     }
 
     pub(super) async fn start_default_handlers(&self, heartbeat_timeout: Duration) {
         self.handle_incoming_frames().await;
         self.handle_inactive_peers(heartbeat_timeout).await;
+    }
+
+    pub(super) async fn handle_conn_stop(&self, handler: ConnectionHandler) {
+        handler.handle(&self.connection);
     }
 
     async fn handle_incoming_frames(&self) {
@@ -99,7 +104,9 @@ impl<V: MaybeVersioned + 'static> AsyncApi<V> {
             receiver: self.connection.receiver(),
             events_tx: self.events_tx.clone(),
         };
-        handler.spawn(self.state.to_closable()).await;
+        handler
+            .spawn(self.connection.share_state().to_closable())
+            .await;
     }
 
     async fn handle_inactive_peers(&self, timeout: Duration) {
@@ -110,7 +117,9 @@ impl<V: MaybeVersioned + 'static> AsyncApi<V> {
             events_tx: self.events_tx.clone(),
         };
 
-        handler.spawn(self.state.to_closable()).await;
+        handler
+            .spawn(self.connection.share_state().to_closable())
+            .await;
     }
 
     pub(super) async fn recv_frame(&mut self) -> Result<(Frame<V>, Callback<V>)> {

@@ -1,9 +1,12 @@
 use std::fmt::Debug;
+use std::future::Future;
 use std::sync::mpsc;
+use std::thread;
 
 use async_trait::async_trait;
+use tokio::task::JoinHandle;
 
-use crate::asnc::consts::CONN_BROADCAST_CHAN_CAPACITY;
+use crate::asnc::consts::{CONN_BROADCAST_CHAN_CAPACITY, CONN_STOP_POOLING_INTERVAL};
 use crate::asnc::io::{Callback, ChannelFactory, FrameReceiver, FrameSender};
 use crate::core::io::{ConnectionConf, ConnectionInfo, OutgoingFrame};
 use crate::core::utils::{Closable, SharedCloser};
@@ -14,8 +17,11 @@ use crate::prelude::*;
 /// Connection builder used to create a [`Connection`].
 #[async_trait]
 pub trait ConnectionBuilder<V: MaybeVersioned + 'static>: ConnectionConf {
-    /// Builds [`Connection`] from provided configuration.
-    async fn build(&self) -> Result<Connection<V>>;
+    /// Builds connection from provided configuration.
+    ///
+    /// Returns the new connection and its main handler. Once handler is finished, the connection
+    /// is considered to be closed.
+    async fn build(&self) -> Result<(Connection<V>, ConnectionHandler)>;
 }
 
 /// <sup>[`async`](crate::asnc)</sup>
@@ -26,6 +32,52 @@ pub struct Connection<V: MaybeVersioned + 'static> {
     sender: ConnSender<V>,
     receiver: ConnReceiver<V>,
     state: SharedCloser,
+}
+
+/// <sup>[`async`](crate::asnc)</sup>
+/// Connection handler.
+pub struct ConnectionHandler {
+    inner: JoinHandle<Result<()>>,
+}
+
+impl ConnectionHandler {
+    /// Spawns a new connection handler from a future.
+    pub fn spawn<F>(task: F) -> Self
+    where
+        F: Future<Output = Result<()>> + Send + 'static,
+    {
+        Self {
+            inner: tokio::spawn(task),
+        }
+    }
+
+    /// Spawns a new connection handler that finishes when the `state` becomes closed.
+    pub fn spawn_from_state(state: SharedCloser) -> Self {
+        Self::spawn(async move {
+            while !state.is_closed() {
+                tokio::time::sleep(CONN_STOP_POOLING_INTERVAL).await;
+            }
+            Ok(())
+        })
+    }
+
+    pub(crate) fn handle<V: MaybeVersioned>(self, conn: &Connection<V>) {
+        let mut state = conn.state.clone();
+        let info = conn.info.clone();
+
+        tokio::task::spawn(async move {
+            let result = self.inner.await;
+            state.close();
+
+            match result {
+                Ok(res) => match res {
+                    Ok(_) => log::debug!("[{info:?}] listener stopped"),
+                    Err(err) => log::debug!("[{info:?}] listener exited with error: {err:?}"),
+                },
+                Err(err) => log::error!("[{info:?}] listener failed: {err:?}"),
+            }
+        });
+    }
 }
 
 impl<V: MaybeVersioned> Connection<V> {

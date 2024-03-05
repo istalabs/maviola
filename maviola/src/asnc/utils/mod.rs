@@ -8,8 +8,5 @@
 use crate::asnc::io::ConnectionBuilder;
 
 mod busy_rw;
-mod handlers;
 
 pub use busy_rw::{BusyReader, BusyWriter};
-
-pub(crate) use handlers::handle_listener_stop;

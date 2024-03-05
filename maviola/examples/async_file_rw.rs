@@ -9,7 +9,6 @@ use maviola::dialects::minimal as dialect;
 use maviola::asnc::prelude::*;
 use maviola::prelude::*;
 
-const HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(50);
 const N_ITER: u16 = 100;
 
 fn report_frame<V: MaybeVersioned>(frame: &Frame<V>) {
@@ -21,18 +20,16 @@ fn report_frame<V: MaybeVersioned>(frame: &Frame<V>) {
     )
 }
 
-async fn run(path: PathBuf) {
+async fn run(path: PathBuf) -> Result<()> {
     let writer = Node::builder()
         .version(V2)
-        .dialect::<Minimal>()
         .system_id(17)
         .component_id(42)
-        .async_connection(FileWriter::new(path.as_path()).unwrap())
+        .async_connection(FileWriter::new(path.as_path())?)
         .build()
-        .await
-        .unwrap();
-    log::warn!("[writer] started");
+        .await?;
 
+    log::warn!("[writer] started");
     for _ in 0..N_ITER {
         writer
             .send(&dialect::messages::Heartbeat::default())
@@ -43,16 +40,13 @@ async fn run(path: PathBuf) {
 
     let reader = Node::builder()
         .version(V2)
-        .dialect::<Minimal>()
         .system_id(17)
         .component_id(42)
-        .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-        .async_connection(FileReader::new(path.as_path()).unwrap())
+        .async_connection(FileReader::new(path.as_path())?)
         .build()
-        .await
-        .unwrap();
-    log::warn!("[reader] started");
+        .await?;
 
+    log::warn!("[reader] started");
     let mut events = reader.events().unwrap();
     while let Some(event) = events.next().await {
         match event {
@@ -60,11 +54,9 @@ async fn run(path: PathBuf) {
             Event::Frame(frame, _) => report_frame(&frame),
             Event::PeerLost(peer) => {
                 log::warn!("[reader] disconnected: {peer:?}");
-                break;
             }
         }
     }
-
     log::warn!("[reader] finished");
 }
 
@@ -80,7 +72,7 @@ async fn main() {
     if path.exists() {
         remove_file(path.as_path()).unwrap();
     }
-    run(path).await;
+    run(path).await.unwrap();
 }
 
 #[cfg(test)]
@@ -91,7 +83,7 @@ async fn file_rw() {
         remove_file(path.as_path()).unwrap();
     }
     let handler = tokio::spawn(async move {
-        run(path).await;
+        run(path).await.unwrap();
     });
 
     tokio::time::sleep(Duration::from_secs(5)).await;
