@@ -36,7 +36,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockServer {
                 reader.set_read_timeout(SOCK_READ_TIMEOUT)?;
 
                 let channel = chan_factory.build(
-                    ChannelInfo::SockClient { path: path.clone() },
+                    ChannelInfo::SockServer { path: path.clone() },
                     reader,
                     writer,
                 );

@@ -147,6 +147,11 @@ test = true
 required-features = ["async"]
 
 [[example]]
+name = "async_sock_ping_pong"
+test = true
+required-features = ["sync"]
+
+[[example]]
 name = "async_file_rw"
 test = true
 required-features = ["sync"]

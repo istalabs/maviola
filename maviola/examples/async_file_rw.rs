@@ -77,7 +77,7 @@ async fn main() {
 
 #[cfg(test)]
 #[tokio::test]
-async fn file_rw() {
+async fn async_file_rw() {
     let path = PathBuf::from("/tmp/maviola_async_file_rw.bin");
     if path.exists() {
         remove_file(path.as_path()).unwrap();
@@ -88,6 +88,6 @@ async fn file_rw() {
 
     tokio::time::sleep(Duration::from_secs(5)).await;
     if !handler.is_finished() {
-        panic!("[file_rw] test took too long")
+        panic!("[async_file_rw] test took too long")
     }
 }

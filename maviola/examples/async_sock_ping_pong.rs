@@ -1,6 +1,7 @@
+use std::fs::remove_file;
+use std::path::PathBuf;
 use std::time::Duration;
 
-use portpicker::{pick_unused_port, Port};
 use tokio_stream::StreamExt;
 
 use maviola::protocol::ComponentId;
@@ -10,16 +11,11 @@ use maviola::prelude::*;
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(50);
 const HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(75);
-const HOST: &str = "127.0.0.1";
 const N_ITER: usize = 10;
 const N_CLIENTS: ComponentId = 5;
 
-fn port() -> Port {
-    pick_unused_port().unwrap()
-}
-
-fn addr(port: Port) -> String {
-    format!("{HOST}:{}", port)
+async fn wait() {
+    tokio::time::sleep(Duration::from_millis(100)).await;
 }
 
 fn report_frame<V: MaybeVersioned>(whoami: &str, frame: &Frame<V>) {
@@ -31,8 +27,7 @@ fn report_frame<V: MaybeVersioned>(whoami: &str, frame: &Frame<V>) {
     )
 }
 
-async fn spawn_client(addr: &str, component_id: ComponentId) {
-    let client_addr = addr.to_string();
+async fn spawn_client(path: PathBuf, component_id: ComponentId) {
     let whoami = format!("client #{component_id}");
 
     tokio::spawn(async move {
@@ -42,7 +37,7 @@ async fn spawn_client(addr: &str, component_id: ComponentId) {
             .component_id(component_id)
             .heartbeat_interval(HEARTBEAT_INTERVAL)
             .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-            .async_connection(TcpClient::new(client_addr)?)
+            .async_connection(SockClient::new(path)?)
             .build()
             .await?;
         client.activate().await?;
@@ -70,23 +65,22 @@ async fn spawn_client(addr: &str, component_id: ComponentId) {
     });
 }
 
-async fn run(addr: &str) -> Result<()> {
-    let server_addr = addr.to_string();
+async fn run(path: PathBuf) -> Result<()> {
     let mut server = Node::builder()
         .version(V2)
         .system_id(17)
         .component_id(42)
         .heartbeat_interval(HEARTBEAT_INTERVAL)
         .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-        .async_connection(TcpServer::new(server_addr)?)
+        .async_connection(SockServer::new(path.as_path())?)
         .build()
         .await?;
     server.activate().await?;
-
-    log::warn!("[server] started as {:?}", server.info());
+    wait().await;
 
     for i in 0..N_CLIENTS {
-        spawn_client(addr, i).await;
+        let path = path.clone();
+        spawn_client(path, i).await;
     }
 
     let mut events = server.events().unwrap();
@@ -115,20 +109,26 @@ async fn main() {
         .filter_module(env!("CARGO_PKG_NAME"), log::LevelFilter::Info) // Log level for current package
         .init();
 
-    let addr = addr(port());
-    run(addr.as_str()).await.unwrap();
+    let path = PathBuf::from("/tmp/maviola.sock");
+    if path.exists() {
+        remove_file(path.as_path()).unwrap();
+    }
+    run(path).await.unwrap();
 }
 
 #[cfg(test)]
 #[tokio::test]
-async fn async_tcp_ping_pong() {
-    let addr = addr(port());
+async fn async_sock_ping_pong() {
+    let path = PathBuf::from("/tmp/maviola_async_sock_ping_pong.sock");
+    if path.exists() {
+        remove_file(path.as_path()).unwrap();
+    }
     let handler = tokio::spawn(async move {
-        run(addr.as_str()).await.unwrap();
+        run(path).await.unwrap();
     });
 
     tokio::time::sleep(Duration::from_secs(5)).await;
     if !handler.is_finished() {
-        panic!("[async_tcp_ping_pong] test took too long")
+        panic!("[async_sock_ping_pong] test took too long")
     }
 }

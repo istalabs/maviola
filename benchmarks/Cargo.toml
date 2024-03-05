@@ -23,8 +23,10 @@ test = true
 [dependencies]
 env_logger = "0.11.1"
 log = "0.4.20"
-maviola = {version = "0.1.0-alpha2", path = "../maviola", features = ["sync", "unstable"]}
+maviola = { version = "0.1.0-alpha2", path = "../maviola", features = ["sync", "async", "unstable"] }
 portpicker = "0.1.1"
+tokio = { version = "1.36.0", default-features = false, features = ["sync", "rt", "rt-multi-thread", "net", "fs", "io-util", "time", "test-util", "macros"] }
+tokio-stream = "0.1.14"
 
 ###########################################################
 # Features
@@ -40,6 +42,8 @@ all = ["mpmc", "sync"]
 mpmc = []
 ## Benchmarks for synchronous API
 sync = []
+## Benchmarks for asynchronous API
+async = []
 
 ###########################################################
 # Metadata

@@ -36,6 +36,10 @@ These examples show basic usage for different transports:
   ```shell
   cargo run --package maviola --example async_tcp_ping_pong
   ```
+* Unix sockets: [`async_sock_ping_pong.rs`](async_sock_ping_pong.rs)
+  ```shell
+  cargo run --package maviola --example async_sock_ping_pong
+  ```
 * Read/write binary stream to a file: [`async_file_rw.rs`](async_file_rw.rs)
   ```shell
   cargo run --package maviola --example async_file_rw

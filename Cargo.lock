@@ -403,6 +403,8 @@ dependencies = [
  "log",
  "maviola",
  "portpicker",
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]

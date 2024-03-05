@@ -121,7 +121,7 @@ pub enum ChannelInfo {
     /// Unix socket client.
     #[cfg(unix)]
     SockClient {
-        /// Server address.
+        /// Socket path.
         path: PathBuf,
     },
     /// Unknown channel

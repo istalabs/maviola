@@ -2,6 +2,8 @@ use std::alloc::System;
 use std::thread;
 use std::time::Duration;
 
+#[cfg(feature = "async")]
+use maviola_benchmarks::asnc::benchmark_async_unix_sockets;
 #[cfg(feature = "mpmc")]
 use maviola_benchmarks::mpmc::{benchmark_mpmc_broadcast, benchmark_mpmc_collect};
 #[cfg(feature = "sync")]
@@ -51,8 +53,20 @@ fn main() {
     {
         log::info!("[benchmark_unix_sockets]");
         let base_mem = GLOBAL.get();
-        benchmark_unix_sockets(100, 1_000);
+        benchmark_unix_sockets(100, 2_000);
         debug_memory("benchmark_unix_sockets", base_mem);
+    }
+
+    #[cfg(feature = "async")]
+    {
+        log::info!("[benchmark_async_unix_sockets]");
+        let base_mem = GLOBAL.get();
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(benchmark_async_unix_sockets(100, 2_000));
+        debug_memory("benchmark_async_unix_sockets", base_mem);
     }
 }
 
@@ -74,5 +88,11 @@ mod benchmark_tests {
     #[cfg(feature = "sync")]
     fn run_benchmark_unix_sockets() {
         super::benchmark_unix_sockets(10, 10);
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "async")]
+    async fn run_benchmark_async_unix_sockets() {
+        super::benchmark_async_unix_sockets(10, 10).await;
     }
 }

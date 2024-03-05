@@ -14,6 +14,13 @@ Synchronous API
 cargo run --package maviola_benchmarks --bin maviola_benchmarks --features sync
 ```
 
+Asynchronous API
+---------------
+
+```shell
+cargo run --package maviola_benchmarks --bin maviola_benchmarks --features async
+```
+
 MPMC
 ----
 

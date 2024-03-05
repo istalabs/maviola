@@ -14,7 +14,7 @@ use crate::prelude::*;
 ///
 /// Create a synchronous Unix-socket server node:
 ///
-/// ```no_run
+/// ```rust,no_run
 /// use maviola::prelude::*;
 ///
 /// let path = "/tmp/maviola.sock";
@@ -29,6 +29,27 @@ use crate::prelude::*;
 ///             SockClient::new(path)    // Configure socket server connection
 ///                 .unwrap()
 ///         ).build().unwrap();
+/// ```
+///
+/// Create an asynchronous Unix-socket server node:
+///
+/// ```rust,no_run
+/// # #[tokio::main] async fn main() {
+/// use maviola::prelude::*;
+///
+/// let path = "/tmp/maviola.sock";
+///
+/// // Create a Unix-socket client node
+/// let node = Node::builder()
+///         /* define other node parameters */
+/// #       .version(V2)
+/// #       .system_id(1)
+/// #       .component_id(1)
+///         .async_connection(
+///             SockClient::new(path)    // Configure socket server connection
+///                 .unwrap()
+///         ).build().await.unwrap();
+/// # }
 /// ```
 #[derive(Clone, Debug)]
 pub struct SockClient {
