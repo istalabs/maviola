@@ -19,7 +19,6 @@ use crate::prelude::*;
 /// <sup>[`sync`](crate::sync)</sup>
 /// Synchronous API for MAVLink [`Node`].
 pub struct SyncApi<V: MaybeVersioned + 'static> {
-    state: SharedCloser,
     connection: Connection<V>,
     peers: Arc<RwLock<HashMap<MavLinkId, Peer>>>,
     events_tx: mpmc::Sender<Event<V>>,
@@ -44,7 +43,6 @@ impl<V: MaybeVersioned + 'static> SyncApi<V> {
         let (events_tx, events_rx) = mpmc::channel();
 
         SyncApi {
-            state: connection.share_state(),
             connection,
             peers: Arc::new(Default::default()),
             events_tx,
@@ -77,9 +75,10 @@ impl<V: MaybeVersioned + 'static> SyncApi<V> {
     }
 
     pub(super) fn events(&self) -> impl Iterator<Item = Event<V>> {
-        EventsIterator {
-            rx: self.events_rx.clone(),
-        }
+        EventsIterator::new(
+            self.events_rx.clone(),
+            self.connection.share_state().to_closable(),
+        )
     }
 
     pub(super) fn start_default_handlers(&self, heartbeat_timeout: Duration) {
@@ -88,14 +87,13 @@ impl<V: MaybeVersioned + 'static> SyncApi<V> {
     }
 
     pub(super) fn handle_conn_stop(&self, handler: thread::JoinHandle<Result<Closer>>) {
-        let mut state = self.state.clone();
+        let mut state = self.connection.share_state();
         let info = self.info().clone();
 
         thread::spawn(move || {
             while !handler.is_finished() {
                 thread::sleep(CONN_STOP_POOLING_INTERVAL);
             }
-
             state.close();
 
             match handler.join() {
@@ -122,7 +120,7 @@ impl<V: MaybeVersioned + 'static> SyncApi<V> {
             receiver: self.connection.receiver(),
             events_tx: self.events_tx.clone(),
         };
-        handler.spawn(self.state.to_closable());
+        handler.spawn(self.connection.share_state().to_closable());
     }
 
     fn handle_inactive_peers(&self, timeout: Duration) {
@@ -133,7 +131,7 @@ impl<V: MaybeVersioned + 'static> SyncApi<V> {
             events_tx: self.events_tx.clone(),
         };
 
-        handler.spawn(self.state.to_closable());
+        handler.spawn(self.connection.share_state().to_closable());
     }
 
     pub(super) fn recv_frame(&self) -> Result<(Frame<V>, Callback<V>)> {

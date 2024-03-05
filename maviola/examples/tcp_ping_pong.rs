@@ -35,18 +35,16 @@ fn spawn_client(addr: &str, component_id: ComponentId) {
     let client_addr = addr.to_string();
     let whoami = format!("client #{component_id}");
 
-    thread::spawn(move || {
-        let mut client = Node::try_from(
-            Node::builder()
-                .system_id(31)
-                .component_id(component_id)
-                .version(V2)
-                .heartbeat_interval(HEARTBEAT_INTERVAL)
-                .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-                .connection(TcpClient::new(client_addr).unwrap()),
-        )
-        .unwrap();
-        client.activate().unwrap();
+    thread::spawn(move || -> Result<()> {
+        let mut client = Node::builder()
+            .version(V2)
+            .system_id(31)
+            .component_id(component_id)
+            .heartbeat_interval(HEARTBEAT_INTERVAL)
+            .heartbeat_timeout(HEARTBEAT_TIMEOUT)
+            .connection(TcpClient::new(client_addr)?)
+            .build()?;
+        client.activate()?;
 
         log::warn!("[{whoami}] started as {:?}", client.info());
 
@@ -65,25 +63,22 @@ fn spawn_client(addr: &str, component_id: ComponentId) {
             }
         }
 
-        log::warn!("[{whoami}] disconnected");
-        drop(client);
+        log::warn!("[{whoami}] finished");
+        Ok(())
     });
 }
 
-fn run(addr: &str) {
+fn run(addr: &str) -> Result<()> {
     let server_addr = addr.to_string();
-    let mut server = Node::try_from(
-        Node::builder()
-            .system_id(17)
-            .component_id(42)
-            .version(V2)
-            .dialect::<Minimal>()
-            .heartbeat_interval(HEARTBEAT_INTERVAL)
-            .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-            .connection(TcpServer::new(server_addr).unwrap()),
-    )
-    .unwrap();
-    server.activate().unwrap();
+    let mut server = Node::builder()
+        .version(V2)
+        .system_id(17)
+        .component_id(42)
+        .heartbeat_interval(HEARTBEAT_INTERVAL)
+        .heartbeat_timeout(HEARTBEAT_TIMEOUT)
+        .connection(TcpServer::new(server_addr)?)
+        .build()?;
+    server.activate()?;
 
     for i in 0..N_CLIENTS {
         spawn_client(addr, i);
@@ -102,6 +97,8 @@ fn run(addr: &str) {
             }
         }
     }
+
+    Ok(())
 }
 
 fn main() {
@@ -112,7 +109,7 @@ fn main() {
         .init();
 
     let addr = addr(port());
-    run(addr.as_str());
+    run(addr.as_str()).unwrap();
 }
 
 #[cfg(test)]
@@ -120,7 +117,7 @@ fn main() {
 fn tcp_ping_pong() {
     let addr = addr(port());
     let handler = thread::spawn(move || {
-        run(addr.as_str());
+        run(addr.as_str()).unwrap();
     });
 
     thread::sleep(Duration::from_secs(5));

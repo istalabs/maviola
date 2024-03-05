@@ -29,19 +29,16 @@ fn report_frame<V: MaybeVersioned>(whoami: &str, frame: &Frame<V>) {
 fn spawn_client(path: PathBuf, component_id: ComponentId) {
     let whoami = format!("client #{component_id}");
 
-    thread::spawn(move || {
-        let mut client = Node::try_from(
-            Node::builder()
-                .system_id(31)
-                .component_id(component_id)
-                .version(V2)
-                .dialect::<Minimal>()
-                .heartbeat_interval(HEARTBEAT_INTERVAL)
-                .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-                .connection(SockClient::new(path).unwrap()),
-        )
-        .unwrap();
-        client.activate().unwrap();
+    thread::spawn(move || -> Result<()> {
+        let mut client = Node::builder()
+            .version(V2)
+            .system_id(31)
+            .component_id(component_id)
+            .heartbeat_interval(HEARTBEAT_INTERVAL)
+            .heartbeat_timeout(HEARTBEAT_TIMEOUT)
+            .connection(SockClient::new(path)?)
+            .build()?;
+        client.activate()?;
 
         log::warn!("[{whoami}] started as {:?}", client.info());
 
@@ -60,24 +57,21 @@ fn spawn_client(path: PathBuf, component_id: ComponentId) {
             }
         }
 
-        log::warn!("[{whoami}] disconnected");
-        drop(client);
+        log::warn!("[{whoami}] finished");
+        Ok(())
     });
 }
 
-fn run(path: PathBuf) {
-    let mut server = Node::try_from(
-        Node::builder()
-            .system_id(17)
-            .component_id(42)
-            .version(V2)
-            .dialect::<Minimal>()
-            .heartbeat_interval(HEARTBEAT_INTERVAL)
-            .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-            .connection(SockServer::new(path.as_path()).unwrap()),
-    )
-    .unwrap();
-    server.activate().unwrap();
+fn run(path: PathBuf) -> Result<()> {
+    let mut server = Node::builder()
+        .version(V2)
+        .system_id(17)
+        .component_id(42)
+        .heartbeat_interval(HEARTBEAT_INTERVAL)
+        .heartbeat_timeout(HEARTBEAT_TIMEOUT)
+        .connection(SockServer::new(path.as_path())?)
+        .build()?;
+    server.activate()?;
     wait();
 
     for i in 0..N_CLIENTS {
@@ -98,6 +92,8 @@ fn run(path: PathBuf) {
             }
         }
     }
+
+    Ok(())
 }
 
 fn main() {
@@ -111,7 +107,7 @@ fn main() {
     if path.exists() {
         remove_file(path.as_path()).unwrap();
     }
-    run(path);
+    run(path).unwrap();
 }
 
 #[cfg(test)]
@@ -122,7 +118,7 @@ fn tcp_ping_pong() {
         remove_file(path.as_path()).unwrap();
     }
     let handler = thread::spawn(move || {
-        run(path);
+        run(path).unwrap();
     });
 
     thread::sleep(Duration::from_secs(5));

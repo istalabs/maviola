@@ -20,9 +20,9 @@ fn wait() {
 
 fn make_sock_server(path: PathBuf) -> EdgeNode<Minimal, V2> {
     Node::builder()
+        .version(V2)
         .system_id(1)
         .component_id(0)
-        .version(V2)
         .heartbeat_interval(HEARTBEAT_INTERVAL)
         .heartbeat_timeout(HEARTBEAT_TIMEOUT)
         .connection(SockServer::new(path.as_path()).unwrap())
@@ -36,9 +36,9 @@ fn make_sock_client(path: PathBuf, id: u16) -> EdgeNode<Minimal, V2> {
     let component_id = bytes[1];
 
     Node::builder()
+        .version(V2)
         .system_id(system_id)
         .component_id(component_id)
-        .version(V2)
         .heartbeat_interval(HEARTBEAT_INTERVAL)
         .heartbeat_timeout(HEARTBEAT_TIMEOUT)
         .connection(SockClient::new(path.as_path()).unwrap())

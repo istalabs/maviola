@@ -8,7 +8,7 @@ use maviola::dialects::minimal as dialect;
 use maviola::prelude::*;
 use maviola::sync::prelude::*;
 
-const HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(75);
+const HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(7500);
 const N_ITER: u16 = 100;
 
 fn wait() {
@@ -24,38 +24,30 @@ fn report_frame<V: MaybeVersioned>(frame: &Frame<V>) {
     )
 }
 
-fn run(path: PathBuf) {
-    let writer = Node::try_from(
-        Node::builder()
-            .system_id(17)
-            .component_id(42)
-            .version(V2)
-            .dialect::<Minimal>()
-            .connection(FileWriter::new(path.as_path()).unwrap()),
-    )
-    .unwrap();
+fn run(path: PathBuf) -> Result<()> {
+    let writer = Node::builder()
+        .version(V2)
+        .system_id(17)
+        .component_id(42)
+        .connection(FileWriter::new(path.as_path())?)
+        .build()?;
 
     log::warn!("[writer] started");
     wait();
     for _ in 0..N_ITER {
-        writer
-            .send(&dialect::messages::Heartbeat::default())
-            .unwrap();
+        writer.send(&dialect::messages::Heartbeat::default())?;
     }
     drop(writer);
     wait();
     log::warn!("[writer] finished");
 
-    let reader = Node::try_from(
-        Node::builder()
-            .system_id(17)
-            .component_id(42)
-            .version(V2)
-            .dialect::<Minimal>()
-            .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-            .connection(FileReader::new(path.as_path()).unwrap()),
-    )
-    .unwrap();
+    let reader = Node::builder()
+        .version(V2)
+        .system_id(17)
+        .component_id(42)
+        .heartbeat_timeout(HEARTBEAT_TIMEOUT)
+        .connection(FileReader::new(path.as_path())?)
+        .build()?;
 
     for event in reader.events() {
         match event {
@@ -63,15 +55,11 @@ fn run(path: PathBuf) {
             Event::Frame(frame, _) => report_frame(&frame),
             Event::PeerLost(peer) => {
                 log::warn!("[reader] disconnected: {peer:?}");
-                if !reader.has_peers() {
-                    log::warn!("[reader] all peers disconnected, exiting");
-                    break;
-                }
             }
         }
     }
 
-    wait();
+    Ok(())
 }
 
 fn main() {
@@ -85,7 +73,7 @@ fn main() {
     if path.exists() {
         remove_file(path.as_path()).unwrap();
     }
-    run(path);
+    run(path).unwrap();
 }
 
 #[cfg(test)]
@@ -96,7 +84,7 @@ fn file_rw() {
         remove_file(path.as_path()).unwrap();
     }
     let handler = thread::spawn(move || {
-        run(path);
+        run(path).unwrap();
     });
 
     thread::sleep(Duration::from_secs(5));

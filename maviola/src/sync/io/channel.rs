@@ -6,8 +6,7 @@ use crate::core::io::{ChannelInfo, ConnectionInfo};
 use crate::core::io::{Receiver, Sender};
 use crate::core::utils::{Closable, SharedCloser, UniqueId};
 use crate::sync::consts::{
-    PEER_CONN_STOP_JOIN_ATTEMPTS, PEER_CONN_STOP_JOIN_POOLING_INTERVAL,
-    PEER_CONN_STOP_POOLING_INTERVAL,
+    CHANNEL_STOP_JOIN_ATTEMPTS, CHANNEL_STOP_JOIN_POOLING_INTERVAL, CHANNEL_STOP_POOLING_INTERVAL,
 };
 use crate::sync::io::{Callback, FrameProducer, FrameSendHandler, FrameSender};
 
@@ -204,16 +203,16 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
             || write_handler.is_finished()
             || read_handler.is_finished())
         {
-            thread::sleep(PEER_CONN_STOP_POOLING_INTERVAL);
+            thread::sleep(CHANNEL_STOP_POOLING_INTERVAL);
         }
         state.close();
 
-        for i in 0..PEER_CONN_STOP_JOIN_ATTEMPTS {
+        for i in 0..CHANNEL_STOP_JOIN_ATTEMPTS {
             if write_handler.is_finished() && read_handler.is_finished() {
                 break;
             }
-            thread::sleep(PEER_CONN_STOP_JOIN_POOLING_INTERVAL);
-            if i == PEER_CONN_STOP_JOIN_ATTEMPTS - 1 {
+            thread::sleep(CHANNEL_STOP_JOIN_POOLING_INTERVAL);
+            if i == CHANNEL_STOP_JOIN_ATTEMPTS - 1 {
                 log::warn!(
                     "[{info:?}] write/read handlers are stuck, finished: write={}, read={}",
                     write_handler.is_finished(),
