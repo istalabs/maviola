@@ -16,8 +16,7 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, AsyncAp
     /// <sup>[`async`](crate::asnc)</sup>
     /// Instantiates node from asynchronous node configuration.
     ///
-    /// Creates ona instance of [`Node`] from [`NodeConf`]. It is also possible to use [`TryFrom`]
-    /// and create a node with [`Node::try_from`].
+    /// Creates ona instance of [`Node`] from [`NodeConf`].
     pub async fn try_from_async_conf(conf: NodeConf<K, D, V, AsyncConnConf<V>>) -> Result<Self> {
         let api = AsyncApi::new(conf.connection().build().await?);
         let state = api.share_state();

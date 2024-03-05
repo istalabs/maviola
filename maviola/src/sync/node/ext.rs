@@ -15,10 +15,9 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, SyncApi
     /// <sup>[`sync`](crate::sync)</sup>
     /// Instantiates node from synchronous node configuration.
     ///
-    /// Creates ona instance of [`Node`] from [`NodeConf`]. It is also possible to use [`TryFrom`]
-    /// and create a node with [`Node::try_from`].
+    /// Creates ona instance of [`Node`] from [`NodeConf`].
     pub fn try_from_conf(conf: NodeConf<K, D, V, ConnConf<V>>) -> Result<Self> {
-        let (conn, stop_handler) = conf.connection().build()?;
+        let (conn, conn_handler) = conf.connection().build()?;
         let api = SyncApi::new(conn);
         let state = api.share_state();
         let is_active = Guarded::from(&state);
@@ -35,7 +34,7 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, SyncApi
         };
 
         node.api.start_default_handlers(node.heartbeat_timeout);
-        node.api.handle_conn_stop(stop_handler);
+        node.api.handle_conn_stop(conn_handler);
 
         Ok(node)
     }

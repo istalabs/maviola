@@ -1,9 +1,11 @@
 use std::fmt::Debug;
 use std::sync::mpsc;
+use std::thread;
 use std::thread::JoinHandle;
 
 use crate::core::io::{ConnectionConf, ConnectionInfo, OutgoingFrame};
-use crate::core::utils::{Closable, Closer, SharedCloser};
+use crate::core::utils::{Closable, SharedCloser};
+use crate::sync::consts::CONN_STOP_POOLING_INTERVAL;
 use crate::sync::io::{Callback, ChannelFactory, FrameReceiver, FrameSender};
 
 use crate::prelude::*;
@@ -11,8 +13,11 @@ use crate::prelude::*;
 /// <sup>[`sync`](crate::sync)</sup>
 /// Connection builder used to create a [`Connection`].
 pub trait ConnectionBuilder<V: MaybeVersioned>: ConnectionConf {
-    /// Builds [`Connection`] from provided configuration.
-    fn build(&self) -> Result<(Connection<V>, JoinHandle<Result<Closer>>)>;
+    /// Builds connection from provided configuration.
+    ///
+    /// Returns the new connection and its main handler. Once handler is finished, the connection
+    /// is considered to be closed.
+    fn build(&self) -> Result<(Connection<V>, ConnectionHandler)>;
 }
 
 /// <sup>[`sync`](crate::sync)</sup>
@@ -23,6 +28,55 @@ pub struct Connection<V: MaybeVersioned + 'static> {
     sender: ConnSender<V>,
     receiver: ConnReceiver<V>,
     state: SharedCloser,
+}
+
+/// <sup>[`sync`](crate::sync)</sup>
+/// Connection handler.
+pub struct ConnectionHandler {
+    inner: JoinHandle<Result<()>>,
+}
+
+impl ConnectionHandler {
+    /// Spawns a new connection handler from a closure.
+    pub fn spawn<F>(func: F) -> Self
+    where
+        F: FnOnce() -> Result<()>,
+        F: Send + 'static,
+    {
+        Self {
+            inner: thread::spawn(func),
+        }
+    }
+
+    /// Spawns a new connection handler that finishes when the `state` becomes closed.
+    pub fn spawn_from_state(state: SharedCloser) -> Self {
+        Self::spawn(move || {
+            while !state.is_closed() {
+                thread::sleep(CONN_STOP_POOLING_INTERVAL);
+            }
+            Ok(())
+        })
+    }
+
+    pub(crate) fn handle<V: MaybeVersioned>(self, conn: &Connection<V>) {
+        let mut state = conn.state.clone();
+        let info = conn.info.clone();
+
+        thread::spawn(move || {
+            while !self.inner.is_finished() {
+                thread::sleep(CONN_STOP_POOLING_INTERVAL);
+            }
+            state.close();
+
+            match self.inner.join() {
+                Ok(res) => match res {
+                    Ok(_) => log::debug!("[{info:?}] connection stopped"),
+                    Err(err) => log::debug!("[{info:?}] connection exited with error: {err:?}"),
+                },
+                Err(err) => log::error!("[{info:?}] connection failed: {err:?}"),
+            }
+        });
+    }
 }
 
 impl<V: MaybeVersioned> Connection<V> {

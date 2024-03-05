@@ -2,30 +2,29 @@ use std::collections::HashMap;
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::mpsc;
 use std::thread;
-use std::thread::JoinHandle;
 
 use crate::core::io::{ChannelInfo, ConnectionInfo};
 use crate::core::utils::{Closable, Closer};
-use crate::sync::io::{Connection, ConnectionBuilder};
+use crate::sync::io::{Connection, ConnectionBuilder, ConnectionHandler};
 use crate::sync::utils::{MpscReader, MpscWriter};
 
 use crate::prelude::*;
 
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServer {
-    fn build(&self) -> Result<(Connection<V>, JoinHandle<Result<Closer>>)> {
+    fn build(&self) -> Result<(Connection<V>, ConnectionHandler)> {
         let server_addr = self.addr;
         let udp_socket = UdpSocket::bind(server_addr)?;
 
         let conn_state = Closer::new();
         let (connection, chan_factory) = Connection::new(self.info.clone(), conn_state.to_shared());
 
-        let handler = thread::spawn(move || -> Result<Closer> {
+        let handler = ConnectionHandler::spawn(move || -> Result<()> {
             let mut peers = HashMap::new();
             let mut buf = [0u8; 512];
 
             loop {
                 if conn_state.is_closed() {
-                    return Ok(conn_state);
+                    return Ok(());
                 }
 
                 let (bytes_read, peer_addr) = udp_socket.recv_from(buf.as_mut_slice())?;

@@ -1,18 +1,15 @@
 use std::net::UdpSocket;
-use std::thread;
-use std::thread::JoinHandle;
 
 use crate::core::io::ChannelInfo;
 use crate::core::utils::net::{pick_unused_port, resolve_socket_addr};
-use crate::core::utils::Closer;
+use crate::core::utils::SharedCloser;
 use crate::sync::io::transport::udp::udp_rw::UdpRW;
-use crate::sync::io::{Connection, ConnectionBuilder};
+use crate::sync::io::{Connection, ConnectionBuilder, ConnectionHandler};
 
 use crate::prelude::*;
-use crate::sync::consts::CONN_STOP_POOLING_INTERVAL;
 
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpClient {
-    fn build(&self) -> Result<(Connection<V>, JoinHandle<Result<Closer>>)> {
+    fn build(&self) -> Result<(Connection<V>, ConnectionHandler)> {
         let bind_addr = match self.bind_addr {
             None => resolve_socket_addr(format!("{}:{}", self.host, pick_unused_port()?))?,
             Some(bind_addr) => bind_addr,
@@ -25,8 +22,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpClient {
         let writer = UdpRW::new(udp_socket);
         let reader = writer.try_clone()?;
 
-        let conn_state = Closer::new();
-        let (connection, chan_factory) = Connection::new(self.info.clone(), conn_state.to_shared());
+        let (connection, chan_factory) = Connection::new(self.info.clone(), SharedCloser::new());
 
         let channel = chan_factory.build(
             ChannelInfo::UdpClient {
@@ -38,12 +34,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpClient {
         );
         let channel_state = channel.spawn();
 
-        let handler = thread::spawn(move || -> Result<Closer> {
-            while !channel_state.is_closed() {
-                thread::sleep(CONN_STOP_POOLING_INTERVAL);
-            }
-            Ok(conn_state)
-        });
+        let handler = ConnectionHandler::spawn_from_state(channel_state);
 
         Ok((connection, handler))
     }

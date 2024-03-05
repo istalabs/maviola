@@ -1,15 +1,13 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::{Arc, RwLock};
-use std::thread;
 use std::time::Duration;
 
 use crate::core::io::ConnectionInfo;
 use crate::core::node::NodeApi;
-use crate::core::utils::{Closer, Guarded, Sealed, SharedCloser, Switch};
+use crate::core::utils::{Guarded, Sealed, SharedCloser, Switch};
 use crate::protocol::{Endpoint, Peer};
-use crate::sync::consts::CONN_STOP_POOLING_INTERVAL;
-use crate::sync::io::{Callback, Connection};
+use crate::sync::io::{Callback, Connection, ConnectionHandler};
 use crate::sync::node::event::EventsIterator;
 use crate::sync::node::handler::{HeartbeatEmitter, InactivePeersHandler, IncomingFramesHandler};
 use crate::sync::node::Event;
@@ -86,31 +84,8 @@ impl<V: MaybeVersioned + 'static> SyncApi<V> {
         self.handle_inactive_peers(heartbeat_timeout);
     }
 
-    pub(super) fn handle_conn_stop(&self, handler: thread::JoinHandle<Result<Closer>>) {
-        let mut state = self.connection.share_state();
-        let info = self.info().clone();
-
-        thread::spawn(move || {
-            while !handler.is_finished() {
-                thread::sleep(CONN_STOP_POOLING_INTERVAL);
-            }
-            state.close();
-
-            match handler.join() {
-                Ok(res) => match res {
-                    Ok(mut closer) => {
-                        closer.close();
-                        log::debug!("[{info:?}] connection stopped")
-                    }
-                    Err(err) => {
-                        log::debug!("[{info:?}] connection exited with error: {err:?}")
-                    }
-                },
-                Err(err) => {
-                    log::error!("[{info:?}] connection aborted: {err:?}");
-                }
-            }
-        });
+    pub(super) fn handle_conn_stop(&self, handler: ConnectionHandler) {
+        handler.handle(&self.connection)
     }
 
     fn handle_incoming_frames(&self) {

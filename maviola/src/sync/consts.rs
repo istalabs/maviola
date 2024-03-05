@@ -1,10 +1,11 @@
 use std::time::Duration;
 
+pub(crate) const CONN_STOP_POOLING_INTERVAL: Duration = Duration::from_millis(1);
+
 pub(crate) const CHANNEL_STOP_POOLING_INTERVAL: Duration = Duration::from_micros(100);
 pub(crate) const CHANNEL_STOP_JOIN_POOLING_INTERVAL: Duration = Duration::from_millis(100);
 pub(crate) const CHANNEL_STOP_JOIN_ATTEMPTS: usize = 30;
 
-pub(crate) const CONN_STOP_POOLING_INTERVAL: Duration = Duration::from_millis(1);
 pub(crate) const EVENTS_RECV_POOLING_INTERVAL: Duration = Duration::from_millis(1);
 
 pub(crate) const TCP_READ_TIMEOUT: Option<Duration> = None;
