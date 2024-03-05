@@ -2,7 +2,6 @@
 
 mod api;
 mod build_ext;
-mod convert;
 mod event;
 mod ext;
 mod handler;
