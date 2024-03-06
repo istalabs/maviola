@@ -50,7 +50,7 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, SyncApi
     /// <sup>[`sync`](crate::sync)</sup>
     /// Receive MAVLink message blocking until MAVLink frame received.
     pub fn recv(&self) -> Result<(D, Callback<V>)> {
-        let (frame, res) = self.recv_frame_internal()?;
+        let (frame, res) = self.api.recv_frame()?;
         let msg = D::decode(frame.payload())?;
         Ok((msg, res))
     }
@@ -58,11 +58,12 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, SyncApi
     /// <sup>[`sync`](crate::sync)</sup>
     /// Attempts to receive MAVLink message without blocking.
     pub fn try_recv(&self) -> Result<(D, Callback<V>)> {
-        let (frame, res) = self.try_recv_frame_internal()?;
+        let (frame, res) = self.api.try_recv_frame()?;
         let msg = D::decode(frame.payload())?;
         Ok((msg, res))
     }
 
+    /// <sup>[`sync`](crate::sync)</sup>
     /// Request the next node [`Event`].
     ///
     /// Blocks until event received.
@@ -70,6 +71,7 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, SyncApi
         self.api.recv_event()
     }
 
+    /// <sup>[`sync`](crate::sync)</sup>
     /// Attempts to receive MAVLink [`Event`] without blocking.
     pub fn try_recv_event(&self) -> Result<Event<V>> {
         self.api.try_recv_event()
@@ -98,11 +100,11 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, SyncApi
     /// * [`timestamp`](Frame::timestamp)
     ///
     /// To send MAVLink messages instead of raw frames, construct an [`Edge`] node and use
-    /// messages [`Node::send_versioned`] for node which is [`Versionless`] and [`Node::send`] for
+    /// [`Node::send_versioned`] for node which is [`Versionless`] and [`Node::send`] for
     /// [`Versioned`] nodes. In the latter case, message will be encoded according to MAVLink
     /// protocol version defined for a node.
     pub fn proxy_frame(&self, frame: &Frame<V>) -> Result<()> {
-        self.send_frame_internal(frame)
+        self.api.send_frame(frame)
     }
 
     /// <sup>[`sync`](crate::sync)</sup>
@@ -110,13 +112,13 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, SyncApi
     ///
     /// Blocks until frame received.
     pub fn recv_frame(&self) -> Result<(Frame<V>, Callback<V>)> {
-        self.recv_frame_internal()
+        self.api.recv_frame()
     }
 
     /// <sup>[`sync`](crate::sync)</sup>
     /// Attempts to receive MAVLink [`Frame`] without blocking.
     pub fn try_recv_frame(&self) -> Result<(Frame<V>, Callback<V>)> {
-        self.try_recv_frame_internal()
+        self.api.try_recv_frame()
     }
 
     /// <sup>[`sync`](crate::sync)</sup>
@@ -125,18 +127,6 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, SyncApi
     /// Blocks while the node is active.
     pub fn events(&self) -> impl Iterator<Item = Event<V>> {
         self.api.events()
-    }
-
-    fn recv_frame_internal(&self) -> Result<(Frame<V>, Callback<V>)> {
-        self.api.recv_frame()
-    }
-
-    fn try_recv_frame_internal(&self) -> Result<(Frame<V>, Callback<V>)> {
-        self.api.try_recv_frame()
-    }
-
-    fn send_frame_internal(&self, frame: &Frame<V>) -> Result<()> {
-        self.api.send_frame(frame)
     }
 }
 
@@ -147,7 +137,7 @@ impl<D: Dialect, V: Versioned + 'static> Node<Edge<V>, D, V, SyncApi<V>> {
     /// Active nodes emit heartbeats and perform other operations which do not depend on user
     /// initiative directly.
     ///
-    /// This method is available only for nodes which are [`Edge`].
+    /// This method is available only for nodes which are [`Edge`] and [`Versioned`].
     ///
     /// [`Node::activate`] is idempotent while node is connected. Otherwise, it will return
     /// [`NodeError::Inactive`] variant of [`Error::Node`].

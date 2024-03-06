@@ -44,9 +44,8 @@ use crate::prelude::*;
 /// // Create a node from configuration
 /// let mut node = Node::builder()
 ///     .version(V2)                // restrict node to MAVLink2 protocol version
-///     .system_id(1)               // System `ID`
-///     .component_id(1)            // Component `ID`
 ///     .dialect::<Minimal>()       // Dialect is set to `minimal`
+///     .id(MavLinkId::new(1, 1))   // Set system and component IDs
 ///     .connection(
 ///         TcpServer::new(addr)    // Configure TCP server connection
 ///             .unwrap()
@@ -68,9 +67,8 @@ use crate::prelude::*;
 /// // Create a node from configuration
 /// let mut node = Node::builder()
 ///     .version(V2)                // restrict node to MAVLink2 protocol version
-///     .system_id(1)               // System `ID`
-///     .component_id(1)            // Component `ID`
 ///     .dialect::<Minimal>()       // Dialect is set to `minimal`
+///     .id(MavLinkId::new(1, 1))   // Set system and component IDs
 ///     .async_connection(
 ///         TcpServer::new(addr)    // Configure TCP server connection
 ///             .unwrap()
@@ -144,13 +142,8 @@ impl<D: Dialect, V: Versioned + 'static, A: NodeApi<V>> Node<Edge<V>, D, V, A> {
     /// If you want to send messages within different MAVLink protocols simultaneously, you have
     /// to construct a [`Versionless`] node and use [`Node::send_versioned`]
     pub fn send(&self, message: &impl Message) -> Result<()> {
-        let frame = self.kind.endpoint.next_frame(message)?;
+        let frame = self.next_frame(message)?;
         self.api.send_frame(&frame)
-    }
-
-    /// Create a next frame from MAVLink message.
-    pub fn next_frame(&self, message: &impl Message) -> Result<Frame<V>> {
-        self.kind.endpoint.next_frame(message).map_err(Error::from)
     }
 
     /// Returns `true`, if node is active.
@@ -179,6 +172,20 @@ impl<D: Dialect, V: Versioned + 'static, A: NodeApi<V>> Node<Edge<V>, D, V, A> {
     /// Default value is [`DEFAULT_HEARTBEAT_INTERVAL`](crate::core::consts::DEFAULT_HEARTBEAT_INTERVAL).
     pub fn heartbeat_interval(&self) -> Duration {
         self.heartbeat_interval
+    }
+
+    /// Create a next frame from MAVLink message.
+    pub fn next_frame(&self, message: &impl Message) -> Result<Frame<V>> {
+        let unsigned_frame = self.kind.endpoint.next_frame(message)?;
+
+        let frame = if V::matches(MavLinkVersion::V2) {
+            let frame = unsigned_frame.try_versioned(V2)?;
+            frame.try_versioned(V::v())?
+        } else {
+            unsigned_frame
+        };
+
+        Ok(frame)
     }
 
     /// Deactivates the node.
@@ -226,8 +233,21 @@ impl<D: Dialect, A: NodeApi<Versionless>> Node<Edge<Versionless>, D, Versionless
     /// If you want to restrict MAVLink protocol to a particular version, construct a [`Versioned`]
     /// node and simply send messages by calling [`Node::send`].
     pub fn send_versioned<V: Versioned>(&self, message: &impl Message) -> Result<()> {
-        let frame = self.kind.endpoint.next_frame::<V>(message)?.versionless();
+        let frame = self.next_frame_versioned::<V>(message)?;
         self.api.send_frame(&frame)
+    }
+
+    /// Create a next frame from MAVLink message with a specified protocol version.
+    ///
+    /// After creation, the frame will be converted into a [`Versionless`] form.
+    pub fn next_frame_versioned<V: Versioned>(
+        &self,
+        message: &impl Message,
+    ) -> Result<Frame<Versionless>> {
+        self.kind
+            .endpoint
+            .next_frame::<V>(message)
+            .map_err(Error::from)
     }
 }
 

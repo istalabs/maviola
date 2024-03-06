@@ -5,6 +5,9 @@ use std::time::SystemTime;
 use crate::protocol::{ComponentId, MavLinkId, SystemId};
 
 /// MAVLink device with [`system_id`](Peer::system_id) and [`component_id`](Peer::component_id).
+///
+/// Similar to [`MavLinkId`] with the difference that it keeps its last active time. Can be
+/// converted from [`MavLinkId`] using [`Peer::from`].
 #[derive(Clone, Eq)]
 pub struct Peer {
     pub(crate) id: MavLinkId,
@@ -68,6 +71,26 @@ impl Debug for Peer {
             .field("system_id", &self.system_id())
             .field("component_id", &self.component_id())
             .finish_non_exhaustive()
+    }
+}
+
+impl From<MavLinkId> for Peer {
+    /// Constructs a [`Peer`] from [`MavLinkId`] passed by value.
+    fn from(value: MavLinkId) -> Self {
+        Self {
+            id: value,
+            last_active: SystemTime::now(),
+        }
+    }
+}
+
+impl From<&MavLinkId> for Peer {
+    /// Constructs a [`Peer`] from [`MavLinkId`] passed by reference.
+    fn from(value: &MavLinkId) -> Self {
+        Self {
+            id: value.clone(),
+            last_active: SystemTime::now(),
+        }
     }
 }
 
