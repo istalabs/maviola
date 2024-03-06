@@ -7,10 +7,10 @@
 //!
 //! The following transports are currently available:
 //!
-//! * TCP: [`TcpServer`]
-//! * UDP: [`UdpServer`]
-//! * File: [`FileWriter`]
-//! * Unix socket: [`SockServer`] (only on Unix-like systems such as Linux or OS X)
+//! * TCP: [`TcpServer`] / [`TcpClient`]
+//! * UDP: [`UdpServer`] / [`UdpClient`]
+//! * File: [`FileWriter`] / [`FileReader`]
+//! * Unix socket: [`SockServer`] / [`SockClient`] (only on Unix-like systems such as Linux or OS X)
 //!
 //! ## API modes
 //!

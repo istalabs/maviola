@@ -6,7 +6,32 @@
 //! example, TCP server creates a channel per each incoming connection. Abstractions related to
 //! channels and connections are defined in the [`io`] module.
 //!
-//! Available transports:
+//! ## Usage
+//!
+//! To use synchronous API, you have to configure node to use asynchronous connection using
+//! [`NodeBuilder::connection`](crate::core::node::NodeBuilder::connection).
+//! For example, the following snippet will create a synchronous TCP client:
+//!
+//! ```rust,no_run
+//! use maviola::prelude::*;
+//!
+//! let addr = "127.0.0.1:5600";
+//!
+//! // Create a TCP client node
+//! let node = Node::builder()
+//!         /* define other node parameters */
+//! #       .version(V2)
+//! #       .system_id(1)
+//! #       .component_id(1)
+//!         .connection(
+//!             TcpClient::new(addr)    // Configure TCP client connection
+//!                 .unwrap()
+//!         ).build().unwrap();
+//! ```
+//!
+//! ## Transport
+//!
+//! The following transports are currently available:
 //!
 //! * TCP: [`TcpServer`] / [`TcpClient`]
 //! * UDP: [`UdpServer`] / [`UdpClient`]
@@ -19,7 +44,7 @@
 //!
 //! ## Events
 //!
-//! The suggested approach for handling several MAVLink devices is subscribing for
+//! The suggested approach for handling connection with several MAVLink devices is subscribing for
 //! [`Node::events`]. This method provides an iterator over all node events. Incoming frames are
 //! emitted as [`Event::Frame`]. Such events contain a [`Frame`] / [`Callback`] pair. The latter can
 //! be used to respond to a channel from which frame was received or broadcast it to all channels

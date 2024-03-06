@@ -168,6 +168,12 @@ impl From<mpsc::RecvError> for Error {
 
 impl<T> From<tokio::sync::broadcast::error::SendError<T>> for Error {
     fn from(_: tokio::sync::broadcast::error::SendError<T>) -> Self {
+        SyncError::ChannelClosed("async MPMC send".into()).into()
+    }
+}
+
+impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Error {
+    fn from(_: tokio::sync::mpsc::error::SendError<T>) -> Self {
         SyncError::ChannelClosed("async MPSC send".into()).into()
     }
 }
@@ -176,7 +182,7 @@ impl From<tokio::sync::broadcast::error::RecvError> for Error {
     fn from(value: tokio::sync::broadcast::error::RecvError) -> Self {
         match value {
             tokio::sync::broadcast::error::RecvError::Closed => {
-                SyncError::ChannelClosed("async MPSC recv".into())
+                SyncError::ChannelClosed("async MPMC recv".into())
             }
             tokio::sync::broadcast::error::RecvError::Lagged(val) => SyncError::Lagged(val),
         }

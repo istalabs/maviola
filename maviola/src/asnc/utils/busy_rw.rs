@@ -6,7 +6,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncWrite, Error, ErrorKind, ReadBuf};
 
-/// <sup>`⍚` | [`sync`](crate::sync)</sup>
+/// <sup>`⍚` | [`async`](crate::asnc)</sup>
 /// Reader that always returns a time-out error.
 ///
 /// This reader always returns time-out I/O error for any read attempt. It is useful for creating
@@ -34,7 +34,7 @@ impl AsyncRead for BusyReader {
     }
 }
 
-/// <sup>`⍚` | [`sync`](crate::sync)</sup>
+/// <sup>`⍚` | [`async`](crate::asnc)</sup>
 /// Writer that always returns a time-out error.
 ///
 /// This writer always returns time-out I/O error for any write attempt. It is useful for creating

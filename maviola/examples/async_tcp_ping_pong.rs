@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use portpicker::{pick_unused_port, Port};
-use tokio_stream::StreamExt;
 
 use maviola::protocol::ComponentId;
 

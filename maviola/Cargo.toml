@@ -25,7 +25,7 @@ path = "src/lib.rs"
 ###########################################################
 [dependencies]
 log = "0.4.20"
-mavio = { version = "0.2.0-rc2", path = "../../mavio/mavio", features = ["extras"] }
+mavio = { version = "0.2.0-rc2", path = "../../mavio/mavio", features = ["extras", "minimal"] }
 portpicker = "0.1.1"
 serde = { version = "1.0.193", default-features = false, features = ["derive"], optional = true }
 serde_arrays = { version = "0.1.0", default-features = false, optional = true }
@@ -47,7 +47,7 @@ tokio = { version = "1.36.0", default-features = false, features = ["sync", "rt"
 ###########################################################
 [features]
 ## Default features.
-default = ["minimal", "sync", "async"]
+default = ["sync", "async"]
 ## Enables synchromous API.
 sync = []
 ## Enables asynchromous API via Tokio.
@@ -57,7 +57,7 @@ async = [
     "dep:tokio",
     "dep:tokio-stream",
     "dep:tokio-util",
-    "mavio/tokio"
+    "mavio/async"
 ]
 ## Enables serde support.
 serde = [
@@ -147,9 +147,14 @@ test = true
 required-features = ["async"]
 
 [[example]]
+name = "async_udp_ping_pong"
+test = true
+required-features = ["async"]
+
+[[example]]
 name = "async_sock_ping_pong"
 test = true
-required-features = ["sync"]
+required-features = ["async"]
 
 [[example]]
 name = "async_file_rw"

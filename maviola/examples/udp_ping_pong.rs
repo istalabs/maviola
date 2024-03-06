@@ -72,7 +72,6 @@ fn run(addr: &str) -> Result<()> {
     let server_addr = addr.to_string();
     let mut server = Node::builder()
         .version(V2)
-        .dialect::<Minimal>()
         .system_id(17)
         .component_id(42)
         .heartbeat_interval(HEARTBEAT_INTERVAL)
@@ -80,6 +79,8 @@ fn run(addr: &str) -> Result<()> {
         .connection(UdpServer::new(server_addr)?)
         .build()?;
     server.activate()?;
+
+    log::warn!("[server] started as {:?}", server.info());
 
     for i in 0..N_CLIENTS {
         spawn_client(addr, i);

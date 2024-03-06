@@ -21,7 +21,7 @@ use crate::prelude::*;
 /// ```rust,no_run
 /// use maviola::prelude::*;
 ///
-/// let addr = "127.0.0.1:5600";
+/// let addr = "127.0.0.1:14500";
 ///
 /// // Create a UDP server node
 /// let node = Node::builder()
@@ -33,6 +33,27 @@ use crate::prelude::*;
 ///             UdpServer::new(addr)    // Configure UDP server connection
 ///                 .unwrap()
 ///         ).build().unwrap();
+/// ```
+///
+/// Create an asynchronous UDP server node:
+///
+/// ```rust,no_run
+/// # #[tokio::main] async fn main() {
+/// use maviola::prelude::*;
+///
+/// let addr = "127.0.0.1:14500";
+///
+/// // Create a UDP server node
+/// let node = Node::builder()
+///         /* define other node parameters */
+/// #       .version(V2)
+/// #       .system_id(1)
+/// #       .component_id(1)
+///         .async_connection(
+///             UdpServer::new(addr)    // Configure UDP server connection
+///                 .unwrap()
+///         ).build().await.unwrap();
+/// # }
 /// ```
 #[derive(Clone, Debug)]
 pub struct UdpServer {

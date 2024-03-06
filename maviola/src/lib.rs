@@ -5,20 +5,54 @@
 //! features of the MAVLink protocol, such as sequencing, message time-stamping, automatic
 //! heartbeats, simplifies message signing, and so on.
 //!
-//! Maviola is based on [Mavio](https://gitlab.com/mavka/libs/mavio), a low-level library with
-//! `no-std` support. If you are looking for a solution for embedded devices, then Mavio would be a
-//! better option.
+//! This library is a part of [Mavka](https://mavka.gitlab.io/home/) toolchain. It is based on
+//! [Mavio](https://gitlab.com/mavka/libs/mavio), a low-level MAVLink library, and compatible with
+//! [MAVSpec](https://gitlab.com/mavka/libs/mavspec) MAVLink dialects generator.
 //!
-//! > **⚠ WIP**
-//! >
-//! > Maviola is still under heavy development. The aim is to provide API similar to
-//! > [`gomavlib`](https://github.com/bluenviron/gomavlib) with additional support for essential MAVLink
-//! > ["microservices"](https://mavlink.io/en/services/) such as [heartbeat](https://mavlink.io/en/services/heartbeat.html),
-//! > [parameter protocol](https://mavlink.io/en/services/parameter.html) and
-//! > [commands](https://mavlink.io/en/services/command.html).
-//! >
-//! > This is project stub. We intentionally do not publish early versions of API to avoid confusion and massive
-//! > breaking changes.
+//! ## Features
+//!
+//! Maviola is designed to hide most of its functionality under corresponding feature flags. If you
+//! need certain features, you have to explicitly opt-in.
+//!
+//! ### API Modes
+//!
+//! Maviola supports both synchronous and asynchronous API:
+//!
+//! * `sync` enables synchronous API (see [`sync`]).
+//! * `async` enables asynchronous API (see [`asnc`]).
+//!
+//! ### MAVLink Dialects
+//!
+//! Standard MAVLink dialect can be enabled by the corresponding feature flags. The `minimal` is
+//! always enabled.
+//!
+//! * [`minimal`]((https://mavlink.io/en/messages/minimal.html)) — minimal dialect required to
+//!   expose your presence to other MAVLink devices (this dialect is enabled by default).
+//! * [`standard`](https://mavlink.io/en/messages/standard.html) — a superset of `minimal` dialect,
+//!   that expected to be used by almost all flight stack.
+//! * [`common`](https://mavlink.io/en/messages/common.html) — minimum viable dialect with most of
+//!   the features, a building block for other future-rich dialects.
+//! * [`ardupilotmega`](https://mavlink.io/en/messages/common.html) — feature-full dialect used by
+//!   [ArduPilot](http://ardupilot.org). In most cases this dialect is the go-to choice if you want
+//!   to recognize almost all MAVLink messages used by existing flight stacks.
+//! * [`all`](https://mavlink.io/en/messages/all.html) — meta-dialect which includes all other
+//!   standard dialects including these which were created for testing purposes. It is guaranteed
+//!   that namespaces of the dialects in `all` family do not collide.
+//! * Other dialects from MAVLink XML [definitions](https://github.com/mavlink/mavlink/tree/master/message_definitions/v1.0):
+//!   `asluav`, `avssuas`, `csairlink`, `cubepilot`, `development`, `icarous`, `matrixpilot`,
+//!   `paparazzi`, `ualberta`, `uavionix`. These do not include `python_array_test` and `test`
+//!   dialects which should be either generated manually or as a part of `all` meta-dialect.
+//!
+//! ### Unstable Features
+//!
+//! Some parts of the API are still considered to be unstable and available only under the
+//! `unstable` feature flag.
+//!
+//! ## Embedded Devices
+//!
+//! Maviola is based on [Mavio](https://gitlab.com/mavka/libs/mavio), a low-level library with
+//! `no-std` support. If you are looking for a solution for embedded devices, then Mavio would
+//! probably be a better option.
 
 #![warn(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]

@@ -2,8 +2,6 @@ use std::fs::remove_file;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use tokio_stream::StreamExt;
-
 use maviola::dialects::minimal as dialect;
 
 use maviola::asnc::prelude::*;
@@ -58,6 +56,7 @@ async fn run(path: PathBuf) -> Result<()> {
         }
     }
     log::warn!("[reader] finished");
+    Ok(())
 }
 
 #[tokio::main(flavor = "current_thread")]
