@@ -45,6 +45,23 @@ impl NodeBuilder<NoSystemId, NoComponentId, Minimal, Versionless, NoConnConf> {
     }
 }
 
+impl<D: Dialect, V: MaybeVersioned, CC: MaybeConnConf>
+    NodeBuilder<NoSystemId, NoComponentId, D, V, CC>
+{
+    /// Set [`NodeConf::system_id`] and [`NodeConf::component_id`].
+    pub fn id(self, id: MavLinkId) -> NodeBuilder<HasSystemId, HasComponentId, D, V, CC> {
+        NodeBuilder {
+            system_id: HasSystemId(id.system),
+            component_id: HasComponentId(id.component),
+            version: self.version,
+            conn_conf: self.conn_conf,
+            heartbeat_timeout: self.heartbeat_timeout,
+            heartbeat_interval: self.heartbeat_interval,
+            _dialect: self._dialect,
+        }
+    }
+}
+
 impl<C: MaybeComponentId, D: Dialect, V: MaybeVersioned, CC: MaybeConnConf>
     NodeBuilder<NoSystemId, C, D, V, CC>
 {

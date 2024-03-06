@@ -82,7 +82,10 @@ impl<V: MaybeVersioned + 'static> Stream for EventStream<V> {
             Ok(event) => Poll::Ready(Some(event)),
             Err(err) => match err {
                 RecvError::Closed => Poll::Ready(None),
-                RecvError::Lagged(_) => Poll::Pending,
+                RecvError::Lagged(_) => {
+                    cx.waker().wake_by_ref();
+                    Poll::Pending
+                }
             },
         }
     }

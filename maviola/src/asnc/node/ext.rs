@@ -127,7 +127,8 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, AsyncAp
     /// <sup>[`async`](crate::asnc)</sup>
     /// Subscribe to node events.
     ///
-    /// Returns a stream of node events.
+    /// Returns a stream of node events. Requires [`StreamExt`] from Tokio stream extensions to be
+    /// imported (you may use [`asnc::prelude`](crate::asnc::prelude) that imports it as well).
     ///
     /// ⚠ The result is wrapped with [`Behold`] as a reminder that the returned stream will have
     /// access only to events that were emitted close to the moment when the method is called and

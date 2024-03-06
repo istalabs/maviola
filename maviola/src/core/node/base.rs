@@ -122,6 +122,12 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> Node<K
         !self.state.is_closed()
     }
 
+    /// Validates frame using node configuration.
+    pub fn validate_frame(&self, frame: &Frame<V>) -> Result<()> {
+        frame.validate_checksum::<D>()?;
+        Ok(())
+    }
+
     fn close(&mut self) {
         self.state.close();
 
@@ -140,6 +146,11 @@ impl<D: Dialect, V: Versioned + 'static, A: NodeApi<V>> Node<Edge<V>, D, V, A> {
     pub fn send(&self, message: &impl Message) -> Result<()> {
         let frame = self.kind.endpoint.next_frame(message)?;
         self.api.send_frame(&frame)
+    }
+
+    /// Create a next frame from MAVLink message.
+    pub fn next_frame(&self, message: &impl Message) -> Result<Frame<V>> {
+        self.kind.endpoint.next_frame(message).map_err(Error::from)
     }
 
     /// Returns `true`, if node is active.
