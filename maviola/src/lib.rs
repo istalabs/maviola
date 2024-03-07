@@ -8,9 +8,8 @@
 //! [![`docs.rs`](https://img.shields.io/docsrs/maviola.svg?label=docs.rs)](https://docs.rs/maviola/latest/maviola/)
 //! [![`issues`](https://img.shields.io/gitlab/issues/open/mavka/libs/maviola.svg)](https://gitlab.com/mavka/libs/maviola/-/issues/)
 //!
-//! Maviola provides abstractions like communication nodes and takes care of **stateful** features
-//! of the MAVLink protocol, such as sequencing, message time-stamping, automatic heartbeats,
-//! message signing, and so on.
+//! Maviola provides abstractions such as communication node and implements **stateful** features
+//! of MAVLink protocol: sequencing, message signing, automatic heartbeats, and so on.
 //!
 //! This library is a part of [Mavka](https://mavka.gitlab.io/home/) toolchain. It is based on
 //! [Mavio](https://gitlab.com/mavka/libs/mavio), a low-level MAVLink library, and compatible with
@@ -21,12 +20,15 @@
 //! This library provides both synchronous and asynchronous API. The synchronous API is available
 //! in [`sync`] module and can be enabled by `sync` feature flag. The asynchronous API is based on
 //! [Tokio](https://tokio.rs/), it can be found in [`asnc`] module and is enabled by `async` feature
-//! flag. The differences between synchronous and asynchronous APIs are minimal, so you can easily
-//! switch between them, if necessary. It is also possible to use both synchronous and asynchronous
-//! APIs in different parts of your project.
+//! flag.
+//!
+//! The central Maviola abstraction is [`Node`](core::node::Node). A node represents a connection to
+//! MAVLink network. Nodes which represent MAVLink components with defined system and component IDs
+//! are called **edge** nodes. Unidentified nodes are called **proxy** nodes. The former can send
+//! automatic heartbeats and perform other actions that does not require initiative from the user.
 //!
 //! ⓘ We suggest to use [`prelude`] with the corresponding [`sync::prelude`] / [`asnc::prelude`]
-//! whenever possible. This will import the most used abstractions.
+//! whenever possible. This will import the most useful abstractions.
 //!
 //! ### Synchronous API
 //!
@@ -76,6 +78,9 @@
 //!                 // except the one that sent this message
 //!                 callback.respond_others(&server.next_frame(&msg)?)?;
 //!             }
+//!         }
+//!         Event::Invalid(frame, err, callback) => {
+//!             /* Handle invalid frame */
 //!         }
 //!     }
 //! }
@@ -136,6 +141,9 @@
 //!                 callback.respond_others(&server.next_frame(&msg)?)?;
 //!             }
 //!         }
+//!         Event::Invalid(frame, err, callback) => {
+//!             /* Handle invalid frame */
+//!         }
 //!     }
 //! }
 //! # Ok(()) }
@@ -185,7 +193,7 @@
 //! </details>
 //!
 //! Custom MAVLink dialects can be generated from XML message definitions using
-//! [MAVSpec](https://gitlab.com/mavka/libs/mavspec). See MAVSpec documentation for details.
+//! [MAVSpec](https://gitlab.com/mavka/libs/mavspec). Check MAVSpec documentation for details.
 //!
 //! ### Unstable Features
 //!
@@ -207,9 +215,7 @@
 )]
 
 #[cfg(feature = "async")]
-#[allow(async_fn_in_trait)]
-#[allow(unused_imports)]
-#[allow(dead_code)]
+// #[allow(async_fn_in_trait)]
 pub mod asnc;
 pub mod core;
 pub mod prelude;

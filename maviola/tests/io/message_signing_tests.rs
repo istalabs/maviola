@@ -1,10 +1,11 @@
-use maviola::protocol::{SignConf, SignStrategy};
+use maviola::protocol::{MessageSigner, SignStrategy};
 
 #[test]
 fn define_signing_config() {
-    SignConf::builder()
+    MessageSigner::builder()
         .key("abcdef")
-        .incoming(SignStrategy::Proxy)
-        .outgoing(SignStrategy::Reject)
+        .link_id(1)
+        .incoming(SignStrategy::Sign)
+        .outgoing(SignStrategy::Strict)
         .build();
 }

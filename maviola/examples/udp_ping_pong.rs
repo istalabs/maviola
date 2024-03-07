@@ -97,6 +97,7 @@ fn run(addr: &str) -> Result<()> {
                     break;
                 }
             }
+            _ => {}
         }
     }
 

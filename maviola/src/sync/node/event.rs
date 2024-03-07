@@ -1,10 +1,11 @@
-use std::sync::mpsc::TryRecvError;
 use std::thread;
 
+use crate::core::error::TryRecvError;
 use crate::core::utils::Closable;
 use crate::protocol::Peer;
 use crate::sync::consts::EVENTS_RECV_POOLING_INTERVAL;
 use crate::sync::io::Callback;
+use crate::sync::node::api::EventReceiver;
 
 use crate::prelude::*;
 
@@ -18,16 +19,18 @@ pub enum Event<V: MaybeVersioned> {
     PeerLost(Peer),
     /// New [`Frame`] received.
     Frame(Frame<V>, Callback<V>),
+    /// New [`Frame`] received, but it hasn't passed validation.
+    Invalid(Frame<V>, Error, Callback<V>),
 }
 
 pub(crate) struct EventsIterator<V: MaybeVersioned + 'static> {
-    rx: mpmc::Receiver<Event<V>>,
+    receiver: EventReceiver<V>,
     state: Closable,
 }
 
 impl<V: MaybeVersioned + 'static> EventsIterator<V> {
-    pub fn new(rx: mpmc::Receiver<Event<V>>, state: Closable) -> Self {
-        Self { rx, state }
+    pub fn new(receiver: EventReceiver<V>, state: Closable) -> Self {
+        Self { receiver, state }
     }
 }
 
@@ -36,17 +39,17 @@ impl<V: MaybeVersioned> Iterator for EventsIterator<V> {
 
     fn next(&mut self) -> Option<Self::Item> {
         while !self.state.is_closed() {
-            return match self.rx.try_recv() {
+            return match self.receiver.try_recv() {
                 Ok(event) => Some(event),
                 Err(err) => match err {
-                    TryRecvError::Empty => {
+                    TryRecvError::Disconnected => None,
+                    _ => {
                         thread::sleep(EVENTS_RECV_POOLING_INTERVAL);
                         continue;
                     }
-                    TryRecvError::Disconnected => None,
                 },
             };
         }
-        self.rx.try_recv().ok()
+        self.receiver.try_recv().ok()
     }
 }

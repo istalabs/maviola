@@ -46,7 +46,7 @@ impl AsyncRead for MpscReader {
             let mut pinned = std::pin::pin!(self.as_mut().get_mut().receiver.recv());
             let poll_result = pinned.as_mut().poll(cx);
 
-            let recv_buf = match poll_result {
+            match poll_result {
                 Poll::Ready(recv_buf) => match recv_buf {
                     None => {
                         return Poll::Ready(Err(std::io::Error::new(
@@ -57,9 +57,7 @@ impl AsyncRead for MpscReader {
                     Some(recv_buf) => recv_buf,
                 },
                 Poll::Pending => return Poll::Pending,
-            };
-
-            recv_buf
+            }
         };
         self.as_mut().buf.append(&mut recv_buf);
 

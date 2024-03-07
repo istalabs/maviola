@@ -93,6 +93,9 @@ pub fn main() -> Result<()> {
                     callback.respond_others(&server.next_frame(&msg)?)?;
                 }
             }
+            Event::Invalid(frame, err, callback) => {
+                /* Handle invalid frame */
+            }
         }
     }
 }
@@ -147,6 +150,9 @@ async fn main() -> Result<()> {
                     // except the one that sent this message
                     callback.respond_others(&server.next_frame(&msg)?)?;
                 }
+            }
+            Event::Invalid(frame, err, callback) => {
+                /* Handle invalid frame */
             }
         }
     }

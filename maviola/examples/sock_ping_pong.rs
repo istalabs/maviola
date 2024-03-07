@@ -90,6 +90,7 @@ fn run(path: PathBuf) -> Result<()> {
                     break;
                 }
             }
+            _ => {}
         }
     }
 

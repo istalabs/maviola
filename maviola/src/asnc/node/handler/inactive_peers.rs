@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
+use crate::asnc::node::api::EventSender;
 use tokio::sync::RwLock;
 
 use crate::asnc::node::Event;
@@ -15,46 +16,67 @@ pub(in crate::asnc::node) struct InactivePeersHandler<V: MaybeVersioned> {
     pub(in crate::asnc::node) info: ConnectionInfo,
     pub(in crate::asnc::node) peers: Arc<RwLock<HashMap<MavLinkId, Peer>>>,
     pub(in crate::asnc::node) timeout: Duration,
-    pub(in crate::asnc::node) events_tx: broadcast::Sender<Event<V>>,
+    pub(in crate::asnc::node) event_sender: EventSender<V>,
 }
 
 impl<V: MaybeVersioned + 'static> InactivePeersHandler<V> {
-    pub(in crate::asnc::node) async fn spawn(self, state: Closable) {
+    pub(in crate::asnc::node) fn spawn(self, state: Closable) {
         tokio::spawn(async move {
-            let info = &self.info;
-
             while !state.is_closed() {
                 tokio::time::sleep(self.timeout).await;
-                let now = SystemTime::now();
 
-                let inactive_peers = {
-                    let peers = self.peers.read().await;
-                    let mut inactive_peers = HashSet::new();
-                    for peer in peers.values() {
-                        if let Ok(since) = now.duration_since(peer.last_active) {
-                            if since > self.timeout {
-                                inactive_peers.insert(peer.id);
-                            }
-                        }
-                    }
-                    inactive_peers
-                };
+                let inactive_peers = self.collect_inactive_peers().await;
 
-                {
-                    let mut peers = self.peers.write().await;
-
-                    for id in inactive_peers {
-                        if let Some(peer) = peers.remove(&id) {
-                            if let Err(err) = self.events_tx.send(Event::PeerLost(peer)) {
-                                log::trace!("[{info:?}] failed to report lost peer event: {err}");
-                                break;
-                            }
-                        }
-                    }
+                if self.handle_inactive_peers(inactive_peers).await.is_err() {
+                    break;
                 }
             }
 
-            log::trace!("[{info:?}] inactive peers handler stopped");
+            self.shutdown().await;
         });
+    }
+
+    async fn collect_inactive_peers(&self) -> HashSet<MavLinkId> {
+        let now = SystemTime::now();
+
+        let peers = self.peers.read().await;
+        let mut inactive_peers = HashSet::new();
+        for peer in peers.values() {
+            if let Ok(since) = now.duration_since(peer.last_active) {
+                if since > self.timeout {
+                    inactive_peers.insert(peer.id);
+                }
+            }
+        }
+        inactive_peers
+    }
+
+    pub async fn handle_inactive_peers(&self, inactive_peers: HashSet<MavLinkId>) -> Result<()> {
+        let mut peers = self.peers.write().await;
+
+        for id in inactive_peers {
+            if let Some(peer) = peers.remove(&id) {
+                if let Err(err) = self.event_sender.send(Event::PeerLost(peer)) {
+                    log::trace!(
+                        "[{:?}] failed to report lost peer event: {err:?}",
+                        &self.info
+                    );
+                    return Err(Error::from(err));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn shutdown(&self) {
+        let mut peers = self.peers.write().await;
+
+        for peer in peers.values() {
+            let _ = self.event_sender.send(Event::PeerLost(peer.clone()));
+        }
+        peers.clear();
+
+        log::trace!("[{:?}] inactive peers handler stopped", self.info);
     }
 }

@@ -88,7 +88,7 @@ impl From<&MavLinkId> for Peer {
     /// Constructs a [`Peer`] from [`MavLinkId`] passed by reference.
     fn from(value: &MavLinkId) -> Self {
         Self {
-            id: value.clone(),
+            id: *value,
             last_active: SystemTime::now(),
         }
     }

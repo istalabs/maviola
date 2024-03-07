@@ -25,6 +25,7 @@ impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, V: MaybeVersioned + 'sta
             component_id: self.component_id,
             version: self.version,
             conn_conf: ConnConf(Box::new(conn_conf)),
+            signer: self.signer,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
             _dialect: self._dialect,

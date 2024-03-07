@@ -55,6 +55,7 @@ fn run(path: PathBuf) -> Result<()> {
             Event::PeerLost(peer) => {
                 log::warn!("[reader] disconnected: {peer:?}");
             }
+            _ => {}
         }
     }
     log::warn!("[reader] finished");

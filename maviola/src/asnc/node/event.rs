@@ -1,13 +1,13 @@
-use std::future::Future;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
-use tokio::sync::broadcast::error::{RecvError, TryRecvError};
 use tokio_stream::Stream;
 use tokio_util::sync::ReusableBoxFuture;
 
 use crate::asnc::consts::EVENTS_RECV_POOLING_INTERVAL;
 use crate::asnc::io::Callback;
+use crate::asnc::node::api::EventReceiver;
+use crate::core::error::{RecvError, TryRecvError};
 use crate::core::utils::Closable;
 use crate::protocol::Peer;
 
@@ -23,6 +23,8 @@ pub enum Event<V: MaybeVersioned> {
     PeerLost(Peer),
     /// New [`Frame`] received.
     Frame(Frame<V>, Callback<V>),
+    /// New [`Frame`] received, but it hasn't passed validation.
+    Invalid(Frame<V>, Error, Callback<V>),
 }
 
 pub(crate) struct EventStream<V: MaybeVersioned + 'static> {
@@ -30,10 +32,9 @@ pub(crate) struct EventStream<V: MaybeVersioned + 'static> {
 }
 
 type RecvResult<V> = core::result::Result<Event<V>, RecvError>;
-type EventReceiver<V> = broadcast::Receiver<Event<V>>;
 
 impl<V: MaybeVersioned + 'static> EventStream<V> {
-    pub(crate) fn new(rx: broadcast::Receiver<Event<V>>, state: Closable) -> Self {
+    pub(crate) fn new(rx: EventReceiver<V>, state: Closable) -> Self {
         Self {
             inner: ReusableBoxFuture::new(make_future(rx, state)),
         }
@@ -41,7 +42,7 @@ impl<V: MaybeVersioned + 'static> EventStream<V> {
 }
 
 async fn make_future<V: MaybeVersioned + 'static>(
-    mut rx: broadcast::Receiver<Event<V>>,
+    mut rx: EventReceiver<V>,
     state: Closable,
 ) -> (RecvResult<V>, EventReceiver<V>, Closable) {
     let handler = tokio::task::spawn(async move {
@@ -49,7 +50,7 @@ async fn make_future<V: MaybeVersioned + 'static>(
             if state.is_closed() {
                 break match rx.try_recv() {
                     Ok(event) => Ok(event),
-                    Err(_) => Err(RecvError::Closed),
+                    Err(_) => Err(RecvError::Disconnected),
                 };
             }
 
@@ -60,7 +61,7 @@ async fn make_future<V: MaybeVersioned + 'static>(
                         tokio::time::sleep(EVENTS_RECV_POOLING_INTERVAL).await;
                         continue;
                     }
-                    TryRecvError::Closed => Err(RecvError::Closed),
+                    TryRecvError::Disconnected => Err(RecvError::Disconnected),
                     TryRecvError::Lagged(n) => Err(RecvError::Lagged(n)),
                 },
             };
@@ -81,7 +82,7 @@ impl<V: MaybeVersioned + 'static> Stream for EventStream<V> {
         match result {
             Ok(event) => Poll::Ready(Some(event)),
             Err(err) => match err {
-                RecvError::Closed => Poll::Ready(None),
+                RecvError::Disconnected => Poll::Ready(None),
                 RecvError::Lagged(_) => {
                     cx.waker().wake_by_ref();
                     Poll::Pending
@@ -100,9 +101,10 @@ mod async_event_tests {
     #[tokio::test]
     async fn test_event_stream() {
         let (tx, rx) = broadcast::channel(2);
+        let event_receiver = EventReceiver::new(rx, None);
         let state = Closer::new();
 
-        let mut stream: EventStream<V2> = EventStream::new(rx, state.to_closable());
+        let mut stream: EventStream<V2> = EventStream::new(event_receiver, state.to_closable());
 
         tx.send(Event::NewPeer(Peer::new(1, 1))).unwrap();
         tx.send(Event::NewPeer(Peer::new(1, 1))).unwrap();

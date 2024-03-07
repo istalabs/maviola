@@ -8,25 +8,25 @@ use crate::prelude::*;
 use crate::sync::io::{Channel, Connection};
 
 /// <sup>[`sync`](crate::sync)</sup>
-/// Producing part of channel that sends outgoing frames to a [`Connection`].
+/// Sends outgoing frames to a [`Connection`] for processing.
 ///
-/// Paired with [`FrameSendHandler`] that usually is owned by a [`Channel`].
-pub type FrameSender<V> = mpmc::Sender<OutgoingFrame<V>>;
+/// Paired with [`OutgoingFrameHandler`], that usually is owned by a [`Channel`].
+pub type OutgoingFrameSender<V> = mpmc::Sender<OutgoingFrame<V>>;
 /// <sup>[`sync`](crate::sync)</sup>
-/// Receiver for incoming frames.
+/// Receives incoming frames from a [`Connection`].
 ///
-/// Paired with [`FrameProducer`] that usually owned by a [`Channel`] and receives incoming frames
-/// from the underlying transport.
-pub type FrameReceiver<V> = mpmc::Receiver<(Frame<V>, Callback<V>)>;
+/// Paired with [`IncomingFrameProducer`], that usually owned by a [`Channel`] and receives incoming
+/// frames from the underlying transport.
+pub type IncomingFrameReceiver<V> = mpmc::Receiver<(Frame<V>, Callback<V>)>;
 /// <sup>[`sync`](crate::sync)</sup>
-/// Handles outgoing frames produced by [`Connection::send`].
+/// Handles outgoing frames, that were sent to [`Connection`] for processing.
 ///
-/// Usually owned by channels which intercept outgoing frames and write them to the underlying
-/// transport. Paired with [`FrameSender`] which is owned by [`Connection`].
-pub type FrameSendHandler<V> = mpmc::Receiver<OutgoingFrame<V>>;
+/// Usually owned by a channels, that intercept outgoing frames and writes them to the underlying
+/// transport. Paired with [`OutgoingFrameSender`] which is owned by [`Connection`].
+pub type OutgoingFrameHandler<V> = mpmc::Receiver<OutgoingFrame<V>>;
 /// <sup>[`sync`](crate::sync)</sup>
-/// Produces incoming frames.
+/// Produces incoming frames from the underlying transport.
 ///
-/// Owned by a [`Channel`] that reads frames from the underlying transport and emits them to the
-/// associated [`Connection`]. Paired with [`FrameReceiver`].
-pub type FrameProducer<V> = mpmc::Sender<(Frame<V>, Callback<V>)>;
+/// Owned by a [`Channel`], that reads frames from the underlying transport and emits them to the
+/// associated [`Connection`]. Paired with [`IncomingFrameReceiver`].
+pub type IncomingFrameProducer<V> = mpmc::Sender<(Frame<V>, Callback<V>)>;

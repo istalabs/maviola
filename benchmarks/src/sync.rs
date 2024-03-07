@@ -80,7 +80,6 @@ pub fn benchmark_unix_sockets(n_clients: u16, n_iter: usize) {
                     break;
                 }
             }
-            barrier.wait();
         });
     }
 
@@ -118,7 +117,6 @@ pub fn benchmark_unix_sockets(n_clients: u16, n_iter: usize) {
     let duration = end.duration_since(start).unwrap();
 
     drop(server);
-    barrier.wait();
     wait();
 
     if n_received_frames < n_interaction {

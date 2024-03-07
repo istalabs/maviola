@@ -58,6 +58,9 @@ use crate::core::node::Node;
 ///             // Send back any incoming frame directly to its sender's channel
 ///             res.respond(&frame).unwrap();
 ///         }
+///         Event::Invalid(frame, err, callback) => {
+///             /* Process invalid frame */
+///         }
 ///     }
 /// }
 /// # }

@@ -1,4 +1,3 @@
-use std::future::Future;
 use std::io::{Error, ErrorKind};
 use std::pin::Pin;
 use std::sync::Arc;

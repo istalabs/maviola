@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use crate::core::io::ConnectionInfo;
 use crate::core::utils::{make_heartbeat_message, Guarded, SharedCloser, Switch};
-use crate::sync::io::ConnSender;
+use crate::sync::node::api::FrameSender;
 
 use crate::prelude::*;
 
@@ -12,7 +12,7 @@ pub(in crate::sync::node) struct HeartbeatEmitter<D: Dialect, V: Versioned + 'st
     pub(in crate::sync::node) info: ConnectionInfo,
     pub(in crate::sync::node) endpoint: Endpoint<V>,
     pub(in crate::sync::node) interval: Duration,
-    pub(in crate::sync::node) sender: ConnSender<V>,
+    pub(in crate::sync::node) sender: FrameSender<V>,
     pub(in crate::sync::node) _version: PhantomData<V>,
     pub(in crate::sync::node) _dialect: PhantomData<D>,
 }
@@ -36,6 +36,7 @@ impl<D: Dialect, V: Versioned + 'static> HeartbeatEmitter<D, V> {
 
                 thread::sleep(self.interval);
             }
+
             log::debug!("[{info:?}] heartbeats emitter stopped");
         });
     }

@@ -1,2 +1,2 @@
 mod message_signing_tests;
-mod node_tests;
+mod sync_node_tests;

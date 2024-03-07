@@ -44,3 +44,12 @@ These examples show basic usage for different transports:
   ```shell
   cargo run --package maviola --example async_file_rw
   ```
+
+Message Signing
+---------------
+
+Basic example:
+
+```shell
+cargo run --package maviola --example message_signing
+```

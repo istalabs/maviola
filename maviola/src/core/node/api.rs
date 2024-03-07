@@ -12,6 +12,9 @@ pub trait NodeApi<V: MaybeVersioned + 'static>: Sealed {
 
     /// Send a MAVLink frame.
     fn send_frame(&self, frame: &Frame<V>) -> Result<()>;
+
+    /// Message signing configuration.
+    fn signer(&self) -> Option<&MessageSigner>;
 }
 
 /// Node without a defined API.
@@ -20,5 +23,9 @@ impl Sealed for NoApi {}
 impl<V: MaybeVersioned + 'static> NodeApi<V> for NoApi {
     fn send_frame(&self, _: &Frame<V>) -> Result<()> {
         unimplemented!()
+    }
+
+    fn signer(&self) -> Option<&MessageSigner> {
+        None
     }
 }

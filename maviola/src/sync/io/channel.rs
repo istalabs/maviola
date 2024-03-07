@@ -8,7 +8,7 @@ use crate::core::utils::{Closable, SharedCloser, UniqueId};
 use crate::sync::consts::{
     CHANNEL_STOP_JOIN_ATTEMPTS, CHANNEL_STOP_JOIN_POOLING_INTERVAL, CHANNEL_STOP_POOLING_INTERVAL,
 };
-use crate::sync::io::{Callback, FrameProducer, FrameSendHandler, FrameSender};
+use crate::sync::io::{Callback, IncomingFrameProducer, OutgoingFrameHandler, OutgoingFrameSender};
 
 use crate::prelude::*;
 
@@ -18,9 +18,9 @@ use crate::prelude::*;
 pub struct ChannelFactory<V: MaybeVersioned + 'static> {
     pub(crate) info: ConnectionInfo,
     pub(crate) state: Closable,
-    pub(crate) sender: FrameSender<V>,
-    pub(crate) send_handler: FrameSendHandler<V>,
-    pub(crate) producer: FrameProducer<V>,
+    pub(crate) sender: OutgoingFrameSender<V>,
+    pub(crate) send_handler: OutgoingFrameHandler<V>,
+    pub(crate) producer: IncomingFrameProducer<V>,
 }
 
 impl<V: MaybeVersioned> ChannelFactory<V> {
@@ -64,9 +64,9 @@ pub struct Channel<V: MaybeVersioned + 'static, R: Read, W: Write> {
     info: ChannelInfo,
     reader: R,
     writer: W,
-    sender: FrameSender<V>,
-    send_handler: FrameSendHandler<V>,
-    producer: FrameProducer<V>,
+    sender: OutgoingFrameSender<V>,
+    send_handler: OutgoingFrameHandler<V>,
+    producer: IncomingFrameProducer<V>,
 }
 
 impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 'static>
@@ -122,7 +122,7 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
 
     fn write_handler(
         id: UniqueId,
-        send_handler: FrameSendHandler<V>,
+        send_handler: OutgoingFrameHandler<V>,
         mut frame_writer: Sender<W, V>,
     ) -> Result<()> {
         loop {
@@ -155,8 +155,8 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
         conn_state: Closable,
         id: UniqueId,
         info: Arc<ChannelInfo>,
-        sender: FrameSender<V>,
-        producer: FrameProducer<V>,
+        sender: OutgoingFrameSender<V>,
+        producer: IncomingFrameProducer<V>,
         mut frame_reader: Receiver<R, V>,
     ) -> Result<()> {
         loop {
@@ -181,11 +181,7 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
             let info = info.clone();
             let send_tx = sender.clone();
 
-            let response = Callback {
-                sender_id: id,
-                sender_info: info.clone(),
-                broadcast_tx: send_tx,
-            };
+            let response = Callback::new(id, info.clone(), send_tx);
 
             producer.send((frame, response))?;
         }

@@ -9,7 +9,7 @@ use crate::core::marker::{
 };
 use crate::core::node::NodeBuilder;
 use crate::protocol::{
-    ComponentId, MavLinkVersion, MaybeVersioned, SystemId, Versioned, Versionless,
+    ComponentId, MavLinkVersion, MaybeVersioned, MessageSigner, SystemId, Versioned, Versionless,
 };
 
 use crate::prelude::*;
@@ -33,6 +33,7 @@ pub struct NodeConf<K: NodeKind, D: Dialect, V: MaybeVersioned, C: MaybeConnConf
     pub(crate) connection_conf: C,
     pub(crate) heartbeat_timeout: Duration,
     pub(crate) heartbeat_interval: Duration,
+    pub(crate) signer: Option<MessageSigner>,
     pub(crate) _dialect: PhantomData<D>,
 }
 
@@ -90,7 +91,7 @@ impl NodeConf<Proxy, Minimal, Versionless, NoConnConf> {
     }
 }
 
-impl<D: Dialect, V: MaybeVersioned, C: HasConnConf> NodeConf<Edge<V>, D, V, C> {
+impl<D: Dialect, V: MaybeVersioned, C: MaybeConnConf> NodeConf<Edge<V>, D, V, C> {
     /// MAVLink system ID.
     #[inline(always)]
     pub fn system_id(&self) -> SystemId {
@@ -101,6 +102,12 @@ impl<D: Dialect, V: MaybeVersioned, C: HasConnConf> NodeConf<Edge<V>, D, V, C> {
     #[inline(always)]
     pub fn component_id(&self) -> ComponentId {
         self.kind.endpoint.component_id()
+    }
+
+    /// Signature configuration.
+    #[inline(always)]
+    pub fn signer(&self) -> Option<&MessageSigner> {
+        self.signer.as_ref()
     }
 }
 
@@ -144,6 +151,7 @@ impl<D: Dialect, V: MaybeVersioned, C: HasConnConf> NodeConf<Edge<V>, D, V, C> {
             conn_conf: self.connection_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_timeout,
+            signer: self.signer,
             _dialect: self._dialect,
         }
     }
@@ -159,6 +167,7 @@ impl<D: Dialect, V: MaybeVersioned, C: HasConnConf> NodeConf<Proxy, D, V, C> {
             conn_conf: self.connection_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_timeout,
+            signer: self.signer,
             _dialect: self._dialect,
         }
     }

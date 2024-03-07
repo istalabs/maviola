@@ -39,6 +39,7 @@ use std::fmt::{Debug, Formatter};
 use std::sync::{mpsc, Arc, RwLock};
 use std::thread;
 
+use crate::core::error::{RecvError, SendError, TryRecvError};
 use crate::core::utils::{Closable, Closer, UniqueId};
 
 /// <sup>`⍚` | [`sync`](crate::sync)</sup>
@@ -59,13 +60,13 @@ impl<T> Sender<T> {
     /// Attempts to send a value on this channel, returning it back if it could
     /// not be sent.
     ///
-    /// Behaves identical to [`mpsc::Sender::send`].
-    pub fn send(&self, value: T) -> Result<(), mpsc::SendError<T>> {
+    /// Behaves identical to [`mpsc::Sender::send`], but returns [`SendError`].
+    pub fn send(&self, value: T) -> Result<(), SendError<T>> {
         if self.state.is_closed() {
-            return Err(mpsc::SendError(value));
+            return Err(SendError(value));
         }
 
-        self.inner.send(value)
+        self.inner.send(value).map_err(SendError::from)
     }
 
     /// Returns inner [`mpsc::Sender`].
@@ -76,6 +77,7 @@ impl<T> Sender<T> {
     /// be consumed by at least one receiver. This may happen if the last receiver becomes
     /// disconnected right before or slightly after the message was sent.
     #[must_use]
+    #[allow(dead_code)]
     pub fn into_inner(self) -> mpsc::Sender<T> {
         self.inner
     }
@@ -105,16 +107,16 @@ impl<T: Clone + Sync + Send + 'static> Receiver<T> {
     /// Attempts to wait for a value on this receiver, returning an error if the
     /// corresponding channel has hung up.
     ///
-    /// Behaves identical to [`mpsc::Receiver::recv`].
-    pub fn recv(&self) -> Result<T, mpsc::RecvError> {
-        self.inner.recv()
+    /// Behaves identical to [`mpsc::Receiver::recv`] but returns [`RecvError`].
+    pub fn recv(&self) -> Result<T, RecvError> {
+        self.inner.recv().map_err(RecvError::from)
     }
 
     /// Attempts to return a pending value on this receiver without blocking.
     ///
-    /// Behaves identical to [`mpsc::Receiver::try_recv`].
-    pub fn try_recv(&self) -> Result<T, mpsc::TryRecvError> {
-        self.inner.try_recv()
+    /// Behaves identical to [`mpsc::Receiver::try_recv`] but returns [`TryRecvError`].
+    pub fn try_recv(&self) -> Result<T, TryRecvError> {
+        self.inner.try_recv().map_err(TryRecvError::from)
     }
 
     /// Returns inner [`mpsc::Receiver`].
@@ -162,6 +164,7 @@ impl<T: Clone + Sync + Send + 'static> Receiver<T> {
     /// # }
     /// ```
     #[must_use]
+    #[allow(dead_code)]
     pub fn into_inner(self) -> (mpsc::Receiver<T>, RecvGuard<T>) {
         (self.inner, self.guard)
     }

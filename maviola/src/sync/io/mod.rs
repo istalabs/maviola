@@ -29,13 +29,17 @@ pub use channel::{Channel, ChannelFactory};
 pub use connection::{Connection, ConnectionBuilder, ConnectionHandler};
 /// <sup>`⍚` |</sup>
 #[cfg(feature = "unstable")]
-pub use types::{FrameProducer, FrameReceiver, FrameSendHandler, FrameSender};
+pub use types::{
+    IncomingFrameProducer, IncomingFrameReceiver, OutgoingFrameHandler, OutgoingFrameSender,
+};
 
 #[cfg(not(feature = "unstable"))]
 pub(crate) use channel::{Channel, ChannelFactory};
 #[cfg(not(feature = "unstable"))]
 pub(crate) use connection::{Connection, ConnectionBuilder, ConnectionHandler};
 #[cfg(not(feature = "unstable"))]
-pub(crate) use types::{FrameProducer, FrameReceiver, FrameSendHandler, FrameSender};
+pub(crate) use types::{
+    IncomingFrameProducer, IncomingFrameReceiver, OutgoingFrameHandler, OutgoingFrameSender,
+};
 
 pub(crate) use connection::{ConnReceiver, ConnSender};

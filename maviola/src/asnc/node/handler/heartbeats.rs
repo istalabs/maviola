@@ -1,11 +1,8 @@
 use std::marker::PhantomData;
-use std::sync::atomic::AtomicU8;
-use std::sync::{atomic, Arc};
 use std::time::Duration;
 
 use crate::asnc::io::ConnSender;
 use crate::core::io::ConnectionInfo;
-use crate::core::marker::Edge;
 use crate::core::utils::{make_heartbeat_message, Guarded, SharedCloser, Switch};
 
 use crate::prelude::*;
@@ -20,7 +17,7 @@ pub(in crate::asnc::node) struct HeartbeatEmitter<D: Dialect, V: Versioned + 'st
 }
 
 impl<D: Dialect, V: Versioned + 'static> HeartbeatEmitter<D, V> {
-    pub(in crate::asnc::node) async fn spawn(self, mut is_active: Guarded<SharedCloser, Switch>) {
+    pub(in crate::asnc::node) fn spawn(self, mut is_active: Guarded<SharedCloser, Switch>) {
         let heartbeat_message = make_heartbeat_message::<D>();
 
         tokio::spawn(async move {
@@ -29,7 +26,8 @@ impl<D: Dialect, V: Versioned + 'static> HeartbeatEmitter<D, V> {
             while is_active.is() {
                 let frame = self.endpoint.next_frame(&heartbeat_message).unwrap();
 
-                if let Err(err) = self.sender.send(&frame) {
+                log::trace!("[{info:?}] broadcasting heartbeat");
+                if let Err(err) = self.sender.send(frame) {
                     log::trace!("[{info:?}] heartbeat can't be broadcast: {err:?}");
                     is_active.set(false);
                     break;
@@ -37,6 +35,7 @@ impl<D: Dialect, V: Versioned + 'static> HeartbeatEmitter<D, V> {
 
                 tokio::time::sleep(self.interval).await;
             }
+
             log::debug!("[{info:?}] heartbeats emitter stopped");
         });
     }

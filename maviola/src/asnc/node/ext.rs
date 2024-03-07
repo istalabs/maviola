@@ -1,6 +1,7 @@
 //! # 🔒 Asynchronous I/O extensions for node
 
 use std::marker::PhantomData;
+use std::sync::Arc;
 use tokio_stream::Stream;
 
 use crate::asnc::marker::AsyncConnConf;
@@ -14,12 +15,15 @@ use crate::prelude::*;
 
 impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, AsyncApi<V>> {
     /// <sup>[`async`](crate::asnc)</sup>
-    /// Instantiates node from asynchronous node configuration.
+    /// Instantiates node from asynchronous configuration.
     ///
-    /// Creates ona instance of [`Node`] from [`NodeConf`].
+    /// Creates an instance of [`Node`] from [`NodeConf`].
     pub async fn try_from_async_conf(conf: NodeConf<K, D, V, AsyncConnConf<V>>) -> Result<Self> {
         let (conn, conn_handler) = conf.connection().build().await?;
-        let api = AsyncApi::new(conn);
+
+        let signer = conf.signer.clone().map(Arc::new);
+        let api = AsyncApi::new(conn, signer.clone());
+
         let state = api.share_state();
         let is_active = Guarded::from(&state);
 
@@ -51,36 +55,6 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, AsyncAp
     }
 
     /// <sup>[`async`](crate::asnc)</sup>
-    /// Receive MAVLink message blocking until MAVLink frame received.
-    pub async fn recv(&mut self) -> Result<(D, Callback<V>)> {
-        let (frame, res) = self.api.recv_frame().await?;
-        let msg = D::decode(frame.payload())?;
-        Ok((msg, res))
-    }
-
-    /// <sup>[`async`](crate::asnc)</sup>
-    /// Attempts to receive MAVLink message without blocking.
-    pub fn try_recv(&mut self) -> Result<(D, Callback<V>)> {
-        let (frame, res) = self.api.try_recv_frame()?;
-        let msg = D::decode(frame.payload())?;
-        Ok((msg, res))
-    }
-
-    /// <sup>[`async`](crate::asnc)</sup>
-    /// Request the next node [`Event`].
-    ///
-    /// Blocks until event received.
-    pub async fn recv_event(&mut self) -> Result<Event<V>> {
-        self.api.recv_event().await
-    }
-
-    /// <sup>[`async`](crate::asnc)</sup>
-    /// Attempts to receive MAVLink [`Event`] without blocking.
-    pub fn try_recv_event(&mut self) -> Result<Event<V>> {
-        self.api.try_recv_event()
-    }
-
-    /// <sup>[`async`](crate::asnc)</sup>
     /// Returns a stream over current peers.
     ///
     /// This method will return a snapshot of the current peers relevant to the time when it was
@@ -91,37 +65,21 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, AsyncAp
     }
 
     /// <sup>[`async`](crate::asnc)</sup>
-    /// Proxy MAVLink [`Frame`].
+    /// Request the next node [`Event`].
     ///
-    /// In proxy mode [`Frame`] is sent with as many fields preserved as possible. However, the
-    /// following properties could be updated based on the node's
-    /// [message signing](https://mavlink.io/en/guide/message_signing.html) configuration
-    /// (`MAVLink 2` [`Versioned`] nodes only):
+    /// Blocks until event received.
     ///
-    /// * [`signature`](Frame::signature)
-    /// * [`link_id`](Frame::link_id)
-    /// * [`timestamp`](Frame::timestamp)
-    ///
-    /// To send MAVLink messages instead of raw frames, construct an [`Edge`] node and use
-    /// [`Node::send_versioned`] for node which is [`Versionless`] and [`Node::send`] for
-    /// [`Versioned`] nodes. In the latter case, message will be encoded according to MAVLink
-    /// protocol version defined for a node.
-    pub fn proxy_frame(&self, frame: &Frame<V>) -> Result<()> {
-        self.api.send_frame(frame)
+    /// If you are interested only in valid incoming frames, use [`Node::recv_frame`] instead.
+    pub async fn recv(&mut self) -> Result<Event<V>> {
+        self.api.recv_event().await
     }
 
     /// <sup>[`async`](crate::asnc)</sup>
-    /// Receive MAVLink [`Frame`].
+    /// Attempts to receive MAVLink [`Event`] without blocking.
     ///
-    /// Blocks until frame received.
-    pub async fn recv_frame(&mut self) -> Result<(Frame<V>, Callback<V>)> {
-        self.api.recv_frame().await
-    }
-
-    /// <sup>[`async`](crate::asnc)</sup>
-    /// Attempts to receive MAVLink [`Frame`] without blocking.
-    pub fn try_recv_frame(&mut self) -> Result<(Frame<V>, Callback<V>)> {
-        self.api.try_recv_frame()
+    /// If you are interested only in valid incoming frames, use [`Node::try_recv_frame`] instead.
+    pub fn try_recv(&mut self) -> Result<Event<V>> {
+        self.api.try_recv_event()
     }
 
     /// <sup>[`async`](crate::asnc)</sup>
@@ -130,13 +88,41 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, AsyncAp
     /// Returns a stream of node events. Requires [`StreamExt`] from Tokio stream extensions to be
     /// imported (you may use [`asnc::prelude`](crate::asnc::prelude) that imports it as well).
     ///
-    /// ⚠ The result is wrapped with [`Behold`] as a reminder that the returned stream will have
-    /// access only to events that were emitted close to the moment when the method is called and
-    /// repetitive calls may lead to undesired behavior. This is related to the nature of the
-    /// asynchronous MPMC channels, that able to operate only on a limited number of the past
+    /// If you are interested only in valid incoming frames, use [`Node::recv_frame`] or
+    /// [`Node::try_recv_frame`] instead.
+    ///
+    /// ⚠ The result is wrapped with [`Behold`] as a reminder, that the returned stream will have
+    /// access only to events that were emitted close to the moment, when the method was called.
+    /// Repetitive calls in the loop may lead to undesired behavior. This is related to the nature
+    /// of the asynchronous MPMC channels, that able to operate only on a limited number of the past
     /// events.
     pub fn events(&self) -> Behold<impl Stream<Item = Event<V>>> {
         Behold::new(self.api.events())
+    }
+
+    /// <sup>[`async`](crate::asnc)</sup>
+    /// Receives the next frame. Blocks until valid frame received or channel is closed.
+    ///
+    /// If you want to check for the next frame without blocking, use [`Node::try_recv_frame`].
+    ///
+    /// **⚠** This method skips all invalid frames. If you are interested in such frames, use
+    /// [Node::events] or [`Node::recv`] instead to receive [`Event::Invalid`] events that
+    /// contain invalid frame with the corresponding error.
+    pub async fn recv_frame(&mut self) -> Result<(Frame<V>, Callback<V>)> {
+        self.api.recv_frame().await
+    }
+
+    /// <sup>[`async`](crate::asnc)</sup>
+    /// Attempts to receive the next valid frame.
+    ///
+    /// This method returns immediately if channel is empty. If you want to block until the next
+    /// frame is received, use [`Node::recv_frame`].
+    ///
+    /// **⚠** This method skips all invalid frames. If you are interested in such frames, use
+    /// [Node::events] or [`Node::try_recv`] instead to receive [`Event::Invalid`] events that
+    /// contain invalid frame with the corresponding error.
+    pub fn try_recv_frame(&mut self) -> Result<(Frame<V>, Callback<V>)> {
+        self.api.try_recv_frame()
     }
 }
 
@@ -162,13 +148,11 @@ impl<D: Dialect, V: Versioned + 'static> Node<Edge<V>, D, V, AsyncApi<V>> {
 
         self.is_active.set(true);
 
-        self.api
-            .start_sending_heartbeats::<D>(
-                self.kind.endpoint.clone(),
-                self.heartbeat_interval,
-                self.is_active.clone(),
-            )
-            .await;
+        self.api.start_sending_heartbeats::<D>(
+            self.kind.endpoint.clone(),
+            self.heartbeat_interval,
+            self.is_active.clone(),
+        );
 
         Ok(())
     }

@@ -10,8 +10,12 @@ mod peer;
 mod signature;
 
 pub use peer::Peer;
-pub use signature::{SignConf, SignConfBuilder, SignStrategy};
+pub use signature::{MessageSigner, MessageSignerBuilder, SignStrategy, UniqueMavTimestamp};
 
 /// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
 #[doc(inline)]
 pub use mavio::protocol::*;
+
+/// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
+#[doc(inline)]
+pub use mavio::utils::MavSha256;

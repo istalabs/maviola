@@ -51,9 +51,12 @@ use crate::core::node::Node;
 ///         Event::PeerLost(peer) => {
 ///             /* handle a peer, that becomes inactive */
 ///         }
-///         Event::Frame(frame, res) => {
+///         Event::Frame(frame, callback) => {
 ///             // Send back any incoming frame directly to its sender's channel
-///             res.respond(&frame).unwrap();
+///             callback.respond(&frame).unwrap();
+///         }
+///         Event::Invalid(frame, err, callback) => {
+///             /* Process invalid frame */
 ///         }
 ///     }
 /// }

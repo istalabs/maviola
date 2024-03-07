@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::time::Duration;
 
-use crate::protocol::{ComponentId, SystemId};
+use crate::protocol::{ComponentId, MessageSigner, SystemId};
 
 use crate::core::consts::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_TIMEOUT};
 use crate::core::marker::{
@@ -27,6 +27,7 @@ pub struct NodeBuilder<
     pub(crate) conn_conf: CC,
     pub(crate) heartbeat_timeout: Duration,
     pub(crate) heartbeat_interval: Duration,
+    pub(crate) signer: Option<MessageSigner>,
     pub(crate) _dialect: PhantomData<D>,
 }
 
@@ -36,10 +37,11 @@ impl NodeBuilder<NoSystemId, NoComponentId, Minimal, Versionless, NoConnConf> {
         Self {
             system_id: NoSystemId,
             component_id: NoComponentId,
-            conn_conf: NoConnConf,
             version: Versionless,
+            conn_conf: NoConnConf,
             heartbeat_timeout: DEFAULT_HEARTBEAT_TIMEOUT,
             heartbeat_interval: DEFAULT_HEARTBEAT_INTERVAL,
+            signer: None,
             _dialect: PhantomData,
         }
     }
@@ -57,6 +59,7 @@ impl<D: Dialect, V: MaybeVersioned, CC: MaybeConnConf>
             conn_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            signer: self.signer,
             _dialect: self._dialect,
         }
     }
@@ -74,6 +77,7 @@ impl<C: MaybeComponentId, D: Dialect, V: MaybeVersioned, CC: MaybeConnConf>
             conn_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            signer: self.signer,
             _dialect: self._dialect,
         }
     }
@@ -94,6 +98,7 @@ impl<S: MaybeSystemId, D: Dialect, V: MaybeVersioned, CC: MaybeConnConf>
             conn_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            signer: self.signer,
             _dialect: self._dialect,
         }
     }
@@ -111,6 +116,7 @@ impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, V: MaybeVersioned, CC: M
             conn_conf: self.conn_conf,
             heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            signer: self.signer,
             _dialect: self._dialect,
         }
     }
@@ -138,6 +144,7 @@ impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, V: MaybeVersioned, CC: M
             conn_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            signer: self.signer,
             _dialect: PhantomData,
         }
     }
@@ -158,6 +165,25 @@ impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, CC: MaybeConnConf>
             conn_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            signer: self.signer,
+            _dialect: self._dialect,
+        }
+    }
+}
+
+impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, V: MaybeVersioned, CC: MaybeConnConf>
+    NodeBuilder<S, C, D, V, CC>
+{
+    /// Set [`NodeConf::signer`].
+    pub fn signer(self, signer: MessageSigner) -> NodeBuilder<S, C, D, V, CC> {
+        NodeBuilder {
+            system_id: self.system_id,
+            component_id: self.component_id,
+            version: self.version,
+            conn_conf: self.conn_conf,
+            heartbeat_timeout: self.heartbeat_timeout,
+            heartbeat_interval: self.heartbeat_interval,
+            signer: Some(signer),
             _dialect: self._dialect,
         }
     }
@@ -187,6 +213,7 @@ impl<V: Versioned, CC: MaybeConnConf, D: Dialect>
             conn_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval,
+            signer: self.signer,
             _dialect: self._dialect,
         }
     }
@@ -204,6 +231,7 @@ impl<D: Dialect, V: MaybeVersioned, CC: HasConnConf>
             connection_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            signer: self.signer,
             _dialect: self._dialect,
         }
     }
@@ -223,6 +251,7 @@ impl<D: Dialect, V: MaybeVersioned, CC: HasConnConf>
             version: self.version,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            signer: self.signer,
             _dialect: self._dialect,
         }
     }

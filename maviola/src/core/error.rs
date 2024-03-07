@@ -66,7 +66,7 @@ pub enum Error {
     #[error("node error: {0:?}")]
     Node(#[from] NodeError),
 
-    /// Multi-threading errors.
+    /// Synchronisation errors.
     #[error("multi-threading error: {0:?}")]
     Sync(#[from] SyncError),
 
@@ -75,14 +75,14 @@ pub enum Error {
     Other(String),
 }
 
-/// Multi-threading errors.
+/// Synchronisation errors.
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum SyncError {
     /// Error while joining threads.
     #[error("error during thread join: {0:?}")]
     ThreadJoin(String),
 
-    /// Failed due to poisoned mutex.
+    /// Failed due to a poisoned mutex.
     #[error("poisoned mutex: {0}")]
     PoisonedMutex(String),
 
@@ -91,8 +91,8 @@ pub enum SyncError {
     Empty,
 
     /// Attempt to read or write into a closed MPSC/MPMC channel.
-    #[error("channel is closed: {0}")]
-    ChannelClosed(String),
+    #[error("channel is closed")]
+    Disconnected,
 
     /// The receiver lagged too far behind. Attempting to receive again will
     /// return the oldest message still retained by the channel.
@@ -112,6 +112,45 @@ pub enum NodeError {
     /// Attempt to use a frame with message ID that can't be recognised by a dialect.
     #[error("provided frame with ID = {0} can't be decoded in current dialect {1}")]
     NotInDialect(MessageId, &'static str),
+}
+
+/// Error that happens, when caller attempts to send message to a closed channel.
+///
+/// The error wraps the value, that failed to be sent.
+///
+/// This error is returned by both synchronous and asynchronous channels.
+#[derive(Debug)]
+pub struct SendError<T>(pub T);
+
+/// Error that happens, when caller performs a blocking attempt to receive a message from a channel.
+///
+/// This error is returned by both synchronous and asynchronous channels.
+#[derive(PartialEq, Eq, Clone, Copy, Debug, thiserror::Error)]
+pub enum RecvError {
+    /// Channel is disconnected, no messages will be received.
+    #[error("channel is disconnected")]
+    Disconnected,
+    /// The receiver is far beyond the queue. Next request attempt will return the earliest possible
+    /// message.
+    #[error("lagged: {0}")]
+    Lagged(u64),
+}
+
+/// Error that happens, when caller tries to receive a message from a channel.
+///
+/// This error is returned by both synchronous and asynchronous channels.
+#[derive(PartialEq, Eq, Clone, Copy, Debug, thiserror::Error)]
+pub enum TryRecvError {
+    /// Channel is empty.
+    #[error("channel is empty")]
+    Empty,
+    /// Channel is disconnected, no messages will be received.
+    #[error("channel is disconnected")]
+    Disconnected,
+    /// The receiver is far beyond the queue. Next request attempt will return the earliest possible
+    /// message.
+    #[error("lagged: {0}")]
+    Lagged(u64),
 }
 
 impl From<mavio::errors::Error> for Error {
@@ -144,9 +183,71 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl<T> From<mpsc::SendError<T>> for Error {
+///////////////////////////////////////////////////////////////////////////////
+//                                Recv/Send                                  //
+///////////////////////////////////////////////////////////////////////////////
+
+impl<T> From<SendError<T>> for Error {
+    fn from(_: SendError<T>) -> Self {
+        SyncError::Disconnected.into()
+    }
+}
+
+impl From<TryRecvError> for Error {
+    fn from(value: TryRecvError) -> Self {
+        match value {
+            TryRecvError::Empty => SyncError::Empty,
+            TryRecvError::Disconnected => SyncError::Disconnected,
+            TryRecvError::Lagged(n) => SyncError::Lagged(n),
+        }
+        .into()
+    }
+}
+
+impl From<RecvError> for Error {
+    fn from(value: RecvError) -> Self {
+        match value {
+            RecvError::Disconnected => SyncError::Disconnected,
+            RecvError::Lagged(n) => SyncError::Lagged(n),
+        }
+        .into()
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+//                                   MPSC                                    //
+///////////////////////////////////////////////////////////////////////////////
+
+impl<T> From<mpsc::SendError<T>> for SendError<T> {
     fn from(value: mpsc::SendError<T>) -> Self {
-        SyncError::ChannelClosed(format!("MPSC send: {value:?}")).into()
+        SendError(value.0)
+    }
+}
+
+impl From<mpsc::TryRecvError> for TryRecvError {
+    fn from(value: mpsc::TryRecvError) -> Self {
+        match value {
+            mpsc::TryRecvError::Empty => TryRecvError::Empty,
+            mpsc::TryRecvError::Disconnected => TryRecvError::Disconnected,
+        }
+    }
+}
+
+impl From<mpsc::RecvError> for RecvError {
+    fn from(_: mpsc::RecvError) -> Self {
+        RecvError::Disconnected
+    }
+}
+
+impl<T> From<mpsc::SendError<T>> for Error {
+    fn from(_: mpsc::SendError<T>) -> Self {
+        SyncError::Disconnected.into()
+    }
+}
+
+impl From<mpsc::RecvError> for Error {
+    fn from(_: mpsc::RecvError) -> Self {
+        SyncError::Disconnected.into()
     }
 }
 
@@ -154,36 +255,51 @@ impl From<mpsc::TryRecvError> for Error {
     fn from(value: mpsc::TryRecvError) -> Self {
         match value {
             mpsc::TryRecvError::Empty => SyncError::Empty,
-            mpsc::TryRecvError::Disconnected => SyncError::ChannelClosed("MPSC try_recv".into()),
+            mpsc::TryRecvError::Disconnected => SyncError::Disconnected,
         }
         .into()
     }
 }
 
-impl From<mpsc::RecvError> for Error {
-    fn from(value: mpsc::RecvError) -> Self {
-        SyncError::ChannelClosed(format!("MPSC recv: {value:?}")).into()
+///////////////////////////////////////////////////////////////////////////////
+//                              Tokio: Broadcast                             //
+///////////////////////////////////////////////////////////////////////////////
+
+impl<T> From<tokio::sync::broadcast::error::SendError<T>> for SendError<T> {
+    fn from(value: tokio::sync::broadcast::error::SendError<T>) -> Self {
+        Self(value.0)
+    }
+}
+
+impl From<tokio::sync::broadcast::error::RecvError> for RecvError {
+    fn from(value: tokio::sync::broadcast::error::RecvError) -> Self {
+        match value {
+            tokio::sync::broadcast::error::RecvError::Closed => RecvError::Disconnected,
+            tokio::sync::broadcast::error::RecvError::Lagged(val) => RecvError::Lagged(val),
+        }
+    }
+}
+
+impl From<tokio::sync::broadcast::error::TryRecvError> for TryRecvError {
+    fn from(value: tokio::sync::broadcast::error::TryRecvError) -> Self {
+        match value {
+            tokio::sync::broadcast::error::TryRecvError::Empty => TryRecvError::Empty,
+            tokio::sync::broadcast::error::TryRecvError::Closed => TryRecvError::Disconnected,
+            tokio::sync::broadcast::error::TryRecvError::Lagged(val) => TryRecvError::Lagged(val),
+        }
     }
 }
 
 impl<T> From<tokio::sync::broadcast::error::SendError<T>> for Error {
     fn from(_: tokio::sync::broadcast::error::SendError<T>) -> Self {
-        SyncError::ChannelClosed("async MPMC send".into()).into()
-    }
-}
-
-impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Error {
-    fn from(_: tokio::sync::mpsc::error::SendError<T>) -> Self {
-        SyncError::ChannelClosed("async MPSC send".into()).into()
+        SyncError::Disconnected.into()
     }
 }
 
 impl From<tokio::sync::broadcast::error::RecvError> for Error {
     fn from(value: tokio::sync::broadcast::error::RecvError) -> Self {
         match value {
-            tokio::sync::broadcast::error::RecvError::Closed => {
-                SyncError::ChannelClosed("async MPMC recv".into())
-            }
+            tokio::sync::broadcast::error::RecvError::Closed => SyncError::Disconnected,
             tokio::sync::broadcast::error::RecvError::Lagged(val) => SyncError::Lagged(val),
         }
         .into()
@@ -194,11 +310,19 @@ impl From<tokio::sync::broadcast::error::TryRecvError> for Error {
     fn from(value: tokio::sync::broadcast::error::TryRecvError) -> Self {
         match value {
             tokio::sync::broadcast::error::TryRecvError::Empty => SyncError::Empty,
-            tokio::sync::broadcast::error::TryRecvError::Closed => {
-                SyncError::ChannelClosed("async MPSC try_recv".into())
-            }
+            tokio::sync::broadcast::error::TryRecvError::Closed => SyncError::Disconnected,
             tokio::sync::broadcast::error::TryRecvError::Lagged(val) => SyncError::Lagged(val),
         }
         .into()
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+//                                Tokio: MPSC                                //
+///////////////////////////////////////////////////////////////////////////////
+
+impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Error {
+    fn from(_: tokio::sync::mpsc::error::SendError<T>) -> Self {
+        SyncError::Disconnected.into()
     }
 }

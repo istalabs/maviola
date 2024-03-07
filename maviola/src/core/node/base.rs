@@ -7,7 +7,8 @@ use crate::core::node::api::{NoApi, NodeApi};
 use crate::core::node::NodeBuilder;
 use crate::core::utils::{Guarded, SharedCloser, Switch};
 use crate::protocol::{
-    ComponentId, Dialect, MavLinkVersion, MaybeVersioned, Message, SystemId, Versioned, Versionless,
+    ComponentId, Dialect, MavLinkVersion, MaybeVersioned, Message, MessageSigner, SystemId,
+    Versioned, Versionless,
 };
 
 use crate::prelude::*;
@@ -31,7 +32,37 @@ use crate::prelude::*;
 ///   can't perform active tasks and is used to pass frames between different parts of a MAVLink
 ///   network.
 ///
-/// # Examples
+/// ## Sending and Receiving
+///
+/// The suggested approach for receiving incoming frames is to use [`Node::events`]. This method
+/// returns an iterator (or a stream in the case of asynchronous API) over node events, such as
+/// incoming frames, invalid frames, that hasn't passed signature validation, new peers, and so on.
+///
+/// You can also receive individual frames via [`Node::recv_frame`] / [`Node::try_recv_frame`].
+///
+/// To send messages you may use either [`Node::send`], or [`Node::send_frame`]. The former accepts
+/// MAVLink messages and decodes them into frames, the latter one is sending MAVLink frames
+/// directly.
+///
+/// ## Frame Validation
+///
+/// Since MAVLink is a connectionless protocol, the only way to ensure frame consistency, is to
+/// validate its checksum. The checksum serves two purposes: first, it ensures, that message was
+/// not damaged during sending, and second, it guarantees that sender and receiver use the same
+/// version of a dialect. Unfortunately, that means, that in order to validate a frame, you have
+/// to know `CRC_EXTRA` of the exact message this frame encodes. You can validate incoming frames
+/// against node dialect using [`Node::validate_frame`], or use [`Frame::validate_checksum`] to
+/// validate against external dialect.
+///
+/// ## Message Signing
+///
+/// MAVLink [message signing](https://mavlink.io/en/guide/message_signing.html) is provided by
+/// [`MessageSigner`] that can be provided upon node configuration. It can be configured with
+/// incoming and outgoing [`SignStrategy`] for a fine-grained control over what and when should be
+/// signed. It is possible to validate several authenticated links with additional keys, but only
+/// one link `ID` / key pair will be used to sign frames.
+///
+/// ## Examples
 ///
 /// Create a synchronous TCP server node:
 ///
@@ -78,6 +109,36 @@ use crate::prelude::*;
 /// node.activate().await.unwrap();
 /// # }
 /// ```
+///
+/// Create a synchronous node, that signs all outgoing messages and rejects unsigned or incorrectly
+/// signed incoming messages:
+///
+/// ```rust,no_run
+/// use maviola::dialects::minimal::messages::Heartbeat;
+/// use maviola::prelude::*;
+/// use maviola::sync::prelude::*;
+///
+/// let node = Node::builder()
+///     .version(V2)
+///     .id(MavLinkId::new(1, 1))
+///     .connection(TcpServer::new("127.0.0.1:5600").unwrap())
+///     .signer(
+///         MessageSigner::builder()
+///             .link_id(1)
+///             .key("unsecure")
+///             .incoming(SignStrategy::Strict)
+///             .outgoing(SignStrategy::Sign)
+///             .build()
+///     )
+///     .build().unwrap();
+///
+/// // The following message will be signed during sending
+/// node.send(&Heartbeat::default()).unwrap();
+///
+/// // Incoming frames are always correctly signed
+/// let (frame, _) = node.recv_frame().unwrap();
+/// assert!(frame.is_signed());
+/// ```
 pub struct Node<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> {
     pub(crate) kind: K,
     pub(crate) api: A,
@@ -112,6 +173,13 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> Node<K
         self.heartbeat_timeout
     }
 
+    /// Returns a reference to [`MessageSigner`], that is responsible for
+    /// [message signing](https://mavlink.io/en/guide/message_signing.html).
+    #[inline(always)]
+    pub fn signer(&self) -> Option<&MessageSigner> {
+        self.api.signer()
+    }
+
     /// Returns `true` if node is connected.
     ///
     /// All nodes are connected by default, they can become disconnected only if I/O transport
@@ -120,7 +188,35 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> Node<K
         !self.state.is_closed()
     }
 
-    /// Validates frame using node configuration.
+    /// Send MAVLink [`Frame`].
+    ///
+    /// The [`Frame`] will be sent with as many fields preserved as possible. However, the
+    /// following properties could be updated based on the [`Node::signer`] configuration
+    /// (`MAVLink 2` frames only):
+    ///
+    /// * [`signature`](Frame::signature)
+    /// * [`link_id`](Frame::link_id)
+    /// * [`timestamp`](Frame::timestamp)
+    ///
+    /// To send MAVLink messages instead of raw frames, construct an [`Edge`] node and use
+    /// [`Node::send_versioned`] for node which is [`Versionless`] and [`Node::send`] for
+    /// [`Versioned`] nodes. In the latter case, message will be encoded according to MAVLink
+    /// protocol version defined for a node.
+    pub fn send_frame(&self, frame: &Frame<V>) -> Result<()> {
+        self.api.send_frame(frame)
+    }
+
+    /// Attempts to send versionless MAVLink frame.
+    ///
+    /// Similar to [`Node::send_frame`], except it accepts only [`Versionless`] frames and tries
+    /// to convert them into a supported versioned form. If conversion is not possible, the method
+    /// will return [`FrameError::InvalidVersion`] variant of [`Error::Frame`].
+    pub fn send_versionless_frame(&self, frame: &Frame<Versionless>) -> Result<()> {
+        let frame = frame.try_to_versioned::<V>()?;
+        self.send_frame(&frame)
+    }
+
+    /// Validates incoming frame using node configuration.
     pub fn validate_frame(&self, frame: &Frame<V>) -> Result<()> {
         frame.validate_checksum::<D>()?;
         Ok(())
@@ -174,16 +270,16 @@ impl<D: Dialect, V: Versioned + 'static, A: NodeApi<V>> Node<Edge<V>, D, V, A> {
         self.heartbeat_interval
     }
 
-    /// Create a next frame from MAVLink message.
+    /// Creates a next frame from MAVLink message.
+    ///
+    /// If [`Node::signer`] is set and the node has `MAVLink 2` protocol version, then frame will
+    /// be signed according to the [`MessageSigner::outgoing`] strategy.
     pub fn next_frame(&self, message: &impl Message) -> Result<Frame<V>> {
-        let unsigned_frame = self.kind.endpoint.next_frame(message)?;
+        let mut frame = self.kind.endpoint.next_frame(message)?;
 
-        let frame = if V::matches(MavLinkVersion::V2) {
-            let frame = unsigned_frame.try_versioned(V2)?;
-            frame.try_versioned(V::v())?
-        } else {
-            unsigned_frame
-        };
+        if let Some(signer) = self.signer() {
+            signer.process_new(&mut frame);
+        }
 
         Ok(frame)
     }
@@ -244,10 +340,13 @@ impl<D: Dialect, A: NodeApi<Versionless>> Node<Edge<Versionless>, D, Versionless
         &self,
         message: &impl Message,
     ) -> Result<Frame<Versionless>> {
-        self.kind
-            .endpoint
-            .next_frame::<V>(message)
-            .map_err(Error::from)
+        let mut frame = self.kind.endpoint.next_frame::<V>(message)?;
+
+        if let Some(signer) = self.signer() {
+            signer.process_new(&mut frame);
+        }
+
+        Ok(frame)
     }
 }
 

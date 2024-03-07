@@ -1,12 +1,12 @@
 use std::fmt::Debug;
-use std::sync::mpsc;
 use std::thread;
 use std::thread::JoinHandle;
 
+use crate::core::error::{RecvError, SendError, TryRecvError};
 use crate::core::io::{ConnectionConf, ConnectionInfo, OutgoingFrame};
 use crate::core::utils::{Closable, SharedCloser};
 use crate::sync::consts::CONN_STOP_POOLING_INTERVAL;
-use crate::sync::io::{Callback, ChannelFactory, FrameReceiver, FrameSender};
+use crate::sync::io::{Callback, ChannelFactory, IncomingFrameReceiver, OutgoingFrameSender};
 
 use crate::prelude::*;
 
@@ -109,26 +109,6 @@ impl<V: MaybeVersioned> Connection<V> {
         &self.info
     }
 
-    /// Send frame.
-    #[inline]
-    pub fn send(&self, frame: &Frame<V>) -> Result<()> {
-        self.sender.send(frame)
-    }
-
-    /// Receive frame.
-    ///
-    /// Blocks until frame received.
-    #[inline]
-    pub fn recv(&self) -> Result<(Frame<V>, Callback<V>)> {
-        self.receiver.recv()
-    }
-
-    /// Attempts to receive MAVLink frame without blocking.
-    #[inline]
-    pub fn try_recv(&self) -> Result<(Frame<V>, Callback<V>)> {
-        self.receiver.try_recv()
-    }
-
     pub(crate) fn share_state(&self) -> SharedCloser {
         self.state.clone()
     }
@@ -162,33 +142,33 @@ impl<V: MaybeVersioned> Drop for Connection<V> {
 
 #[derive(Clone, Debug)]
 pub(crate) struct ConnSender<V: MaybeVersioned + 'static> {
-    sender: FrameSender<V>,
+    sender: OutgoingFrameSender<V>,
     state: Closable,
 }
 
 impl<V: MaybeVersioned> ConnSender<V> {
-    pub(crate) fn send(&self, frame: &Frame<V>) -> Result<()> {
+    pub(crate) fn send(&self, frame: Frame<V>) -> Result<()> {
         if self.state.is_closed() {
-            return Err(Error::from(mpsc::SendError(frame)));
+            return Err(Error::from(SendError(frame)));
         }
 
         self.sender
-            .send(OutgoingFrame::new(frame.clone()))
+            .send(OutgoingFrame::new(frame))
             .map_err(Error::from)
     }
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct ConnReceiver<V: MaybeVersioned + 'static> {
-    receiver: FrameReceiver<V>,
+    receiver: IncomingFrameReceiver<V>,
 }
 
 impl<V: MaybeVersioned> ConnReceiver<V> {
-    pub(crate) fn recv(&self) -> Result<(Frame<V>, Callback<V>)> {
-        self.receiver.recv().map_err(Error::from)
+    pub(crate) fn try_recv(&self) -> core::result::Result<(Frame<V>, Callback<V>), TryRecvError> {
+        self.receiver.try_recv()
     }
 
-    pub(crate) fn try_recv(&self) -> Result<(Frame<V>, Callback<V>)> {
-        self.receiver.try_recv().map_err(Error::from)
+    pub(crate) fn recv(&self) -> core::result::Result<(Frame<V>, Callback<V>), RecvError> {
+        self.receiver.recv()
     }
 }

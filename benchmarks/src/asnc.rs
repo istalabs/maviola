@@ -51,7 +51,7 @@ async fn make_sock_client(path: PathBuf, id: u16) -> EdgeNode<Minimal, V2> {
 
 pub async fn benchmark_async_unix_sockets(n_clients: u16, n_iter: usize) {
     let n_interaction = n_clients as u32 * n_iter as u32;
-    let path = PathBuf::from("/tmp/maviola_benchmarks.sock");
+    let path = PathBuf::from("/tmp/maviola_async_benchmarks.sock");
     if Path::exists(path.as_path()) {
         remove_file(path.as_path()).unwrap();
     }

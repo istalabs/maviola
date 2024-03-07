@@ -1,13 +1,12 @@
 use std::sync::Arc;
 
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::sync::broadcast::error::RecvError;
 
 use crate::asnc::consts::{
     CHANNEL_STOP_JOIN_ATTEMPTS, CHANNEL_STOP_JOIN_POOLING_INTERVAL, CHANNEL_STOP_POOLING_INTERVAL,
 };
-use crate::asnc::io::{Callback, FrameProducer, FrameSendHandler, FrameSender};
-use crate::core::io::{AsyncReceiver, AsyncSender, OutgoingFrame};
+use crate::asnc::io::{Callback, IncomingFrameProducer, OutgoingFrameHandler, OutgoingFrameSender};
+use crate::core::io::{AsyncReceiver, AsyncSender};
 use crate::core::io::{ChannelInfo, ConnectionInfo};
 use crate::core::utils::{Closable, SharedCloser, UniqueId};
 
@@ -19,9 +18,9 @@ use crate::prelude::*;
 pub struct ChannelFactory<V: MaybeVersioned + 'static> {
     pub(crate) info: ConnectionInfo,
     pub(crate) state: Closable,
-    pub(crate) sender: FrameSender<V>,
-    pub(crate) send_handler: FrameSendHandler<V>,
-    pub(crate) producer: FrameProducer<V>,
+    pub(crate) sender: OutgoingFrameSender<V>,
+    pub(crate) send_handler: OutgoingFrameHandler<V>,
+    pub(crate) producer: IncomingFrameProducer<V>,
 }
 
 impl<V: MaybeVersioned> ChannelFactory<V> {
@@ -65,9 +64,9 @@ pub struct Channel<V: MaybeVersioned + 'static, R: AsyncRead, W: AsyncWrite> {
     info: ChannelInfo,
     reader: R,
     writer: W,
-    sender: FrameSender<V>,
-    send_handler: FrameSendHandler<V>,
-    producer: FrameProducer<V>,
+    sender: OutgoingFrameSender<V>,
+    send_handler: OutgoingFrameHandler<V>,
+    producer: IncomingFrameProducer<V>,
 }
 
 impl<
@@ -127,7 +126,7 @@ impl<
 
     async fn write_handler(
         id: UniqueId,
-        mut send_handler: FrameSendHandler<V>,
+        mut send_handler: OutgoingFrameHandler<V>,
         mut frame_writer: AsyncSender<W, V>,
     ) -> Result<()> {
         loop {
@@ -160,8 +159,8 @@ impl<
         conn_state: Closable,
         id: UniqueId,
         info: Arc<ChannelInfo>,
-        sender: FrameSender<V>,
-        producer: FrameProducer<V>,
+        sender: OutgoingFrameSender<V>,
+        producer: IncomingFrameProducer<V>,
         mut frame_reader: AsyncReceiver<R, V>,
     ) -> Result<()> {
         loop {
@@ -186,11 +185,7 @@ impl<
             let info = info.clone();
             let send_tx = sender.clone();
 
-            let response = Callback {
-                sender_id: id,
-                sender_info: info.clone(),
-                broadcast_tx: send_tx,
-            };
+            let response = Callback::new(id, info.clone(), send_tx);
 
             producer.send((frame, response))?;
         }

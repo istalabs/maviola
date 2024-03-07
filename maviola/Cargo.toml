@@ -142,6 +142,11 @@ test = true
 required-features = ["sync"]
 
 [[example]]
+name = "message_signing"
+test = true
+required-features = ["sync"]
+
+[[example]]
 name = "async_tcp_ping_pong"
 test = true
 required-features = ["async"]
