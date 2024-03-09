@@ -20,7 +20,7 @@ pub enum Event<V: MaybeVersioned> {
     /// New [`Frame`] received.
     Frame(Frame<V>, Callback<V>),
     /// New [`Frame`] received, but it hasn't passed validation.
-    Invalid(Frame<V>, Error, Callback<V>),
+    Invalid(Frame<V>, FrameError, Callback<V>),
 }
 
 pub(crate) struct EventsIterator<V: MaybeVersioned + 'static> {

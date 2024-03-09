@@ -30,7 +30,7 @@ async fn spawn_client(path: PathBuf, component_id: ComponentId) {
 
     tokio::spawn(async move {
         let mut client = Node::builder()
-            .version(V2)
+            .version::<V2>()
             .system_id(31)
             .component_id(component_id)
             .heartbeat_interval(HEARTBEAT_INTERVAL)
@@ -65,7 +65,7 @@ async fn spawn_client(path: PathBuf, component_id: ComponentId) {
 
 async fn run(path: PathBuf) -> Result<()> {
     let mut server = Node::builder()
-        .version(V2)
+        .version::<V2>()
         .system_id(17)
         .component_id(42)
         .heartbeat_interval(HEARTBEAT_INTERVAL)
@@ -126,7 +126,14 @@ async fn async_sock_ping_pong() {
         run(path).await.unwrap();
     });
 
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    for _ in 0..10 {
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        if handler.is_finished() {
+            handler.await.unwrap();
+            return;
+        }
+    }
+
     if !handler.is_finished() {
         panic!("[async_sock_ping_pong] test took too long")
     }

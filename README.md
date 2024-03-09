@@ -65,8 +65,7 @@ use maviola::sync::prelude::*;
 pub fn main() -> Result<()> {
     // Create a MAVLink node
     let server = Node::builder()
-        .version(V2)                                    // Set protocol version to `V2`
-        .dialect::<Minimal>()                           // Set MAVLink dialect to `minimal`
+        .version::<V2>()                                // Set protocol version to `V2`
         .id(MavLinkId::new(17, 42))                     // Set device system and component IDs
         .connection(TcpServer::new("127.0.0.1:5600")?)  // Define connection settings
         .build()?;
@@ -119,8 +118,7 @@ use maviola::asnc::prelude::*;
 async fn main() -> Result<()> {
     // Create a MAVLink node
     let server = Node::builder()
-        .version(V2)                            // Set protocol version to `V2`
-        .dialect::<Minimal>()                   // Set MAVLink dialect to `minimal`
+        .version::<V2>()                        // Set protocol version to `V2`
         .id(MavLinkId::new(17, 42))             // Set device system and component IDs
         .async_connection(
             TcpServer::new("127.0.0.1:5600")?   // Define connection settings

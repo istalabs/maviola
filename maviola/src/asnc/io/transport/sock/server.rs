@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use tokio::net::UnixListener;
 
 use crate::asnc::io::{Connection, ConnectionBuilder, ConnectionHandler};
+use crate::asnc::marker::AsyncConnConf;
 use crate::core::io::ChannelInfo;
 use crate::core::utils::Closer;
 
@@ -34,5 +35,9 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockServer {
         });
 
         Ok((connection, handler))
+    }
+
+    fn to_conf(&self) -> AsyncConnConf<V> {
+        AsyncConnConf::new(self.clone())
     }
 }

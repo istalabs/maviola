@@ -7,6 +7,7 @@ use crate::sync::io::{Connection, ConnectionBuilder, ConnectionHandler};
 use crate::sync::utils::BusyReader;
 
 use crate::prelude::*;
+use crate::sync::marker::ConnConf;
 
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for FileWriter {
     fn build(&self) -> Result<(Connection<V>, ConnectionHandler)> {
@@ -24,5 +25,9 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for FileWriter {
         let handler = ConnectionHandler::spawn_from_state(channel_state);
 
         Ok((connection, handler))
+    }
+
+    fn to_conf(&self) -> ConnConf<V> {
+        ConnConf::new(self.clone())
     }
 }

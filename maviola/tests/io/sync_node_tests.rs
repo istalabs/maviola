@@ -5,7 +5,6 @@ use std::time::Duration;
 
 use portpicker::Port;
 
-use maviola::core::marker::Edge;
 use maviola::dialects::minimal;
 use maviola::protocol::{ComponentId, SystemId};
 use maviola::sync::node::Event;
@@ -17,7 +16,7 @@ static INIT: Once = Once::new();
 static INIT_LOGGER: Once = Once::new();
 pub const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Debug;
 pub const HOST: &str = "127.0.0.1";
-const WAIT_DURATION: Duration = Duration::from_millis(50);
+const WAIT_DURATION: Duration = Duration::from_millis(100);
 const WAIT_LONG_DURATION: Duration = Duration::from_millis(500);
 pub const DEFAULT_TCP_SERVER_SYS_ID: SystemId = 2;
 pub const DEFAULT_TCP_SERVER_COMP_ID: ComponentId = 0;
@@ -54,9 +53,9 @@ fn initialize() {
     INIT.call_once(|| init_logger());
 }
 
-pub fn make_tcp_server_node_v2(port: Port) -> Node<Edge<V2>, Minimal, V2, SyncApi<V2>> {
+pub fn make_tcp_server_node_v2(port: Port) -> EdgeNode<V2> {
     Node::builder()
-        .version(V2)
+        .version::<V2>()
         .system_id(DEFAULT_TCP_SERVER_SYS_ID)
         .component_id(DEFAULT_TCP_SERVER_COMP_ID)
         .connection(TcpServer::new(make_addr(port)).unwrap())
@@ -64,12 +63,9 @@ pub fn make_tcp_server_node_v2(port: Port) -> Node<Edge<V2>, Minimal, V2, SyncAp
         .unwrap()
 }
 
-pub fn make_tcp_client_node_v2(
-    port: Port,
-    component_id: u8,
-) -> Node<Edge<V2>, Minimal, V2, SyncApi<V2>> {
+pub fn make_tcp_client_node_v2(port: Port, component_id: u8) -> EdgeNode<V2> {
     Node::builder()
-        .version(V2)
+        .version::<V2>()
         .system_id(DEFAULT_TCP_CLIENT_SYS_ID)
         .component_id(component_id)
         .connection(TcpClient::new(make_addr(port)).unwrap())
@@ -77,7 +73,7 @@ pub fn make_tcp_client_node_v2(
         .unwrap()
 }
 
-fn make_client_nodes_v2(port: Port, count: u8) -> HashMap<u8, EdgeNode<Minimal, V2>> {
+fn make_client_nodes_v2(port: Port, count: u8) -> HashMap<u8, EdgeNode<V2>> {
     (0..count)
         .map(|i| (i, make_tcp_client_node_v2(port, i)))
         .collect()
@@ -151,7 +147,7 @@ fn events_are_received() {
 
     let port = unused_port();
     let server_node = Node::builder()
-        .version(V2)
+        .version::<V2>()
         .system_id(1)
         .component_id(1)
         .connection(TcpServer::new(make_addr(port)).unwrap())
@@ -187,7 +183,7 @@ fn heartbeats_are_sent() {
 
     let port = unused_port();
     let mut server_node = Node::builder()
-        .version(V2)
+        .version::<V2>()
         .system_id(1)
         .component_id(1)
         .connection(TcpServer::new(make_addr(port)).unwrap())
@@ -240,7 +236,7 @@ fn node_no_id_no_dialect_no_version() {
         .into_versionless();
 
     for _ in 0..5 {
-        client_node.proxy_frame(&frame).unwrap();
+        client_node.send_frame(&frame).unwrap();
     }
 
     wait_long();
@@ -289,7 +285,7 @@ fn node_no_id() {
     let port = unused_port();
     let server_node = make_tcp_server_node_v2(port);
     let client_node = Node::builder()
-        .version(V2)
+        .version::<V2>()
         .connection(TcpClient::new(make_addr(port)).unwrap())
         .build()
         .unwrap();
@@ -317,7 +313,6 @@ fn node_no_version() {
     let client_node = Node::builder()
         .system_id(42)
         .component_id(142)
-        .dialect::<Minimal>()
         .connection(TcpClient::new(make_addr(port)).unwrap())
         .build()
         .unwrap();

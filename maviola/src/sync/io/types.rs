@@ -1,8 +1,7 @@
 use crate::core::io::OutgoingFrame;
-use crate::protocol::Frame;
-use crate::sync::io::Callback;
 
 use crate::prelude::*;
+use crate::sync::prelude::*;
 
 #[cfg(doc)]
 use crate::sync::io::{Channel, Connection};

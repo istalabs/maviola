@@ -20,7 +20,7 @@ fn report_frame<V: MaybeVersioned>(frame: &Frame<V>) {
 
 async fn run(path: PathBuf) -> Result<()> {
     let writer = Node::builder()
-        .version(V2)
+        .version::<V2>()
         .system_id(17)
         .component_id(42)
         .async_connection(FileWriter::new(path.as_path())?)
@@ -37,7 +37,7 @@ async fn run(path: PathBuf) -> Result<()> {
     log::warn!("[writer] finished");
 
     let reader = Node::builder()
-        .version(V2)
+        .version::<V2>()
         .system_id(17)
         .component_id(42)
         .async_connection(FileReader::new(path.as_path())?)
@@ -86,7 +86,14 @@ async fn async_file_rw() {
         run(path).await.unwrap();
     });
 
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    for _ in 0..10 {
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        if handler.is_finished() {
+            handler.await.unwrap();
+            return;
+        }
+    }
+
     if !handler.is_finished() {
         panic!("[async_file_rw] test took too long")
     }

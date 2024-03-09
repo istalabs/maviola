@@ -1,15 +1,18 @@
 use std::fmt::Debug;
 use std::future::Future;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use tokio::task::JoinHandle;
 
 use crate::asnc::consts::{CONN_BROADCAST_CHAN_CAPACITY, CONN_STOP_POOLING_INTERVAL};
 use crate::asnc::io::{Callback, ChannelFactory, IncomingFrameReceiver, OutgoingFrameSender};
-use crate::core::error::{RecvError, SendError, TryRecvError};
+use crate::asnc::marker::AsyncConnConf;
+use crate::core::error::{RecvError, RecvTimeoutError, SendError, TryRecvError};
 use crate::core::io::{ConnectionConf, ConnectionInfo, OutgoingFrame};
 use crate::core::utils::{Closable, SharedCloser};
 
+use crate::asnc::prelude::*;
 use crate::prelude::*;
 
 /// <sup>[`async`](crate::asnc)</sup>
@@ -21,6 +24,9 @@ pub trait ConnectionBuilder<V: MaybeVersioned + 'static>: ConnectionConf {
     /// Returns the new connection and its main handler. Once handler is finished, the connection
     /// is considered to be closed.
     async fn build(&self) -> Result<(Connection<V>, ConnectionHandler)>;
+
+    /// Converts connection builder to [`AsyncConnConf`]
+    fn to_conf(&self) -> AsyncConnConf<V>;
 }
 
 /// <sup>[`async`](crate::asnc)</sup>
@@ -82,8 +88,8 @@ impl ConnectionHandler {
 impl<V: MaybeVersioned> Connection<V> {
     /// Creates a new connection and associated [`ChannelFactory`].
     pub fn new(info: ConnectionInfo, state: SharedCloser) -> (Self, ChannelFactory<V>) {
-        let (sender, send_handler) = broadcast::channel(CONN_BROADCAST_CHAN_CAPACITY);
-        let (producer, receiver) = broadcast::channel(CONN_BROADCAST_CHAN_CAPACITY);
+        let (sender, send_handler) = mpmc::channel(CONN_BROADCAST_CHAN_CAPACITY);
+        let (producer, receiver) = mpmc::channel(CONN_BROADCAST_CHAN_CAPACITY);
 
         let connection = Self {
             info,
@@ -159,6 +165,17 @@ impl<V: MaybeVersioned> ConnSender<V> {
             .map_err(Error::from)
             .map(|_| ())
     }
+
+    pub(crate) fn send_raw(
+        &self,
+        frame: OutgoingFrame<V>,
+    ) -> core::result::Result<(), SendError<OutgoingFrame<V>>> {
+        if self.state.is_closed() {
+            return Err(SendError(frame));
+        }
+
+        self.sender.send(frame).map_err(SendError::from).map(|_| ())
+    }
 }
 
 #[derive(Debug)]
@@ -178,12 +195,19 @@ impl<V: MaybeVersioned> ConnReceiver<V> {
     pub(crate) async fn recv(
         &mut self,
     ) -> core::result::Result<(Frame<V>, Callback<V>), RecvError> {
-        self.receiver.recv().await.map_err(RecvError::from)
+        self.receiver.recv().await
+    }
+
+    pub(crate) async fn recv_timeout(
+        &mut self,
+        timeout: Duration,
+    ) -> core::result::Result<(Frame<V>, Callback<V>), RecvTimeoutError> {
+        self.receiver.recv_timeout(timeout).await
     }
 
     pub(crate) fn try_recv(
         &mut self,
     ) -> core::result::Result<(Frame<V>, Callback<V>), TryRecvError> {
-        self.receiver.try_recv().map_err(TryRecvError::from)
+        self.receiver.try_recv()
     }
 }

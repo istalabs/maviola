@@ -1,14 +1,17 @@
 use std::fmt::Debug;
 use std::thread;
 use std::thread::JoinHandle;
+use std::time::Duration;
 
-use crate::core::error::{RecvError, SendError, TryRecvError};
+use crate::core::error::{RecvError, RecvTimeoutError, SendError, TryRecvError};
 use crate::core::io::{ConnectionConf, ConnectionInfo, OutgoingFrame};
 use crate::core::utils::{Closable, SharedCloser};
 use crate::sync::consts::CONN_STOP_POOLING_INTERVAL;
-use crate::sync::io::{Callback, ChannelFactory, IncomingFrameReceiver, OutgoingFrameSender};
+use crate::sync::io::{ChannelFactory, IncomingFrameReceiver, OutgoingFrameSender};
+use crate::sync::marker::ConnConf;
 
 use crate::prelude::*;
+use crate::sync::prelude::*;
 
 /// <sup>[`sync`](crate::sync)</sup>
 /// Connection builder used to create a [`Connection`].
@@ -18,6 +21,16 @@ pub trait ConnectionBuilder<V: MaybeVersioned>: ConnectionConf {
     /// Returns the new connection and its main handler. Once handler is finished, the connection
     /// is considered to be closed.
     fn build(&self) -> Result<(Connection<V>, ConnectionHandler)>;
+
+    /// Converts connection builder to [`ConnConf`]
+    fn to_conf(&self) -> ConnConf<V>;
+
+    /// If `true`, then this connection can be safely restored on failure.
+    ///
+    /// A blanket implementation always returns `false`.
+    fn is_repairable(&self) -> bool {
+        false
+    }
 }
 
 /// <sup>[`sync`](crate::sync)</sup>
@@ -48,7 +61,7 @@ impl ConnectionHandler {
         }
     }
 
-    /// Spawns a new connection handler that finishes when the `state` becomes closed.
+    /// Spawns a new connection handler that finishes, when the `state` becomes closed.
     pub fn spawn_from_state(state: SharedCloser) -> Self {
         Self::spawn(move || {
             while !state.is_closed() {
@@ -93,7 +106,7 @@ impl<V: MaybeVersioned> Connection<V> {
             state,
         };
 
-        let builder = ChannelFactory {
+        let chan_factory = ChannelFactory {
             info: connection.info.clone(),
             state: connection.state.to_closable(),
             sender,
@@ -101,7 +114,7 @@ impl<V: MaybeVersioned> Connection<V> {
             producer,
         };
 
-        (connection, builder)
+        (connection, chan_factory)
     }
 
     /// Information about this connection.
@@ -109,16 +122,20 @@ impl<V: MaybeVersioned> Connection<V> {
         &self.info
     }
 
-    pub(crate) fn share_state(&self) -> SharedCloser {
+    pub(in crate::sync) fn state(&self) -> Closable {
+        self.state.to_closable()
+    }
+
+    pub(in crate::sync) fn share_state(&self) -> SharedCloser {
         self.state.clone()
     }
 
-    pub(crate) fn sender(&self) -> ConnSender<V> {
-        self.sender.clone()
+    pub(in crate::sync) fn sender(&self) -> &ConnSender<V> {
+        &self.sender
     }
 
-    pub(crate) fn receiver(&self) -> ConnReceiver<V> {
-        self.receiver.clone()
+    pub(in crate::sync) fn receiver(&self) -> &ConnReceiver<V> {
+        &self.receiver
     }
 
     fn close(&mut self) {
@@ -141,13 +158,13 @@ impl<V: MaybeVersioned> Drop for Connection<V> {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug)]
-pub(crate) struct ConnSender<V: MaybeVersioned + 'static> {
+pub(in crate::sync) struct ConnSender<V: MaybeVersioned + 'static> {
     sender: OutgoingFrameSender<V>,
     state: Closable,
 }
 
 impl<V: MaybeVersioned> ConnSender<V> {
-    pub(crate) fn send(&self, frame: Frame<V>) -> Result<()> {
+    pub(in crate::sync) fn send(&self, frame: Frame<V>) -> Result<()> {
         if self.state.is_closed() {
             return Err(Error::from(SendError(frame)));
         }
@@ -155,6 +172,17 @@ impl<V: MaybeVersioned> ConnSender<V> {
         self.sender
             .send(OutgoingFrame::new(frame))
             .map_err(Error::from)
+    }
+
+    pub(in crate::sync) fn send_raw(
+        &self,
+        frame: OutgoingFrame<V>,
+    ) -> core::result::Result<(), SendError<OutgoingFrame<V>>> {
+        if self.state.is_closed() {
+            return Err(SendError(frame));
+        }
+
+        self.sender.send(frame)
     }
 }
 
@@ -164,11 +192,74 @@ pub(crate) struct ConnReceiver<V: MaybeVersioned + 'static> {
 }
 
 impl<V: MaybeVersioned> ConnReceiver<V> {
-    pub(crate) fn try_recv(&self) -> core::result::Result<(Frame<V>, Callback<V>), TryRecvError> {
-        self.receiver.try_recv()
+    #[inline(always)]
+    pub(in crate::sync) fn recv(&self) -> core::result::Result<(Frame<V>, Callback<V>), RecvError> {
+        self.receiver.recv()
     }
 
-    pub(crate) fn recv(&self) -> core::result::Result<(Frame<V>, Callback<V>), RecvError> {
-        self.receiver.recv()
+    #[inline(always)]
+    pub(in crate::sync) fn recv_timeout(
+        &self,
+        timeout: Duration,
+    ) -> core::result::Result<(Frame<V>, Callback<V>), RecvTimeoutError> {
+        self.receiver.recv_timeout(timeout)
+    }
+
+    #[inline(always)]
+    pub(in crate::sync) fn try_recv(
+        &self,
+    ) -> core::result::Result<(Frame<V>, Callback<V>), TryRecvError> {
+        self.receiver.try_recv()
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+//                                  Tests                                    //
+///////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::utils::net::pick_unused_port;
+    use mavio::dialects::minimal::messages::Heartbeat;
+    use std::time::Duration;
+
+    #[test]
+    fn standalone_connections() {
+        let addr = format!("127.0.0.1:{}", pick_unused_port().unwrap());
+
+        let (server, handler) = TcpServer::new(addr.as_str())
+            .unwrap()
+            .to_conf()
+            .0
+            .build()
+            .unwrap();
+        handler.handle::<V2>(&server);
+
+        let (client, handler) = TcpClient::new(addr.as_str()).unwrap().build().unwrap();
+        handler.handle::<V2>(&server);
+
+        client.sender().send(make_frame()).unwrap();
+        wait();
+        server.receiver().try_recv().unwrap();
+
+        server.sender().send(make_frame()).unwrap();
+        wait();
+        client.receiver().try_recv().unwrap();
+    }
+
+    fn wait() {
+        thread::sleep(Duration::from_millis(100));
+    }
+
+    fn make_frame() -> Frame<V2> {
+        Frame::builder()
+            .sequence(0)
+            .system_id(1)
+            .component_id(1)
+            .version(V2)
+            .message(&Heartbeat::default())
+            .unwrap()
+            .build()
     }
 }

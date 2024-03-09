@@ -37,7 +37,7 @@ fn spawn_client(addr: &str, component_id: ComponentId) {
 
     thread::spawn(move || -> Result<()> {
         let mut client = Node::builder()
-            .version(V2)
+            .version::<V2>()
             .system_id(31)
             .component_id(component_id)
             .heartbeat_interval(HEARTBEAT_INTERVAL)
@@ -71,7 +71,7 @@ fn spawn_client(addr: &str, component_id: ComponentId) {
 fn run(addr: &str) -> Result<()> {
     let server_addr = addr.to_string();
     let mut server = Node::builder()
-        .version(V2)
+        .version::<V2>()
         .system_id(17)
         .component_id(42)
         .heartbeat_interval(HEARTBEAT_INTERVAL)
@@ -121,7 +121,14 @@ fn tcp_ping_pong() {
         run(addr.as_str()).unwrap();
     });
 
-    thread::sleep(Duration::from_secs(5));
+    for _ in 0..10 {
+        thread::sleep(Duration::from_millis(250));
+        if handler.is_finished() {
+            handler.join().unwrap();
+            return;
+        }
+    }
+
     if !handler.is_finished() {
         panic!("[tcp_ping_pong] test took too long")
     }

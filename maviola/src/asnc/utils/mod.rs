@@ -8,6 +8,7 @@
 use crate::asnc::io::ConnectionBuilder;
 
 mod busy_rw;
+pub mod mpmc;
 mod mpsc_rw;
 
 pub use busy_rw::{BusyReader, BusyWriter};

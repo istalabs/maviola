@@ -12,12 +12,13 @@ use crate::asnc::io::{Callback, ConnReceiver, ConnSender, Connection, Connection
 use crate::asnc::node::event::EventStream;
 use crate::asnc::node::handler::{HeartbeatEmitter, InactivePeersHandler, IncomingFramesHandler};
 use crate::asnc::node::Event;
-use crate::core::error::{RecvError, SendError, TryRecvError};
-use crate::core::io::ConnectionInfo;
+use crate::core::error::{RecvError, RecvTimeoutError, SendError, TryRecvError};
+use crate::core::io::{ConnectionInfo, OutgoingFrame};
 use crate::core::node::NodeApi;
 use crate::core::utils::{Guarded, Sealed, SharedCloser, Switch};
-use crate::protocol::{Endpoint, Peer};
+use crate::protocol::{DialectVersion, Endpoint, FrameProcessor, Peer};
 
+use crate::asnc::prelude::*;
 use crate::prelude::*;
 
 /// <sup>[`async`](crate::asnc)</sup>
@@ -26,7 +27,7 @@ pub struct AsyncApi<V: MaybeVersioned + 'static> {
     connection: Connection<V>,
     sender: FrameSender<V>,
     receiver: FrameReceiver<V>,
-    signer: Option<Arc<MessageSigner>>,
+    processor: Arc<FrameProcessor>,
     peers: Arc<RwLock<HashMap<MavLinkId, Peer>>>,
     event_sender: EventSender<V>,
     event_receiver: EventReceiver<V>,
@@ -45,32 +46,32 @@ impl<V: MaybeVersioned + 'static> NodeApi<V> for AsyncApi<V> {
     }
 
     #[inline(always)]
-    fn signer(&self) -> Option<&MessageSigner> {
-        self.signer()
+    fn processor(&self) -> &FrameProcessor {
+        self.processor()
     }
 }
 
 impl<V: MaybeVersioned + 'static> AsyncApi<V> {
-    pub(super) fn new(connection: Connection<V>, signer: Option<Arc<MessageSigner>>) -> Self {
-        let (events_tx, events_rx) = broadcast::channel(CONN_BROADCAST_CHAN_CAPACITY);
+    pub(super) fn new(connection: Connection<V>, processor: Arc<FrameProcessor>) -> Self {
+        let (events_tx, events_rx) = mpmc::channel(CONN_BROADCAST_CHAN_CAPACITY);
 
-        let sender = FrameSender::new(connection.sender(), signer.clone());
-        let receiver = FrameReceiver::new(connection.receiver(), signer.clone());
-        let event_receiver = EventReceiver::new(events_rx, signer.clone());
+        let sender = FrameSender::new(connection.sender(), processor.clone());
+        let receiver = FrameReceiver::new(connection.receiver(), processor.clone());
+        let event_receiver = EventReceiver::new(events_rx).with_processor(processor.clone());
 
         AsyncApi {
             connection,
             sender,
             receiver,
-            signer: signer.clone(),
+            processor: processor.clone(),
             peers: Arc::new(Default::default()),
             event_sender: EventSender::new(events_tx),
             event_receiver,
         }
     }
 
-    fn signer(&self) -> Option<&MessageSigner> {
-        self.signer.as_ref().map(|signer| signer.as_ref())
+    fn processor(&self) -> &FrameProcessor {
+        &self.processor
     }
 
     pub(super) fn share_state(&self) -> SharedCloser {
@@ -105,6 +106,10 @@ impl<V: MaybeVersioned + 'static> AsyncApi<V> {
         self.sender.send(frame)
     }
 
+    pub(super) fn frame_sender(&self) -> &FrameSender<V> {
+        &self.sender
+    }
+
     pub(super) fn events(&self) -> impl Stream<Item = Event<V>> {
         EventStream::new(
             self.event_receiver.resubscribe(),
@@ -120,8 +125,22 @@ impl<V: MaybeVersioned + 'static> AsyncApi<V> {
         self.event_receiver.try_recv().map_err(Error::from)
     }
 
+    pub(super) fn event_receiver(&self) -> EventReceiver<V> {
+        self.event_receiver.clone()
+    }
+
     pub(super) async fn recv_frame(&mut self) -> Result<(Frame<V>, Callback<V>)> {
         self.receiver.recv().await.map_err(Error::from)
+    }
+
+    pub(super) async fn recv_frame_timeout(
+        &mut self,
+        timeout: Duration,
+    ) -> Result<(Frame<V>, Callback<V>)> {
+        self.receiver
+            .recv_timeout(timeout)
+            .await
+            .map_err(Error::from)
     }
 
     pub(super) fn try_recv_frame(&mut self) -> Result<(Frame<V>, Callback<V>)> {
@@ -160,18 +179,19 @@ impl<V: MaybeVersioned + 'static> AsyncApi<V> {
 }
 
 impl<V: Versioned> AsyncApi<V> {
-    pub(crate) fn start_sending_heartbeats<D: Dialect>(
+    pub(crate) fn start_sending_heartbeats(
         &self,
         endpoint: Endpoint<V>,
         interval: Duration,
         is_active: Guarded<SharedCloser, Switch>,
+        dialect_version: Option<DialectVersion>,
     ) {
         let emitter = HeartbeatEmitter {
             info: self.info().clone(),
             endpoint,
             interval,
             sender: self.connection.sender(),
-            _dialect: PhantomData::<D>,
+            dialect_version,
             _version: PhantomData::<V>,
         };
         emitter.spawn(is_active);
@@ -183,48 +203,54 @@ impl<V: Versioned> AsyncApi<V> {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone)]
-pub(super) struct FrameSender<V: MaybeVersioned + 'static> {
+pub(in crate::asnc) struct FrameSender<V: MaybeVersioned + 'static> {
     inner: ConnSender<V>,
-    signer: Option<Arc<MessageSigner>>,
+    processor: Arc<FrameProcessor>,
 }
 
 pub(super) struct FrameReceiver<V: MaybeVersioned + 'static> {
     inner: ConnReceiver<V>,
-    signer: Option<Arc<MessageSigner>>,
+    processor: Arc<FrameProcessor>,
 }
 
 #[derive(Clone)]
 pub(super) struct EventSender<V: MaybeVersioned> {
-    inner: broadcast::Sender<Event<V>>,
+    inner: mpmc::Sender<Event<V>>,
 }
 
-pub(super) struct EventReceiver<V: MaybeVersioned + 'static> {
-    inner: broadcast::Receiver<Event<V>>,
-    signer: Option<Arc<MessageSigner>>,
+#[derive(Clone)]
+pub(in crate::asnc) struct EventReceiver<V: MaybeVersioned + 'static> {
+    inner: mpmc::Receiver<Event<V>>,
+    processor: Arc<FrameProcessor>,
 }
 
 impl<V: MaybeVersioned + 'static> FrameSender<V> {
-    pub(super) fn new(sender: ConnSender<V>, signer: Option<Arc<MessageSigner>>) -> Self {
+    pub(super) fn new(sender: ConnSender<V>, processor: Arc<FrameProcessor>) -> Self {
         Self {
             inner: sender,
-            signer,
+            processor,
         }
     }
 
     pub(super) fn send(&self, frame: &Frame<V>) -> Result<()> {
         let mut frame = frame.clone();
-        if let Some(signer) = &self.signer {
-            signer.process_outgoing(&mut frame)?;
-        }
+        self.processor.process_outgoing(&mut frame)?;
         self.inner.send(frame)
+    }
+
+    pub(in crate::asnc) fn send_raw(
+        &self,
+        frame: OutgoingFrame<V>,
+    ) -> core::result::Result<(), SendError<OutgoingFrame<V>>> {
+        self.inner.send_raw(frame)
     }
 }
 
 impl<V: MaybeVersioned + 'static> FrameReceiver<V> {
-    pub(super) fn new(receiver: ConnReceiver<V>, signer: Option<Arc<MessageSigner>>) -> Self {
+    pub(super) fn new(receiver: ConnReceiver<V>, processor: Arc<FrameProcessor>) -> Self {
         Self {
             inner: receiver,
-            signer,
+            processor,
         }
     }
 
@@ -233,6 +259,23 @@ impl<V: MaybeVersioned + 'static> FrameReceiver<V> {
     ) -> core::result::Result<(Frame<V>, Callback<V>), RecvError> {
         loop {
             return match self.inner.recv().await {
+                Ok((mut frame, mut callback)) => {
+                    if self.process_frame(&mut frame, &mut callback).is_err() {
+                        continue;
+                    }
+                    Ok((frame, callback))
+                }
+                Err(err) => Err(err),
+            };
+        }
+    }
+
+    pub(super) async fn recv_timeout(
+        &mut self,
+        timeout: Duration,
+    ) -> core::result::Result<(Frame<V>, Callback<V>), RecvTimeoutError> {
+        loop {
+            return match self.inner.recv_timeout(timeout).await {
                 Ok((mut frame, mut callback)) => {
                     if self.process_frame(&mut frame, &mut callback).is_err() {
                         continue;
@@ -259,18 +302,14 @@ impl<V: MaybeVersioned + 'static> FrameReceiver<V> {
     }
 
     fn process_frame(&self, frame: &mut Frame<V>, callback: &mut Callback<V>) -> Result<()> {
-        callback.set_signer(self.signer.clone());
-
-        if let Some(signer) = &self.signer {
-            signer.process_incoming(frame)?;
-        }
-
+        callback.set_processor(self.processor.clone());
+        self.processor.process_incoming(frame)?;
         Ok(())
     }
 }
 
 impl<V: MaybeVersioned> EventSender<V> {
-    pub(super) fn new(sender: broadcast::Sender<Event<V>>) -> Self {
+    pub(super) fn new(sender: mpmc::Sender<Event<V>>) -> Self {
         Self { inner: sender }
     }
 
@@ -281,18 +320,28 @@ impl<V: MaybeVersioned> EventSender<V> {
 }
 
 impl<V: MaybeVersioned> EventReceiver<V> {
-    pub(super) fn new(
-        receiver: broadcast::Receiver<Event<V>>,
-        signer: Option<Arc<MessageSigner>>,
-    ) -> Self {
+    pub(super) fn new(receiver: mpmc::Receiver<Event<V>>) -> Self {
         Self {
             inner: receiver,
-            signer,
+            processor: Arc::new(FrameProcessor::new()),
         }
+    }
+
+    fn with_processor(mut self, processor: Arc<FrameProcessor>) -> Self {
+        self.processor = processor;
+        self
     }
 
     pub(super) async fn recv(&mut self) -> core::result::Result<Event<V>, RecvError> {
         let event = self.inner.recv().await?;
+        Ok(self.process_event(event))
+    }
+
+    pub(in crate::asnc) async fn recv_timeout(
+        &mut self,
+        timeout: Duration,
+    ) -> core::result::Result<Event<V>, RecvTimeoutError> {
+        let event = self.inner.recv_timeout(timeout).await?;
         Ok(self.process_event(event))
     }
 
@@ -302,24 +351,22 @@ impl<V: MaybeVersioned> EventReceiver<V> {
     }
 
     pub(super) fn resubscribe(&self) -> Self {
-        Self::new(self.inner.resubscribe(), self.signer.clone())
+        Self::new(self.inner.resubscribe()).with_processor(self.processor.clone())
     }
 
     fn process_event(&self, event: Event<V>) -> Event<V> {
         match event {
             Event::Frame(mut frame, mut callback) => {
-                callback.set_signer(self.signer.clone());
+                callback.set_processor(self.processor.clone());
 
-                if let Some(signer) = &self.signer {
-                    if let Err(err) = signer.process_incoming(&mut frame) {
-                        return Event::Invalid(frame, err, callback);
-                    }
+                if let Err(err) = self.processor.process_incoming(&mut frame) {
+                    return Event::Invalid(frame, err, callback);
                 }
 
                 Event::Frame(frame, callback)
             }
             Event::Invalid(frame, err, mut callback) => {
-                callback.set_signer(self.signer.clone());
+                callback.set_processor(self.processor.clone());
                 Event::Invalid(frame, err, callback)
             }
             Event::NewPeer(peer) => Event::NewPeer(peer),

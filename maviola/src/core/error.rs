@@ -9,13 +9,16 @@
 //! wrap them as the corresponding variants of [`Error`]. All such low-level MAVLink abstractions
 //! are available in [`crate::core`].
 
+use std::fmt::{Debug, Formatter};
 use std::sync::{mpsc, Arc, PoisonError};
 
 use crate::protocol::MessageId;
 
 /// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
 #[doc(inline)]
-pub use mavio::errors::{FrameError, SpecError};
+pub use mavio::error::{
+    ChecksumError, FrameError, IncompatFlagsError, SignatureError, SpecError, VersionError,
+};
 
 /// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
 /// Low-level error re-exported from Mavio. Maviola wraps all variants of [`CoreError`] with its own
@@ -100,6 +103,11 @@ pub enum SyncError {
     /// Includes the number of skipped messages.
     #[error("receiver is too far behind: {0}")]
     Lagged(u64),
+
+    /// This **channel** is currently empty, but the **Sender**(s) have not yet
+    /// disconnected, so data may yet become available.
+    #[error("timed out")]
+    Timeout,
 }
 
 /// Node errors.
@@ -119,17 +127,38 @@ pub enum NodeError {
 /// The error wraps the value, that failed to be sent.
 ///
 /// This error is returned by both synchronous and asynchronous channels.
-#[derive(Debug)]
 pub struct SendError<T>(pub T);
 
 /// Error that happens, when caller performs a blocking attempt to receive a message from a channel.
 ///
 /// This error is returned by both synchronous and asynchronous channels.
-#[derive(PartialEq, Eq, Clone, Copy, Debug, thiserror::Error)]
+#[derive(Clone, Copy, Debug, thiserror::Error)]
 pub enum RecvError {
     /// Channel is disconnected, no messages will be received.
     #[error("channel is disconnected")]
     Disconnected,
+
+    /// The receiver is far beyond the queue. Next request attempt will return the earliest possible
+    /// message.
+    #[error("lagged: {0}")]
+    Lagged(u64),
+}
+
+/// Error that happens, when caller performs attempts to receive a message from a channel within a
+/// timeout.
+///
+/// This error is returned by both synchronous and asynchronous channels.
+#[derive(Clone, Copy, Debug, thiserror::Error)]
+pub enum RecvTimeoutError {
+    /// Channel is disconnected, no messages will be received.
+    #[error("channel is disconnected")]
+    Disconnected,
+
+    /// This **channel** is currently empty, but the **Sender**(s) have not yet
+    /// disconnected, so data may yet become available.
+    #[error("timed out")]
+    Timeout,
+
     /// The receiver is far beyond the queue. Next request attempt will return the earliest possible
     /// message.
     #[error("lagged: {0}")]
@@ -139,28 +168,30 @@ pub enum RecvError {
 /// Error that happens, when caller tries to receive a message from a channel.
 ///
 /// This error is returned by both synchronous and asynchronous channels.
-#[derive(PartialEq, Eq, Clone, Copy, Debug, thiserror::Error)]
+#[derive(Clone, Copy, Debug, thiserror::Error)]
 pub enum TryRecvError {
     /// Channel is empty.
     #[error("channel is empty")]
     Empty,
+
     /// Channel is disconnected, no messages will be received.
     #[error("channel is disconnected")]
     Disconnected,
+
     /// The receiver is far beyond the queue. Next request attempt will return the earliest possible
     /// message.
     #[error("lagged: {0}")]
     Lagged(u64),
 }
 
-impl From<mavio::errors::Error> for Error {
-    fn from(value: mavio::errors::Error) -> Self {
+impl From<mavio::error::Error> for Error {
+    fn from(value: mavio::error::Error) -> Self {
         match value {
-            mavio::errors::Error::Io(err) => Self::Io(err),
-            mavio::errors::Error::Frame(err) => Self::Frame(err),
-            mavio::errors::Error::Spec(err) => Self::Spec(err),
+            mavio::error::Error::Io(err) => Self::Io(err),
+            mavio::error::Error::Frame(err) => Self::Frame(err),
+            mavio::error::Error::Spec(err) => Self::Spec(err),
             #[allow(deprecated)]
-            mavio::errors::Error::Buffer(err) => Self::Other(format!("{err:?}")),
+            mavio::error::Error::Buffer(err) => Self::Other(format!("{err:?}")),
         }
     }
 }
@@ -183,13 +214,64 @@ impl From<std::io::Error> for Error {
     }
 }
 
+impl From<VersionError> for Error {
+    fn from(value: VersionError) -> Self {
+        FrameError::from(value).into()
+    }
+}
+
+impl From<ChecksumError> for Error {
+    fn from(value: ChecksumError) -> Self {
+        FrameError::from(value).into()
+    }
+}
+
+impl From<SignatureError> for Error {
+    fn from(value: SignatureError) -> Self {
+        FrameError::from(value).into()
+    }
+}
+
+impl From<IncompatFlagsError> for Error {
+    fn from(value: IncompatFlagsError) -> Self {
+        FrameError::from(value).into()
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 //                                Recv/Send                                  //
 ///////////////////////////////////////////////////////////////////////////////
 
+impl<T> Debug for SendError<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SendError").finish_non_exhaustive()
+    }
+}
+
 impl<T> From<SendError<T>> for Error {
     fn from(_: SendError<T>) -> Self {
         SyncError::Disconnected.into()
+    }
+}
+
+impl From<RecvError> for Error {
+    fn from(value: RecvError) -> Self {
+        match value {
+            RecvError::Disconnected => SyncError::Disconnected,
+            RecvError::Lagged(n) => SyncError::Lagged(n),
+        }
+        .into()
+    }
+}
+
+impl From<RecvTimeoutError> for Error {
+    fn from(value: RecvTimeoutError) -> Self {
+        match value {
+            RecvTimeoutError::Disconnected => SyncError::Disconnected,
+            RecvTimeoutError::Timeout => SyncError::Timeout,
+            RecvTimeoutError::Lagged(n) => SyncError::Lagged(n),
+        }
+        .into()
     }
 }
 
@@ -199,16 +281,6 @@ impl From<TryRecvError> for Error {
             TryRecvError::Empty => SyncError::Empty,
             TryRecvError::Disconnected => SyncError::Disconnected,
             TryRecvError::Lagged(n) => SyncError::Lagged(n),
-        }
-        .into()
-    }
-}
-
-impl From<RecvError> for Error {
-    fn from(value: RecvError) -> Self {
-        match value {
-            RecvError::Disconnected => SyncError::Disconnected,
-            RecvError::Lagged(n) => SyncError::Lagged(n),
         }
         .into()
     }
@@ -224,18 +296,27 @@ impl<T> From<mpsc::SendError<T>> for SendError<T> {
     }
 }
 
+impl From<mpsc::RecvError> for RecvError {
+    fn from(_: mpsc::RecvError) -> Self {
+        RecvError::Disconnected
+    }
+}
+
+impl From<mpsc::RecvTimeoutError> for RecvTimeoutError {
+    fn from(value: mpsc::RecvTimeoutError) -> Self {
+        match value {
+            mpsc::RecvTimeoutError::Timeout => RecvTimeoutError::Timeout,
+            mpsc::RecvTimeoutError::Disconnected => RecvTimeoutError::Disconnected,
+        }
+    }
+}
+
 impl From<mpsc::TryRecvError> for TryRecvError {
     fn from(value: mpsc::TryRecvError) -> Self {
         match value {
             mpsc::TryRecvError::Empty => TryRecvError::Empty,
             mpsc::TryRecvError::Disconnected => TryRecvError::Disconnected,
         }
-    }
-}
-
-impl From<mpsc::RecvError> for RecvError {
-    fn from(_: mpsc::RecvError) -> Self {
-        RecvError::Disconnected
     }
 }
 
@@ -251,13 +332,15 @@ impl From<mpsc::RecvError> for Error {
     }
 }
 
+impl From<mpsc::RecvTimeoutError> for Error {
+    fn from(value: mpsc::RecvTimeoutError) -> Self {
+        RecvTimeoutError::from(value).into()
+    }
+}
+
 impl From<mpsc::TryRecvError> for Error {
     fn from(value: mpsc::TryRecvError) -> Self {
-        match value {
-            mpsc::TryRecvError::Empty => SyncError::Empty,
-            mpsc::TryRecvError::Disconnected => SyncError::Disconnected,
-        }
-        .into()
+        TryRecvError::from(value).into()
     }
 }
 
@@ -298,22 +381,13 @@ impl<T> From<tokio::sync::broadcast::error::SendError<T>> for Error {
 
 impl From<tokio::sync::broadcast::error::RecvError> for Error {
     fn from(value: tokio::sync::broadcast::error::RecvError) -> Self {
-        match value {
-            tokio::sync::broadcast::error::RecvError::Closed => SyncError::Disconnected,
-            tokio::sync::broadcast::error::RecvError::Lagged(val) => SyncError::Lagged(val),
-        }
-        .into()
+        RecvError::from(value).into()
     }
 }
 
 impl From<tokio::sync::broadcast::error::TryRecvError> for Error {
     fn from(value: tokio::sync::broadcast::error::TryRecvError) -> Self {
-        match value {
-            tokio::sync::broadcast::error::TryRecvError::Empty => SyncError::Empty,
-            tokio::sync::broadcast::error::TryRecvError::Closed => SyncError::Disconnected,
-            tokio::sync::broadcast::error::TryRecvError::Lagged(val) => SyncError::Lagged(val),
-        }
-        .into()
+        TryRecvError::from(value).into()
     }
 }
 
@@ -321,8 +395,14 @@ impl From<tokio::sync::broadcast::error::TryRecvError> for Error {
 //                                Tokio: MPSC                                //
 ///////////////////////////////////////////////////////////////////////////////
 
+impl<T> From<tokio::sync::mpsc::error::SendError<T>> for SendError<T> {
+    fn from(value: tokio::sync::mpsc::error::SendError<T>) -> Self {
+        SendError(value.0)
+    }
+}
+
 impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Error {
-    fn from(_: tokio::sync::mpsc::error::SendError<T>) -> Self {
-        SyncError::Disconnected.into()
+    fn from(value: tokio::sync::mpsc::error::SendError<T>) -> Self {
+        SendError::from(value).into()
     }
 }

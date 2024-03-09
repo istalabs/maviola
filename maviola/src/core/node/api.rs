@@ -1,5 +1,6 @@
 use crate::core::io::ConnectionInfo;
 use crate::core::utils::Sealed;
+use crate::protocol::FrameProcessor;
 
 use crate::prelude::*;
 
@@ -13,8 +14,8 @@ pub trait NodeApi<V: MaybeVersioned + 'static>: Sealed {
     /// Send a MAVLink frame.
     fn send_frame(&self, frame: &Frame<V>) -> Result<()>;
 
-    /// Message signing configuration.
-    fn signer(&self) -> Option<&MessageSigner>;
+    /// Message processor that is responsible for message signing and frame compatibility.
+    fn processor(&self) -> &FrameProcessor;
 }
 
 /// Node without a defined API.
@@ -22,10 +23,10 @@ pub struct NoApi;
 impl Sealed for NoApi {}
 impl<V: MaybeVersioned + 'static> NodeApi<V> for NoApi {
     fn send_frame(&self, _: &Frame<V>) -> Result<()> {
-        unimplemented!()
+        unreachable!()
     }
 
-    fn signer(&self) -> Option<&MessageSigner> {
-        None
+    fn processor(&self) -> &FrameProcessor {
+        unreachable!()
     }
 }

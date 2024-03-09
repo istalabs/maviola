@@ -9,6 +9,7 @@ use crate::sync::io::{Connection, ConnectionBuilder, ConnectionHandler};
 use crate::sync::utils::{MpscReader, MpscWriter};
 
 use crate::prelude::*;
+use crate::sync::marker::ConnConf;
 
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServer {
     fn build(&self) -> Result<(Connection<V>, ConnectionHandler)> {
@@ -66,6 +67,10 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServer {
         });
 
         Ok((connection, handler))
+    }
+
+    fn to_conf(&self) -> ConnConf<V> {
+        ConnConf::new(self.clone())
     }
 }
 

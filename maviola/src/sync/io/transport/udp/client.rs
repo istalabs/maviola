@@ -5,6 +5,7 @@ use crate::core::utils::net::{pick_unused_port, resolve_socket_addr};
 use crate::core::utils::SharedCloser;
 use crate::sync::io::transport::udp::udp_rw::UdpRW;
 use crate::sync::io::{Connection, ConnectionBuilder, ConnectionHandler};
+use crate::sync::marker::ConnConf;
 
 use crate::prelude::*;
 
@@ -37,5 +38,13 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpClient {
         let handler = ConnectionHandler::spawn_from_state(channel_state);
 
         Ok((connection, handler))
+    }
+
+    fn to_conf(&self) -> ConnConf<V> {
+        ConnConf::new(self.clone())
+    }
+
+    fn is_repairable(&self) -> bool {
+        true
     }
 }

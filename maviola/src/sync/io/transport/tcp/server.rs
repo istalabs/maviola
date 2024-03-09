@@ -1,9 +1,12 @@
-use std::net::TcpListener;
+use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::thread;
 
+use crate::core::consts::SERVER_HANG_UP_TIMEOUT;
 use crate::core::io::ChannelInfo;
-use crate::core::utils::Closer;
+use crate::core::utils::{Closable, Closer};
 use crate::sync::consts::{TCP_READ_TIMEOUT, TCP_WRITE_TIMEOUT};
 use crate::sync::io::{Connection, ConnectionBuilder, ConnectionHandler};
+use crate::sync::marker::ConnConf;
 
 use crate::prelude::*;
 
@@ -16,6 +19,8 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpServer {
         let (connection, chan_factory) = Connection::new(self.info.clone(), conn_state.to_shared());
 
         let handler = ConnectionHandler::spawn(move || -> Result<()> {
+            on_close_handler(conn_state.to_closable(), server_addr);
+
             for stream in listener.incoming() {
                 if conn_state.is_closed() {
                     break;
@@ -45,4 +50,17 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpServer {
 
         Ok((connection, handler))
     }
+
+    fn to_conf(&self) -> ConnConf<V> {
+        ConnConf::new(self.clone())
+    }
+}
+
+fn on_close_handler(state: Closable, addr: SocketAddr) {
+    thread::spawn(move || {
+        while !state.is_closed() {
+            thread::sleep(SERVER_HANG_UP_TIMEOUT);
+        }
+        _ = TcpStream::connect(addr);
+    });
 }

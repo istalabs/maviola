@@ -4,6 +4,7 @@ use crate::asnc::io::OutgoingFrameSender;
 use crate::core::io::ChannelInfo;
 use crate::core::io::{BroadcastScope, OutgoingFrame};
 use crate::core::utils::UniqueId;
+use crate::protocol::FrameProcessor;
 
 use crate::prelude::*;
 
@@ -22,7 +23,7 @@ pub struct Callback<V: MaybeVersioned> {
     sender_id: UniqueId,
     sender_info: Arc<ChannelInfo>,
     sender: OutgoingFrameSender<V>,
-    signer: Option<Arc<MessageSigner>>,
+    processor: Arc<FrameProcessor>,
 }
 
 impl<V: MaybeVersioned> Callback<V> {
@@ -64,19 +65,21 @@ impl<V: MaybeVersioned> Callback<V> {
             sender_id: id,
             sender_info: info,
             sender,
-            signer: None,
+            processor: Arc::new(FrameProcessor::new()),
         }
     }
 
-    pub(in crate::asnc) fn set_signer(&mut self, signer: Option<Arc<MessageSigner>>) {
-        self.signer = signer;
+    pub(in crate::asnc) fn set_processor(&mut self, processor: Arc<FrameProcessor>) {
+        self.processor = processor;
+    }
+
+    pub(in crate::asnc) fn set_sender(&mut self, sender: OutgoingFrameSender<V>) {
+        self.sender = sender;
     }
 
     fn process_outgoing_frame(&self, frame: &Frame<V>) -> Result<Frame<V>> {
         let mut frame = frame.clone();
-        if let Some(signer) = &self.signer {
-            signer.process_outgoing(&mut frame)?;
-        }
+        self.processor.process_outgoing(&mut frame)?;
         Ok(frame)
     }
 

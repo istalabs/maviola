@@ -3,6 +3,7 @@ use std::os::unix::net::UnixStream;
 use crate::core::io::ChannelInfo;
 use crate::core::utils::SharedCloser;
 use crate::sync::io::{Connection, ConnectionBuilder, ConnectionHandler};
+use crate::sync::marker::ConnConf;
 
 use crate::prelude::*;
 
@@ -20,5 +21,13 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockClient {
         let handler = ConnectionHandler::spawn_from_state(channel_state);
 
         Ok((connection, handler))
+    }
+
+    fn to_conf(&self) -> ConnConf<V> {
+        ConnConf::new(self.clone())
+    }
+
+    fn is_repairable(&self) -> bool {
+        true
     }
 }

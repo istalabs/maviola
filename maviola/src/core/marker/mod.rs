@@ -6,5 +6,8 @@ mod node;
 
 pub use node::{
     Edge, HasComponentId, HasConnConf, HasSystemId, MaybeComponentId, MaybeConnConf, MaybeSystemId,
-    NoComponentId, NoConnConf, NoSystemId, NodeKind, Proxy,
+    NodeKind, Proxy,
 };
+
+#[doc(inline)]
+pub use crate::protocol::Unset;

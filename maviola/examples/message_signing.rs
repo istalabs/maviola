@@ -10,20 +10,20 @@ fn port() -> Port {
     pick_unused_port().unwrap()
 }
 
-fn make_server(address: &str, link_id: SignedLinkId, key: &str) -> Result<EdgeNode<Minimal, V2>> {
+fn make_server(address: &str, link_id: SignedLinkId, key: &str) -> Result<EdgeNode<V2>> {
     let server = Node::builder()
-        .version(V2)
+        .version::<V2>()
         .id(MavLinkId::new(1, 0))
         .connection(TcpServer::new(address)?)
-        .signer(MessageSigner::new(link_id, key))
+        .signer(FrameSigner::new(link_id, key))
         .build()?;
     log::warn!("[server] started");
     Ok(server)
 }
 
-fn make_unauthorized_client(address: &str) -> Result<EdgeNode<Minimal, V2>> {
+fn make_unauthorized_client(address: &str) -> Result<EdgeNode<V2>> {
     let unauthorized_client = Node::builder()
-        .version(V2)
+        .version::<V2>()
         .id(MavLinkId::new(1, 1))
         .connection(TcpClient::new(address)?)
         .build()?;
@@ -31,22 +31,18 @@ fn make_unauthorized_client(address: &str) -> Result<EdgeNode<Minimal, V2>> {
     Ok(unauthorized_client)
 }
 
-fn make_authorized_client(
-    address: &str,
-    link_id: SignedLinkId,
-    key: &str,
-) -> Result<EdgeNode<Minimal, V2>> {
+fn make_authorized_client(address: &str, link_id: SignedLinkId, key: &str) -> Result<EdgeNode<V2>> {
     let authorised_client = Node::builder()
-        .version(V2)
+        .version::<V2>()
         .id(MavLinkId::new(1, 2))
         .connection(TcpClient::new(address)?)
-        .signer(MessageSigner::new(link_id, key))
+        .signer(FrameSigner::new(link_id, key))
         .build()?;
     log::warn!("[authorised_client] started");
     Ok(authorised_client)
 }
 
-fn server_receive_unsigned_and_respond_signed(server: EdgeNode<Minimal, V2>) -> Result<()> {
+fn server_receive_unsigned_and_respond_signed(server: EdgeNode<V2>) -> Result<()> {
     for event in server.events() {
         match event {
             Event::Frame(frame, callback) => {
@@ -69,7 +65,7 @@ fn server_receive_unsigned_and_respond_signed(server: EdgeNode<Minimal, V2>) -> 
     Ok(())
 }
 
-fn authorized_client_receive_signed(authorized_client: EdgeNode<Minimal, V2>) -> Result<()> {
+fn authorized_client_receive_signed(authorized_client: EdgeNode<V2>) -> Result<()> {
     for event in authorized_client.events() {
         match event {
             Event::Frame(frame, _) => {
@@ -91,14 +87,13 @@ fn authorized_client_receive_signed(authorized_client: EdgeNode<Minimal, V2>) ->
 }
 
 fn run() -> Result<()> {
-    let port = port();
-    let address = format!("127.0.0.1:{port}");
+    let addr = format!("127.0.0.1:{}", port());
     let link_id = 1;
     let key = "something unsecure";
 
-    let server = make_server(address.as_str(), link_id, key)?;
-    let unauthorized_client = make_unauthorized_client(address.as_str())?;
-    let authorized_client = make_authorized_client(address.as_str(), link_id, key)?;
+    let server = make_server(addr.as_str(), link_id, key)?;
+    let unauthorized_client = make_unauthorized_client(addr.as_str())?;
+    let authorized_client = make_authorized_client(addr.as_str(), link_id, key)?;
 
     unauthorized_client.send(&Heartbeat::default()).unwrap();
     log::info!("[unauthorized_client] send unsigned frame");
@@ -130,7 +125,14 @@ fn message_signing() {
         run().unwrap();
     });
 
-    thread::sleep(Duration::from_secs(5));
+    for _ in 0..10 {
+        thread::sleep(Duration::from_millis(250));
+        if handler.is_finished() {
+            handler.join().unwrap();
+            return;
+        }
+    }
+
     if !handler.is_finished() {
         panic!("[message_signing] test took too long")
     }

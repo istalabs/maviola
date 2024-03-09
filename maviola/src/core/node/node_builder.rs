@@ -1,197 +1,193 @@
 use std::marker::PhantomData;
 use std::time::Duration;
 
-use crate::protocol::{ComponentId, MessageSigner, SystemId};
+use crate::protocol::{
+    ComponentId, CustomFrameProcessors, IntoCompatProcessor, IntoFrameSigner, KnownDialects,
+    ProcessFrame, SystemId,
+};
 
 use crate::core::consts::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_TIMEOUT};
 use crate::core::marker::{
     Edge, HasComponentId, HasConnConf, HasSystemId, MaybeComponentId, MaybeConnConf, MaybeSystemId,
-    NoComponentId, NoConnConf, NoSystemId, Proxy,
+    Proxy, Unset,
 };
+use crate::core::node::node_conf::IntoNodeConf;
 use crate::core::node::NodeConf;
 
 use crate::prelude::*;
 
 /// Builder for [`Node`] and [`NodeConf`].
-#[derive(Clone, Debug, Default)]
-pub struct NodeBuilder<
-    S: MaybeSystemId,
-    C: MaybeComponentId,
-    D: Dialect,
-    V: MaybeVersioned,
-    CC: MaybeConnConf,
-> {
+#[derive(Clone, Debug)]
+pub struct NodeBuilder<S: MaybeSystemId, C: MaybeComponentId, V: MaybeVersioned, CC: MaybeConnConf>
+{
     pub(crate) system_id: S,
     pub(crate) component_id: C,
-    pub(crate) version: V,
     pub(crate) conn_conf: CC,
     pub(crate) heartbeat_timeout: Duration,
     pub(crate) heartbeat_interval: Duration,
-    pub(crate) signer: Option<MessageSigner>,
-    pub(crate) _dialect: PhantomData<D>,
+    pub(crate) dialects: KnownDialects,
+    pub(crate) signer: Option<FrameSigner>,
+    pub(crate) compat: Option<CompatProcessor>,
+    pub(crate) processors: CustomFrameProcessors,
+    pub(crate) _version: PhantomData<V>,
 }
 
-impl NodeBuilder<NoSystemId, NoComponentId, Minimal, Versionless, NoConnConf> {
+impl NodeBuilder<Unset, Unset, Versionless, Unset> {
     /// Instantiate an empty [`NodeBuilder`].
     pub fn new() -> Self {
         Self {
-            system_id: NoSystemId,
-            component_id: NoComponentId,
-            version: Versionless,
-            conn_conf: NoConnConf,
+            system_id: Unset,
+            component_id: Unset,
+            conn_conf: Unset,
             heartbeat_timeout: DEFAULT_HEARTBEAT_TIMEOUT,
             heartbeat_interval: DEFAULT_HEARTBEAT_INTERVAL,
+            dialects: Default::default(),
             signer: None,
-            _dialect: PhantomData,
+            compat: None,
+            processors: Default::default(),
+            _version: PhantomData,
         }
     }
 }
 
-impl<D: Dialect, V: MaybeVersioned, CC: MaybeConnConf>
-    NodeBuilder<NoSystemId, NoComponentId, D, V, CC>
-{
+impl<V: MaybeVersioned, CC: MaybeConnConf> NodeBuilder<Unset, Unset, V, CC> {
     /// Set [`NodeConf::system_id`] and [`NodeConf::component_id`].
-    pub fn id(self, id: MavLinkId) -> NodeBuilder<HasSystemId, HasComponentId, D, V, CC> {
+    pub fn id(self, id: MavLinkId) -> NodeBuilder<HasSystemId, HasComponentId, V, CC> {
         NodeBuilder {
             system_id: HasSystemId(id.system),
             component_id: HasComponentId(id.component),
-            version: self.version,
             conn_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            dialects: self.dialects,
             signer: self.signer,
-            _dialect: self._dialect,
+            compat: self.compat,
+            processors: self.processors,
+            _version: self._version,
         }
     }
 }
 
-impl<C: MaybeComponentId, D: Dialect, V: MaybeVersioned, CC: MaybeConnConf>
-    NodeBuilder<NoSystemId, C, D, V, CC>
-{
+impl<C: MaybeComponentId, V: MaybeVersioned, CC: MaybeConnConf> NodeBuilder<Unset, C, V, CC> {
     /// Set [`NodeConf::system_id`].
-    pub fn system_id(self, system_id: SystemId) -> NodeBuilder<HasSystemId, C, D, V, CC> {
+    pub fn system_id(self, system_id: SystemId) -> NodeBuilder<HasSystemId, C, V, CC> {
         NodeBuilder {
             system_id: HasSystemId(system_id),
             component_id: self.component_id,
-            version: self.version,
             conn_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            dialects: self.dialects,
             signer: self.signer,
-            _dialect: self._dialect,
+            compat: self.compat,
+            processors: self.processors,
+            _version: self._version,
         }
     }
 }
 
-impl<S: MaybeSystemId, D: Dialect, V: MaybeVersioned, CC: MaybeConnConf>
-    NodeBuilder<S, NoComponentId, D, V, CC>
-{
+impl<S: MaybeSystemId, V: MaybeVersioned, CC: MaybeConnConf> NodeBuilder<S, Unset, V, CC> {
     /// Set [`NodeConf::component_id`].
-    pub fn component_id(
-        self,
-        component_id: ComponentId,
-    ) -> NodeBuilder<S, HasComponentId, D, V, CC> {
+    pub fn component_id(self, component_id: ComponentId) -> NodeBuilder<S, HasComponentId, V, CC> {
         NodeBuilder {
             system_id: self.system_id,
             component_id: HasComponentId(component_id),
-            version: self.version,
             conn_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            dialects: self.dialects,
             signer: self.signer,
-            _dialect: self._dialect,
+            compat: self.compat,
+            processors: self.processors,
+            _version: self._version,
         }
     }
 }
 
-impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, V: MaybeVersioned, CC: MaybeConnConf>
-    NodeBuilder<S, C, D, V, CC>
+impl<S: MaybeSystemId, C: MaybeComponentId, V: MaybeVersioned, CC: MaybeConnConf>
+    NodeBuilder<S, C, V, CC>
 {
     /// Set [`NodeConf::heartbeat_timeout`].
-    pub fn heartbeat_timeout(self, heartbeat_timeout: Duration) -> NodeBuilder<S, C, D, V, CC> {
+    pub fn heartbeat_timeout(self, heartbeat_timeout: Duration) -> Self {
         NodeBuilder {
-            system_id: self.system_id,
-            component_id: self.component_id,
-            version: self.version,
-            conn_conf: self.conn_conf,
             heartbeat_timeout,
-            heartbeat_interval: self.heartbeat_interval,
-            signer: self.signer,
-            _dialect: self._dialect,
+            ..self
         }
     }
-}
 
-impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, V: MaybeVersioned, CC: MaybeConnConf>
-    NodeBuilder<S, C, D, V, CC>
-{
-    /// Set dialect.
-    ///
-    /// The dialect is a generic parameter, therefore you have to use
-    /// [turbofish](https://turbo.fish/about) syntax:
-    ///
-    /// ```rust
-    /// use maviola::core::node::Node;
-    /// use maviola::dialects::Minimal;
-    ///
-    /// Node::builder().dialect::<Minimal>();
-    /// ```
-    pub fn dialect<Dial: Dialect>(self) -> NodeBuilder<S, C, Dial, V, CC> {
-        NodeBuilder {
-            system_id: self.system_id,
-            component_id: self.component_id,
-            version: self.version,
-            conn_conf: self.conn_conf,
-            heartbeat_timeout: self.heartbeat_timeout,
-            heartbeat_interval: self.heartbeat_interval,
-            signer: self.signer,
-            _dialect: PhantomData,
-        }
-    }
-}
-
-impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, CC: MaybeConnConf>
-    NodeBuilder<S, C, D, Versionless, CC>
-{
-    /// Set [`NodeConf::version`].
-    pub fn version<Version: Versioned>(
-        self,
-        version: Version,
-    ) -> NodeBuilder<S, C, D, Version, CC> {
-        NodeBuilder {
-            system_id: self.system_id,
-            component_id: self.component_id,
-            version,
-            conn_conf: self.conn_conf,
-            heartbeat_timeout: self.heartbeat_timeout,
-            heartbeat_interval: self.heartbeat_interval,
-            signer: self.signer,
-            _dialect: self._dialect,
-        }
-    }
-}
-
-impl<S: MaybeSystemId, C: MaybeComponentId, D: Dialect, V: MaybeVersioned, CC: MaybeConnConf>
-    NodeBuilder<S, C, D, V, CC>
-{
     /// Set [`NodeConf::signer`].
-    pub fn signer(self, signer: MessageSigner) -> NodeBuilder<S, C, D, V, CC> {
+    ///
+    /// Accepts anything, that implements [`IntoFrameSigner`].
+    pub fn signer(self, signer: impl IntoFrameSigner) -> Self {
+        NodeBuilder {
+            signer: Some(signer.into_message_signer()),
+            ..self
+        }
+    }
+
+    /// Set [`NodeConf::compat`].
+    pub fn compat(self, compat: impl IntoCompatProcessor) -> Self {
+        NodeBuilder {
+            compat: Some(compat.into_compat_processor()),
+            ..self
+        }
+    }
+
+    /// Set main [`NodeConf::dialect`].
+    ///
+    /// Dialect should be specified via [turbofish](https://turbo.fish/about) syntax.
+    ///
+    /// Default dialect is `minimal`.
+    pub fn dialect<D: Dialect>(mut self) -> Self {
+        self.dialects = self.dialects.with_dialect(D::spec());
+        self
+    }
+
+    /// Adds dialect to [`NodeConf::known_dialects`].
+    ///
+    /// Node can perform frame validation against known dialects. However, automatic operations,
+    /// like heartbeats, will use the main [`NodeConf::dialect`].
+    ///
+    /// Dialect should be specified via [turbofish](https://turbo.fish/about) syntax.
+    ///
+    /// Default `minimal` is always among the known dialects. Internally, dialect names are used as
+    /// a dialect `ID`. So, it is technically possible to replace default dialect, but we strongly
+    /// advice against doing that.
+    pub fn add_dialect<D: Dialect>(mut self) -> Self {
+        self.dialects = self.dialects.with_known_dialect(D::spec());
+        self
+    }
+
+    /// Adds a custom frame processor, that implements [`ProcessFrame`].
+    pub fn add_processor(
+        mut self,
+        name: &'static str,
+        processor: impl ProcessFrame + 'static,
+    ) -> Self {
+        self.processors.add(name, processor);
+        self
+    }
+}
+
+impl<S: MaybeSystemId, C: MaybeComponentId, CC: MaybeConnConf> NodeBuilder<S, C, Versionless, CC> {
+    /// Set [`NodeConf::version`].
+    pub fn version<Version: MaybeVersioned>(self) -> NodeBuilder<S, C, Version, CC> {
         NodeBuilder {
             system_id: self.system_id,
             component_id: self.component_id,
-            version: self.version,
             conn_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
-            signer: Some(signer),
-            _dialect: self._dialect,
+            dialects: self.dialects,
+            signer: self.signer,
+            compat: self.compat,
+            processors: self.processors,
+            _version: PhantomData,
         }
     }
 }
 
-impl<V: Versioned, CC: MaybeConnConf, D: Dialect>
-    NodeBuilder<HasSystemId, HasComponentId, D, V, CC>
-{
+impl<V: Versioned, CC: MaybeConnConf> NodeBuilder<HasSystemId, HasComponentId, V, CC> {
     /// Set [`NodeConf::heartbeat_interval`].
     ///
     /// This parameter makes sense only for nodes that are identified, has a specified dialect
@@ -205,54 +201,70 @@ impl<V: Versioned, CC: MaybeConnConf, D: Dialect>
     pub fn heartbeat_interval(
         self,
         heartbeat_interval: Duration,
-    ) -> NodeBuilder<HasSystemId, HasComponentId, D, V, CC> {
+    ) -> NodeBuilder<HasSystemId, HasComponentId, V, CC> {
         NodeBuilder {
-            system_id: self.system_id,
-            component_id: self.component_id,
-            version: self.version,
-            conn_conf: self.conn_conf,
-            heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval,
-            signer: self.signer,
-            _dialect: self._dialect,
+            ..self
         }
     }
 }
 
-impl<D: Dialect, V: MaybeVersioned, CC: HasConnConf>
-    NodeBuilder<NoSystemId, NoComponentId, D, V, CC>
-{
+impl<V: MaybeVersioned, CC: HasConnConf> NodeBuilder<Unset, Unset, V, CC> {
     /// Build and instance of [`NodeConf`] without defined [`NodeConf::system_id`] and
     /// [`NodeConf::component_id`].
-    pub fn conf(self) -> NodeConf<Proxy, D, V, CC> {
+    pub fn conf(self) -> NodeConf<Proxy, V, CC> {
         NodeConf {
             kind: Proxy,
-            version: self.version,
             connection_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            dialects: self.dialects,
             signer: self.signer,
-            _dialect: self._dialect,
+            compat: self.compat,
+            processors: self.processors,
+            _version: PhantomData,
         }
     }
 }
 
-impl<D: Dialect, V: MaybeVersioned, CC: HasConnConf>
-    NodeBuilder<HasSystemId, HasComponentId, D, V, CC>
-{
+impl<V: MaybeVersioned, CC: HasConnConf> NodeBuilder<HasSystemId, HasComponentId, V, CC> {
     /// Build and instance of [`NodeConf`] with defined [`NodeConf::system_id`] and
     /// [`NodeConf::component_id`].
-    pub fn conf(self) -> NodeConf<Edge<V>, D, V, CC> {
+    pub fn conf(self) -> NodeConf<Edge<V>, V, CC> {
         NodeConf {
             kind: Edge {
                 endpoint: Endpoint::new(MavLinkId::new(self.system_id.0, self.component_id.0)),
             },
             connection_conf: self.conn_conf,
-            version: self.version,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,
+            dialects: self.dialects,
             signer: self.signer,
-            _dialect: self._dialect,
+            compat: self.compat,
+            processors: self.processors,
+            _version: PhantomData,
         }
+    }
+}
+
+impl Default for NodeBuilder<Unset, Unset, Versionless, Unset> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<V: MaybeVersioned, C: HasConnConf> IntoNodeConf<Proxy, V, C>
+    for NodeBuilder<Unset, Unset, V, C>
+{
+    fn into_node_conf(self) -> NodeConf<Proxy, V, C> {
+        self.conf()
+    }
+}
+
+impl<V: MaybeVersioned, C: HasConnConf> IntoNodeConf<Edge<V>, V, C>
+    for NodeBuilder<HasSystemId, HasComponentId, V, C>
+{
+    fn into_node_conf(self) -> NodeConf<Edge<V>, V, C> {
+        self.conf()
     }
 }

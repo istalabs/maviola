@@ -1,33 +1,34 @@
 //! MAVLink [message signing](https://mavlink.io/en/guide/message_signing.html) tools.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::sync::atomic::AtomicU64;
 use std::sync::{atomic, Arc};
 use std::time::SystemTime;
 
+use crate::core::error::SignatureError;
 use crate::protocol::{
-    MavSha256, MavTimestamp, SecretKey, Sign, SignedLinkId, Signer, SigningConf,
+    MavSha256, MavTimestamp, MessageId, SecretKey, Sign, SignedLinkId, Signer, SigningConf,
 };
 
 use crate::prelude::*;
 
-pub use builder::MessageSignerBuilder;
+pub use builder::FrameSignerBuilder;
 use builder::{NoLinkId, NoSecretKey};
 
 /// MAVLink [message signing](https://mavlink.io/en/guide/message_signing.html) manager.
 ///
-/// [`MessageSigner`] allows to verify and sign outgoing and incoming frames. There are several
+/// [`FrameSigner`] allows to verify and sign outgoing and incoming frames. There are several
 /// signing strategies defined by [`SignStrategy`] which can be specified both for
-/// [`MessageSigner::incoming`] and [`MessageSigner::outgoing`] frames.
+/// [`FrameSigner::incoming`] and [`FrameSigner::outgoing`] frames.
 ///
-/// Each instance of a manager is configured with the main [`MessageSigner::link_id`] and the main
-/// [`MessageSigner::key`]. These will be used to sign frames.
+/// Each instance of a manager is configured with the main [`FrameSigner::link_id`] and the main
+/// [`FrameSigner::key`]. These will be used to sign frames.
 ///
 /// It is possible to add additional links with corresponding secret keys. These links will be used
 /// to validate already signed frames. Depending on a [`SignStrategy`], these frames can be either
 /// rejected, kept as they are, or re-signed with the main key and link `ID`. All supported links
-/// (including the main one) can be accessed with [`MessageSigner::links`].
+/// (including the main one) can be accessed with [`FrameSigner::links`].
 ///
 /// **⚠** Secret keys are excluded from [Serde](https://serde.rs) serialization.
 ///
@@ -36,7 +37,7 @@ use builder::{NoLinkId, NoSecretKey};
 /// ```rust
 /// use maviola::prelude::*;
 ///
-/// let signer = MessageSigner::builder()
+/// let signer = FrameSigner::builder()
 ///     .link_id(1)                         // Set main link `ID`
 ///     .key("main key")                    // Set main key
 ///     .incoming(SignStrategy::ReSign)     // All incoming frames will be re-signed
@@ -46,13 +47,14 @@ use builder::{NoLinkId, NoSecretKey};
 /// ```
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct MessageSigner {
+pub struct FrameSigner {
     link_id: SignedLinkId,
     incoming: SignStrategy,
     outgoing: SignStrategy,
     #[cfg_attr(feature = "serde", serde(skip_serializing))]
     links: HashMap<SignedLinkId, SecretKey>,
     last_timestamp: UniqueMavTimestamp,
+    exclude: HashSet<MessageId>,
 }
 
 /// Message signing strategy.
@@ -89,25 +91,33 @@ pub enum SignStrategy {
     Strip,
 }
 
+/// A trait for entities, that can be converted to [`FrameSigner`].
+///
+/// Currently, this trait is implemented for [`FrameSigner`] and [`FrameSignerBuilder`].
+pub trait IntoFrameSigner {
+    /// Convert to a [`FrameSigner`].
+    fn into_message_signer(self) -> FrameSigner;
+}
+
 /// MAVLink timestamp wrapper that preserve uniqueness of timestamp sequence.
 ///
 /// ⚠ It is not strictly guaranteed that the next timestamp will be unique, if multiple clones
 /// of a signer are used. Nevertheless, [`UniqueMavTimestamp`] allows to significantly reduc
 /// timestamp collisions.
 ///
-/// Used internally by [`MessageSigner`].
+/// Used internally by [`FrameSigner`].
 #[derive(Clone)]
 pub struct UniqueMavTimestamp(Arc<AtomicU64>);
 
-impl MessageSigner {
-    /// Creates a [`MessageSigner`] with the main `link_id` / `key` and default strategies.
+impl FrameSigner {
+    /// Creates a [`FrameSigner`] with the main `link_id` / `key` and default strategies.
     ///
     /// # Usage
     ///
     /// ```rust
     /// use maviola::prelude::*;
     ///
-    /// let signer = MessageSigner::new(17, "main secret key");
+    /// let signer = FrameSigner::new(17, "main secret key");
     /// ```
     ///
     /// This is equal to:
@@ -115,7 +125,7 @@ impl MessageSigner {
     /// ```rust
     /// use maviola::prelude::*;
     ///
-    /// let signer = MessageSigner::builder()
+    /// let signer = FrameSigner::builder()
     ///     .link_id(17)
     ///     .key("main secret key")
     ///     .build();
@@ -124,9 +134,9 @@ impl MessageSigner {
         Self::builder().link_id(link_id).key(key.into()).build()
     }
 
-    /// Instantiates an empty [`MessageSignerBuilder`].
-    pub fn builder() -> MessageSignerBuilder<NoLinkId, NoSecretKey> {
-        MessageSignerBuilder::new()
+    /// Instantiates an empty [`FrameSignerBuilder`].
+    pub fn builder() -> FrameSignerBuilder<NoLinkId, NoSecretKey> {
+        FrameSignerBuilder::new()
     }
 
     /// Main link `ID`.
@@ -156,15 +166,26 @@ impl MessageSigner {
         self.links.iter().map(|(&link_id, key)| (link_id, key))
     }
 
+    /// Message `IDs` excluded from message signing and verification.
+    pub fn exclude(&self) -> impl Iterator<Item = MessageId> {
+        self.exclude.clone().into_iter()
+    }
+
     /// Takes incoming frame and processes it according to a [`Self::incoming`] signing strategy.
     #[inline(always)]
-    pub fn process_incoming<V: MaybeVersioned>(&self, frame: &mut Frame<V>) -> Result<()> {
+    pub fn process_incoming<V: MaybeVersioned>(
+        &self,
+        frame: &mut Frame<V>,
+    ) -> core::result::Result<(), SignatureError> {
         self.process_for_strategy(frame, self.incoming)
     }
 
     /// Takes outgoing frame and processes it according to a [`Self::outgoing`] signing strategy.
     #[inline(always)]
-    pub fn process_outgoing<V: MaybeVersioned>(&self, frame: &mut Frame<V>) -> Result<()> {
+    pub fn process_outgoing<V: MaybeVersioned>(
+        &self,
+        frame: &mut Frame<V>,
+    ) -> core::result::Result<(), SignatureError> {
         self.process_for_strategy(frame, self.outgoing)
     }
 
@@ -182,11 +203,17 @@ impl MessageSigner {
     ///
     /// Frame will be validated, then its signature will be added, replaced, or stripped based on
     /// the strategy.
+    ///
+    /// If [`Frame::message_id`] in [`FrameSigner::exclude`], then it will be skipped from
+    /// validation.
     pub fn process_for_strategy<V: MaybeVersioned>(
         &self,
         frame: &mut Frame<V>,
         strategy: SignStrategy,
-    ) -> Result<()> {
+    ) -> core::result::Result<(), SignatureError> {
+        if self.exclude.contains(&frame.message_id()) {
+            return Ok(());
+        }
         self.validate_for_strategy(frame, strategy)?;
         self.sign_for_strategy(frame, strategy);
         Ok(())
@@ -197,21 +224,21 @@ impl MessageSigner {
         &self,
         frame: &Frame<V>,
         strategy: SignStrategy,
-    ) -> Result<()> {
+    ) -> core::result::Result<(), SignatureError> {
         if let SignStrategy::Proxy = strategy {
             return Ok(());
         }
 
         if let SignStrategy::Strict = strategy {
             if !frame.is_signed() {
-                return Err(FrameError::InvalidSignature.into());
+                return Err(SignatureError);
             }
         }
 
         match strategy {
             SignStrategy::Sign | SignStrategy::ReSign | SignStrategy::Strict => {
                 if frame.is_signed() && !self.has_valid_signature(frame) {
-                    return Err(FrameError::InvalidSignature.into());
+                    return Err(SignatureError);
                 }
             }
             SignStrategy::Proxy | SignStrategy::Strip => {}
@@ -232,7 +259,7 @@ impl MessageSigner {
     /// Returns `true` if frame has a valid signature.
     ///
     /// Attempts to validate frame signature by searching for a suitable key given the provided
-    /// [`Frame::link_id`]. If such link `ID` is not among the available [`MessageSigner::links`],
+    /// [`Frame::link_id`]. If such link `ID` is not among the available [`FrameSigner::links`],
     /// then frame will be considered invalid.
     ///
     /// Unsigned frames and `MAVLink 1` frames are always invalid.
@@ -371,80 +398,70 @@ impl<'de> serde::Deserialize<'de> for UniqueMavTimestamp {
     }
 }
 
-/// Builder for [`MessageSigner`]
+impl IntoFrameSigner for FrameSigner {
+    /// Passes [`FrameSigner`] without change.
+    fn into_message_signer(self) -> FrameSigner {
+        self
+    }
+}
+
+/// Builder for [`FrameSigner`]
 pub mod builder {
     use super::*;
 
-    /// Marker for [`MessageSignerBuilder`] which defines whether [`MessageSignerBuilder::key`] was set.
+    /// Marker for [`FrameSignerBuilder`] which defines whether [`FrameSignerBuilder::key`] was set.
     pub trait MaybeSecretKey: Clone + Debug {}
 
-    /// Marks [`MessageSignerBuilder`] without secret key.
+    /// Marks [`FrameSignerBuilder`] without secret key.
     #[derive(Clone, Debug)]
     pub struct NoSecretKey;
     impl MaybeSecretKey for NoSecretKey {}
 
-    /// Marks [`MessageSignerBuilder`] with secret key being set.
+    /// Marks [`FrameSignerBuilder`] with secret key being set.
     #[derive(Clone, Debug)]
     pub struct HasSecretKey(SecretKey);
     impl MaybeSecretKey for HasSecretKey {}
 
-    /// Marker for [`MessageSignerBuilder`] which defines whether [`MessageSignerBuilder::link_id`] was set.
+    /// Marker for [`FrameSignerBuilder`] which defines whether [`FrameSignerBuilder::link_id`] was set.
     pub trait MaybeLinkId: Copy + Clone + Debug {}
 
-    /// Marks [`MessageSignerBuilder`] without link `ID`.
+    /// Marks [`FrameSignerBuilder`] without link `ID`.
     #[derive(Copy, Clone, Debug)]
     pub struct NoLinkId;
     impl MaybeLinkId for NoLinkId {}
 
-    /// Marks [`MessageSignerBuilder`] without link `ID` being set.
+    /// Marks [`FrameSignerBuilder`] without link `ID` being set.
     #[derive(Copy, Clone, Debug)]
     pub struct HasLinkId(SignedLinkId);
     impl MaybeLinkId for HasLinkId {}
 
-    /// Builder for [`MessageSigner`].
+    /// Builder for [`FrameSigner`].
     #[derive(Clone, Debug)]
-    pub struct MessageSignerBuilder<L: MaybeLinkId, K: MaybeSecretKey> {
+    pub struct FrameSignerBuilder<L: MaybeLinkId, K: MaybeSecretKey> {
         link_id: L,
         key: K,
         incoming: Option<SignStrategy>,
         outgoing: Option<SignStrategy>,
         links: HashMap<SignedLinkId, SecretKey>,
+        exclude: HashSet<MessageId>,
     }
 
-    impl Default for MessageSignerBuilder<NoLinkId, NoSecretKey> {
-        fn default() -> Self {
-            Self::new()
-        }
-    }
-
-    impl<K: MaybeSecretKey> MessageSignerBuilder<NoLinkId, K> {
-        /// Set secret key.
-        pub fn link_id(self, link_id: SignedLinkId) -> MessageSignerBuilder<HasLinkId, K> {
-            MessageSignerBuilder {
-                link_id: HasLinkId(link_id),
-                key: self.key,
-                incoming: self.incoming,
-                outgoing: self.outgoing,
-                links: self.links,
-            }
-        }
-    }
-
-    impl MessageSignerBuilder<NoLinkId, NoSecretKey> {
-        /// Creates a new instance of [`MessageSignerBuilder`].
+    impl FrameSignerBuilder<NoLinkId, NoSecretKey> {
+        /// Creates a new instance of [`FrameSignerBuilder`].
         ///
         /// # Usage
         ///
         /// ```rust
         /// use maviola::prelude::*;
         ///
-        /// MessageSigner::builder()
+        /// FrameSigner::builder()
         ///     .link_id(1)
         ///     .key("main key")
         ///     .incoming(SignStrategy::Sign)
         ///     .outgoing(SignStrategy::Strict)
         ///     .add_link(2, "key for the link #2")
         ///     .add_link(3, "key for the link #3")
+        ///     .exclude(&[11, 17, 42])
         ///     .build();
         /// ```
         pub fn new() -> Self {
@@ -454,52 +471,70 @@ pub mod builder {
                 incoming: None,
                 outgoing: None,
                 links: Default::default(),
+                exclude: Default::default(),
             }
         }
     }
 
-    impl<L: MaybeLinkId> MessageSignerBuilder<L, NoSecretKey> {
-        /// Set secret key.
-        pub fn key<K: Into<SecretKey>>(self, key: K) -> MessageSignerBuilder<L, HasSecretKey> {
-            MessageSignerBuilder {
+    impl<K: MaybeSecretKey> FrameSignerBuilder<NoLinkId, K> {
+        /// Set [`FrameSigner::link_id`].
+        pub fn link_id(self, link_id: SignedLinkId) -> FrameSignerBuilder<HasLinkId, K> {
+            FrameSignerBuilder {
+                link_id: HasLinkId(link_id),
+                key: self.key,
+                incoming: self.incoming,
+                outgoing: self.outgoing,
+                links: self.links,
+                exclude: self.exclude,
+            }
+        }
+    }
+
+    impl<L: MaybeLinkId> FrameSignerBuilder<L, NoSecretKey> {
+        /// Set [`FrameSigner::key`].
+        pub fn key<K: Into<SecretKey>>(self, key: K) -> FrameSignerBuilder<L, HasSecretKey> {
+            FrameSignerBuilder {
                 link_id: self.link_id,
                 key: HasSecretKey(key.into()),
                 incoming: self.incoming,
                 outgoing: self.outgoing,
                 links: self.links,
+                exclude: self.exclude,
             }
         }
     }
 
-    impl<L: MaybeLinkId, K: MaybeSecretKey> MessageSignerBuilder<L, K> {
-        /// Define incoming signing strategy.
-        pub fn incoming(self, strategy: SignStrategy) -> MessageSignerBuilder<L, K> {
+    impl<L: MaybeLinkId, K: MaybeSecretKey> FrameSignerBuilder<L, K> {
+        /// Set [`FrameSigner::incoming`].
+        pub fn incoming(self, strategy: SignStrategy) -> Self {
             Self {
-                link_id: self.link_id,
-                key: self.key,
                 incoming: Some(strategy),
-                outgoing: self.outgoing,
-                links: self.links,
+                ..self
             }
         }
 
-        /// Define outgoing signing strategy.
-        pub fn outgoing(self, strategy: SignStrategy) -> MessageSignerBuilder<L, K> {
+        /// Set [`FrameSigner::outgoing`].
+        pub fn outgoing(self, strategy: SignStrategy) -> Self {
             Self {
-                link_id: self.link_id,
-                key: self.key,
-                incoming: self.incoming,
                 outgoing: Some(strategy),
-                links: self.links,
+                ..self
+            }
+        }
+
+        /// Set [`FrameSigner::exclude`].
+        pub fn exclude(self, message_ids: &[MessageId]) -> Self {
+            Self {
+                exclude: HashSet::from_iter(message_ids.iter().map(|&id| id)),
+                ..self
             }
         }
     }
 
-    impl MessageSignerBuilder<HasLinkId, HasSecretKey> {
-        /// Adds additional link.
+    impl FrameSignerBuilder<HasLinkId, HasSecretKey> {
+        /// Adds additional link to [`FrameSigner::links`].
         ///
         /// ⚠ If `link_id` is the same as the one specified for the main
-        /// [`MessageSignerBuilder::link_id`], then the main key will be replaced with the provided one.
+        /// [`FrameSignerBuilder::link_id`], then the main key will be replaced with the provided one.
         ///
         /// Extra links are used for confirming that processed frames are correctly signed.
         pub fn add_link<K: Into<SecretKey>>(mut self, link_id: SignedLinkId, key: K) -> Self {
@@ -513,25 +548,39 @@ pub mod builder {
         }
     }
 
-    impl MessageSignerBuilder<HasLinkId, HasSecretKey> {
-        /// Builds [`MessageSigner`].
-        pub fn build(mut self) -> MessageSigner {
+    impl FrameSignerBuilder<HasLinkId, HasSecretKey> {
+        /// Builds [`FrameSigner`].
+        pub fn build(mut self) -> FrameSigner {
             self.links.insert(self.link_id.0, self.key.0.clone());
 
-            MessageSigner {
+            FrameSigner {
                 link_id: self.link_id.0,
                 incoming: self.incoming.unwrap_or_default(),
                 outgoing: self.outgoing.unwrap_or_default(),
                 links: self.links,
                 last_timestamp: Default::default(),
+                exclude: self.exclude,
             }
         }
     }
 
-    impl From<MessageSignerBuilder<HasLinkId, HasSecretKey>> for MessageSigner {
+    impl Default for FrameSignerBuilder<NoLinkId, NoSecretKey> {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    impl From<FrameSignerBuilder<HasLinkId, HasSecretKey>> for FrameSigner {
         #[inline]
-        fn from(value: MessageSignerBuilder<HasLinkId, HasSecretKey>) -> Self {
+        fn from(value: FrameSignerBuilder<HasLinkId, HasSecretKey>) -> Self {
             value.build()
+        }
+    }
+
+    impl IntoFrameSigner for FrameSignerBuilder<HasLinkId, HasSecretKey> {
+        /// Builds [`FrameSigner`] from [`FrameSignerBuilder`].
+        fn into_message_signer(self) -> FrameSigner {
+            self.build()
         }
     }
 }

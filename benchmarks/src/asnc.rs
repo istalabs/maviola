@@ -19,9 +19,9 @@ async fn wait() {
     tokio::time::sleep(WAIT_DURATION).await;
 }
 
-async fn make_sock_server(path: PathBuf) -> EdgeNode<Minimal, V2> {
+async fn make_sock_server(path: PathBuf) -> EdgeNode<V2> {
     Node::builder()
-        .version(V2)
+        .version::<V2>()
         .system_id(1)
         .component_id(0)
         .heartbeat_interval(HEARTBEAT_INTERVAL)
@@ -32,13 +32,13 @@ async fn make_sock_server(path: PathBuf) -> EdgeNode<Minimal, V2> {
         .unwrap()
 }
 
-async fn make_sock_client(path: PathBuf, id: u16) -> EdgeNode<Minimal, V2> {
+async fn make_sock_client(path: PathBuf, id: u16) -> EdgeNode<V2> {
     let bytes: [u8; 2] = id.to_le_bytes();
     let system_id = bytes[0];
     let component_id = bytes[1];
 
     Node::builder()
-        .version(V2)
+        .version::<V2>()
         .system_id(system_id)
         .component_id(component_id)
         .heartbeat_interval(HEARTBEAT_INTERVAL)

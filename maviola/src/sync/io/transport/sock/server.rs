@@ -7,6 +7,7 @@ use crate::sync::consts::{SOCK_ACCEPT_INTERVAL, SOCK_READ_TIMEOUT, SOCK_WRITE_TI
 use crate::sync::io::{Connection, ConnectionBuilder, ConnectionHandler};
 
 use crate::prelude::*;
+use crate::sync::marker::ConnConf;
 
 impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockServer {
     fn build(&self) -> Result<(Connection<V>, ConnectionHandler)> {
@@ -47,5 +48,9 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockServer {
         });
 
         Ok((connection, handler))
+    }
+
+    fn to_conf(&self) -> ConnConf<V> {
+        ConnConf::new(self.clone())
     }
 }

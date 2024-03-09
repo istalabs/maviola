@@ -52,6 +52,21 @@ impl<V: MaybeVersioned> ChannelFactory<V> {
     pub fn is_closed(&self) -> bool {
         self.state.is_closed()
     }
+
+    /// Returns a producer of incoming frames.
+    pub fn producer(&self) -> &IncomingFrameProducer<V> {
+        &self.producer
+    }
+
+    /// Returns a sender for outgoing frames.
+    pub fn sender(&self) -> &OutgoingFrameSender<V> {
+        &self.sender
+    }
+
+    /// Returns a handler for outgoing frames.
+    pub fn send_handler(&mut self) -> &mut OutgoingFrameHandler<V> {
+        &mut self.send_handler
+    }
 }
 
 /// <sup>[`async`](crate::asnc)</sup>

@@ -13,14 +13,14 @@ use crate::sync::io::{Callback, IncomingFrameProducer, OutgoingFrameHandler, Out
 use crate::prelude::*;
 
 /// <sup>[`sync`](crate::sync)</sup>
-/// Factory that produces a channels withing associated [`Connection`](super::Connection).
+/// Factory that produces channels withing associated [`Connection`](super::Connection).
 #[derive(Clone, Debug)]
 pub struct ChannelFactory<V: MaybeVersioned + 'static> {
-    pub(crate) info: ConnectionInfo,
-    pub(crate) state: Closable,
-    pub(crate) sender: OutgoingFrameSender<V>,
-    pub(crate) send_handler: OutgoingFrameHandler<V>,
-    pub(crate) producer: IncomingFrameProducer<V>,
+    pub(super) info: ConnectionInfo,
+    pub(super) state: Closable,
+    pub(super) sender: OutgoingFrameSender<V>,
+    pub(super) send_handler: OutgoingFrameHandler<V>,
+    pub(super) producer: IncomingFrameProducer<V>,
 }
 
 impl<V: MaybeVersioned> ChannelFactory<V> {
@@ -51,6 +51,21 @@ impl<V: MaybeVersioned> ChannelFactory<V> {
     /// Returns `true` if associated connection is already closed.
     pub fn is_closed(&self) -> bool {
         self.state.is_closed()
+    }
+
+    /// Returns a producer of incoming frames.
+    pub fn producer(&self) -> &IncomingFrameProducer<V> {
+        &self.producer
+    }
+
+    /// Returns a sender for outgoing frames.
+    pub fn sender(&self) -> &OutgoingFrameSender<V> {
+        &self.sender
+    }
+
+    /// Returns a handler for outgoing frames.
+    pub fn send_handler(&self) -> &OutgoingFrameHandler<V> {
+        &self.send_handler
     }
 }
 
@@ -181,9 +196,9 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
             let info = info.clone();
             let send_tx = sender.clone();
 
-            let response = Callback::new(id, info.clone(), send_tx);
+            let callback = Callback::new(id, info.clone(), send_tx);
 
-            producer.send((frame, response))?;
+            producer.send((frame, callback))?;
         }
     }
 

@@ -3,7 +3,7 @@
 use std::fmt::Debug;
 
 use crate::core::utils::Sealed;
-use crate::protocol::{ComponentId, Endpoint, MaybeVersioned, SystemId};
+use crate::protocol::{ComponentId, Endpoint, MaybeVersioned, SystemId, Unset};
 
 /// <sup>🔒</sup>
 /// All kinds of nodes are falling ander this trait.
@@ -39,19 +39,22 @@ impl<V: MaybeVersioned> NodeKind for Edge<V> {}
 /// Variant of a node configuration which may or may not have a connection config.
 ///
 /// ⚠ This trait is sealed ⚠
-pub trait MaybeConnConf: Debug + Sealed {}
+pub trait MaybeConnConf: Debug + Send + Sealed {}
 
-/// Variant of a node configuration without a connection config.
-#[derive(Copy, Clone, Debug)]
-pub struct NoConnConf;
-impl Sealed for NoConnConf {}
-impl MaybeConnConf for NoConnConf {}
+impl MaybeConnConf for Unset {}
 
 /// <sup>🔒</sup>
 /// Variant of a node configuration which has a connection config.
 ///
 /// ⚠ This trait is sealed ⚠
-pub trait HasConnConf: MaybeConnConf {}
+pub trait HasConnConf: MaybeConnConf {
+    /// Returns `true` if it makes sense to restart the node after connection failure.
+    ///
+    /// A blanket implementation always returns `false`.
+    fn is_repairable(&self) -> bool {
+        false
+    }
+}
 
 /// <sup>🔒</sup>
 /// Marker trait for an entity with or without MAVLink system `ID`.
@@ -59,11 +62,7 @@ pub trait HasConnConf: MaybeConnConf {}
 /// ⚠ This trait is sealed ⚠
 pub trait MaybeSystemId: Clone + Copy + Debug + Sync + Send + Sealed {}
 
-/// Marker for an entity without MAVLink system `ID`.
-#[derive(Copy, Clone, Debug)]
-pub struct NoSystemId;
-impl Sealed for NoSystemId {}
-impl MaybeSystemId for NoSystemId {}
+impl MaybeSystemId for Unset {}
 
 /// Marker for an entity with a defined MAVLink system `ID`.
 #[derive(Copy, Clone, Debug)]
@@ -77,11 +76,7 @@ impl MaybeSystemId for HasSystemId {}
 /// ⚠ This trait is sealed ⚠
 pub trait MaybeComponentId: Clone + Debug + Sync + Send + Sealed {}
 
-/// Marker for an entity without MAVLink component `ID`.
-#[derive(Copy, Clone, Debug)]
-pub struct NoComponentId;
-impl Sealed for NoComponentId {}
-impl MaybeComponentId for NoComponentId {}
+impl MaybeComponentId for Unset {}
 
 /// Marker for an entity with a defined MAVLink component `ID`.
 #[derive(Copy, Clone, Debug)]

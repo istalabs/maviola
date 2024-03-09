@@ -34,13 +34,6 @@ pub enum ConnectionInfo {
         /// File path.
         path: PathBuf,
     },
-    /// Custom connection.
-    Custom {
-        /// Name of the custom connection.
-        name: String,
-        /// Implementation-specific details.
-        details: String,
-    },
     /// <sup>`unix`</sup>
     /// Unix socket server.
     #[cfg(unix)]
@@ -54,6 +47,15 @@ pub enum ConnectionInfo {
     SockClient {
         /// Server address.
         path: PathBuf,
+    },
+    /// Network with multiple connections.
+    Network,
+    /// Custom connection.
+    Custom {
+        /// Name of the custom connection.
+        name: String,
+        /// Implementation-specific details.
+        details: String,
     },
     /// Unknown connection.
     Unknown,
@@ -101,15 +103,6 @@ pub enum ChannelInfo {
         /// File path.
         path: PathBuf,
     },
-    /// Custom channel.
-    Custom {
-        /// Name of the custom connection.
-        conn_name: String,
-        /// Name of the custom channel.
-        channel_name: String,
-        /// Implementation-specific details.
-        details: String,
-    },
     /// <sup>`unix`</sup>
     /// Unix socket server.
     #[cfg(unix)]
@@ -123,6 +116,15 @@ pub enum ChannelInfo {
     SockClient {
         /// Socket path.
         path: PathBuf,
+    },
+    /// Custom channel.
+    Custom {
+        /// Name of the custom connection.
+        conn_name: String,
+        /// Name of the custom channel.
+        channel_name: String,
+        /// Implementation-specific details.
+        details: String,
     },
     /// Unknown channel
     Unknown,

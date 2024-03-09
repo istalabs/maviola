@@ -51,8 +51,7 @@
 //! # fn main() -> Result<()> {
 //! // Create a MAVLink node
 //! let server = Node::builder()
-//!     .version(V2)                                    // Set protocol version to `V2`
-//!     .dialect::<Minimal>()                           // Set MAVLink dialect to `minimal`
+//!     .version::<V2>()                                // Set protocol version to `V2`
 //!     .id(MavLinkId::new(17, 42))                     // Set device system and component IDs
 //!     .connection(TcpServer::new("127.0.0.1:5600")?)  // Define connection settings
 //!     .build()?;
@@ -71,7 +70,7 @@
 //!             }
 //!         }
 //!         // Handle incoming MAVLink frame
-//!         Event::Frame(frame, callback) => if server.validate_frame(&frame).is_ok() {
+//!         Event::Frame(frame, callback) => {
 //!             // Handle heartbeat message
 //!             if let Ok(Minimal::Heartbeat(msg)) = frame.decode::<Minimal>() {
 //!                 // Respond with the same heartbeat message to all clients,
@@ -109,8 +108,7 @@
 //! # #[tokio::main] async fn main() -> Result<()> {
 //! // Create a MAVLink node
 //! let server = Node::builder()
-//!     .version(V2)                            // Set protocol version to `V2`
-//!     .dialect::<Minimal>()                   // Set MAVLink dialect to `minimal`
+//!     .version::<V2>()                        // Set protocol version to `V2`
 //!     .id(MavLinkId::new(17, 42))             // Set device system and component IDs
 //!     .async_connection(
 //!         TcpServer::new("127.0.0.1:5600")?   // Define connection settings
@@ -133,7 +131,7 @@
 //!             }
 //!         }
 //!         // Handle incoming MAVLink frame
-//!         Event::Frame(frame, callback) => if server.validate_frame(&frame).is_ok() {
+//!         Event::Frame(frame, callback) => {
 //!             // Handle heartbeat message
 //!             if let Ok(Minimal::Heartbeat(msg)) = frame.decode::<Minimal>() {
 //!                 // Respond with the same heartbeat message to all clients,
@@ -222,8 +220,6 @@ pub mod prelude;
 pub mod protocol;
 #[cfg(feature = "sync")]
 pub mod sync;
-
-pub(crate) extern crate mavio;
 
 #[doc(inline = true)]
 /// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>

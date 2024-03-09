@@ -25,7 +25,7 @@ fn report_frame<V: MaybeVersioned>(frame: &Frame<V>) {
 
 fn run(path: PathBuf) -> Result<()> {
     let writer = Node::builder()
-        .version(V2)
+        .version::<V2>()
         .system_id(17)
         .component_id(42)
         .connection(FileWriter::new(path.as_path())?)
@@ -41,7 +41,7 @@ fn run(path: PathBuf) -> Result<()> {
     log::warn!("[writer] finished");
 
     let reader = Node::builder()
-        .version(V2)
+        .version::<V2>()
         .system_id(17)
         .component_id(42)
         .connection(FileReader::new(path.as_path())?)
@@ -88,7 +88,14 @@ fn file_rw() {
         run(path).unwrap();
     });
 
-    thread::sleep(Duration::from_secs(5));
+    for _ in 0..10 {
+        thread::sleep(Duration::from_millis(250));
+        if handler.is_finished() {
+            handler.join().unwrap();
+            return;
+        }
+    }
+
     if !handler.is_finished() {
         panic!("[file_rw] test took too long")
     }

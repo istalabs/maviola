@@ -29,6 +29,7 @@ mod broadcast;
 mod connection_conf;
 mod connection_info;
 mod core;
+mod retry;
 mod transport;
 
 pub use transport::{FileReader, FileWriter, TcpClient, TcpServer, UdpClient, UdpServer};
@@ -39,6 +40,7 @@ pub(crate) use broadcast::BroadcastScope;
 pub use broadcast::OutgoingFrame;
 pub use connection_conf::ConnectionConf;
 pub use connection_info::{ChannelInfo, ConnectionInfo};
+pub use retry::Retry;
 
 #[cfg(feature = "sync")]
 /// <sup>[`mavio`](https://crates.io/crates/mavio) | `sync`</sup>

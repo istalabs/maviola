@@ -34,7 +34,7 @@ pub use types::{
 };
 
 #[cfg(not(feature = "unstable"))]
-pub(crate) use channel::{Channel, ChannelFactory};
+pub(crate) use channel::ChannelFactory;
 #[cfg(not(feature = "unstable"))]
 pub(crate) use connection::{Connection, ConnectionBuilder, ConnectionHandler};
 #[cfg(not(feature = "unstable"))]

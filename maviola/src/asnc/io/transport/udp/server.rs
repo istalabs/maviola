@@ -7,6 +7,7 @@ use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 
 use crate::asnc::io::{Connection, ConnectionBuilder, ConnectionHandler};
+use crate::asnc::marker::AsyncConnConf;
 use crate::asnc::utils::{MpscReader, MpscWriter};
 use crate::core::io::{ChannelInfo, ConnectionInfo};
 use crate::core::utils::{Closable, Closer};
@@ -68,6 +69,10 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServer {
         });
 
         Ok((connection, handler))
+    }
+
+    fn to_conf(&self) -> AsyncConnConf<V> {
+        AsyncConnConf::new(self.clone())
     }
 }
 

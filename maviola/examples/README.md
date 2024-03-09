@@ -4,8 +4,6 @@ Basic Examples
 Synchronous API
 ---------------
 
-### Basic examples
-
 These examples show basic usage for different transports:
 
 * TCP: [`tcp_ping_pong.rs`](tcp_ping_pong.rs)
@@ -28,8 +26,6 @@ These examples show basic usage for different transports:
 Asynchronous API
 ----------------
 
-### Basic examples
-
 These examples show basic usage for different transports:
 
 * TCP: [`async_tcp_ping_pong.rs`](async_tcp_ping_pong.rs)
@@ -45,11 +41,38 @@ These examples show basic usage for different transports:
   cargo run --package maviola --example async_file_rw
   ```
 
+Network
+-------
+
+Synchronous example of a node with multiple connections: [`network.rs`](network.rs)
+
+```shell
+cargo run --package maviola --example network
+```
+
+Asynchronous example of a node with multiple connections: [`async_network.rs`](async_network.rs)
+
+```shell
+cargo run --package maviola --example async_network
+```
+
 Message Signing
 ---------------
 
-Basic example:
+Basic synchronous example: [`message_signing.rs`](message_signing.rs)
 
 ```shell
 cargo run --package maviola --example message_signing
+```
+
+Custom Processing
+-----------------
+
+The following examples shows, how to use custom message processors to scramble and unscramble frame data. In real-world
+applications you might want to use proper encryption algorithms.
+
+Synchronous scrambler: [`scrambler.rs`](scrambler.rs)
+
+```shell
+cargo run --package maviola --example scrambler
 ```

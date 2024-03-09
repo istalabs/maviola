@@ -1,6 +1,6 @@
 //! # API extensions for synchronous MAVLink node
 
-mod api;
+pub(in crate::sync) mod api;
 mod build_ext;
 mod event;
 mod ext;
@@ -30,10 +30,9 @@ use crate::core::node::Node;
 ///
 /// // Create a node from configuration
 /// let mut node = Node::builder()
-///     .version(V2)                // restrict node to MAVLink2 protocol version
+///     .version::<V2>()                // restrict node to MAVLink2 protocol version
 ///     .system_id(1)               // System `ID`
 ///     .component_id(1)            // Component `ID`
-///     .dialect::<Minimal>()       // Dialect is set to `minimal`
 ///     .connection(
 ///         TcpServer::new(addr)    // Configure TCP server connection
 ///             .unwrap()
@@ -61,8 +60,8 @@ use crate::core::node::Node;
 ///     }
 /// }
 /// ```
-pub type EdgeNode<D, V> = Node<Edge<V>, D, V, SyncApi<V>>;
+pub type EdgeNode<V> = Node<Edge<V>, V, SyncApi<V>>;
 
 /// <sup>[`sync`](crate::sync)</sup>
 /// Synchronous node representing a MAVLink proxy.
-pub type ProxyNode<D, V> = Node<Proxy, D, V, SyncApi<V>>;
+pub type ProxyNode<V> = Node<Proxy, V, SyncApi<V>>;

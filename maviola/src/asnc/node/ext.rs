@@ -2,9 +2,11 @@
 
 use std::marker::PhantomData;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio_stream::Stream;
 
 use crate::asnc::marker::AsyncConnConf;
+use crate::asnc::node::api::{EventReceiver, FrameSender};
 use crate::core::marker::{Edge, NodeKind};
 use crate::core::node::NodeConf;
 use crate::core::utils::Guarded;
@@ -13,16 +15,16 @@ use crate::protocol::{Behold, Peer};
 use crate::asnc::prelude::*;
 use crate::prelude::*;
 
-impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, AsyncApi<V>> {
+impl<K: NodeKind, V: MaybeVersioned + 'static> Node<K, V, AsyncApi<V>> {
     /// <sup>[`async`](crate::asnc)</sup>
     /// Instantiates node from asynchronous configuration.
     ///
     /// Creates an instance of [`Node`] from [`NodeConf`].
-    pub async fn try_from_async_conf(conf: NodeConf<K, D, V, AsyncConnConf<V>>) -> Result<Self> {
+    pub async fn try_from_async_conf(conf: NodeConf<K, V, AsyncConnConf<V>>) -> Result<Self> {
         let (conn, conn_handler) = conf.connection().build().await?;
 
-        let signer = conf.signer.clone().map(Arc::new);
-        let api = AsyncApi::new(conn, signer.clone());
+        let processor = Arc::new(conf.make_processor());
+        let api = AsyncApi::new(conn, processor.clone());
 
         let state = api.share_state();
         let is_active = Guarded::from(&state);
@@ -34,7 +36,7 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, AsyncAp
             is_active,
             heartbeat_timeout: conf.heartbeat_timeout,
             heartbeat_interval: conf.heartbeat_interval,
-            _dialect: PhantomData,
+            processor,
             _version: PhantomData,
         };
 
@@ -113,6 +115,23 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, AsyncAp
     }
 
     /// <sup>[`async`](crate::asnc)</sup>
+    /// Attempts ot receives the next frame until the timeout is reached. Blocks until valid frame
+    /// received, deadline is reached, or channel is closed.
+    ///
+    /// If you want to block until the next frame is received, use [`Node::recv_frame`].
+    /// If you want to check for the next frame without blocking, use [`Node::try_recv_frame`].
+    ///
+    /// **⚠** This method skips all invalid frames. If you are interested in such frames, use
+    /// [Node::events] or [`Node::recv`] instead to receive [`Event::Invalid`] events that
+    /// contain invalid frame with the corresponding error.
+    pub async fn recv_frame_timeout(
+        &mut self,
+        timeout: Duration,
+    ) -> Result<(Frame<V>, Callback<V>)> {
+        self.api.recv_frame_timeout(timeout).await
+    }
+
+    /// <sup>[`async`](crate::asnc)</sup>
     /// Attempts to receive the next valid frame.
     ///
     /// This method returns immediately if channel is empty. If you want to block until the next
@@ -124,9 +143,17 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, AsyncAp
     pub fn try_recv_frame(&mut self) -> Result<(Frame<V>, Callback<V>)> {
         self.api.try_recv_frame()
     }
+
+    pub(in crate::asnc) fn event_receiver(&self) -> EventReceiver<V> {
+        self.api.event_receiver()
+    }
+
+    pub(in crate::asnc) fn frame_sender(&self) -> &FrameSender<V> {
+        self.api.frame_sender()
+    }
 }
 
-impl<D: Dialect, V: Versioned + 'static> Node<Edge<V>, D, V, AsyncApi<V>> {
+impl<V: Versioned + 'static> Node<Edge<V>, V, AsyncApi<V>> {
     /// <sup>[`async`](crate::asnc)</sup>
     /// Activates the node.
     ///
@@ -148,10 +175,11 @@ impl<D: Dialect, V: Versioned + 'static> Node<Edge<V>, D, V, AsyncApi<V>> {
 
         self.is_active.set(true);
 
-        self.api.start_sending_heartbeats::<D>(
+        self.api.start_sending_heartbeats(
             self.kind.endpoint.clone(),
             self.heartbeat_interval,
             self.is_active.clone(),
+            self.dialect().version(),
         );
 
         Ok(())

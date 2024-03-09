@@ -22,7 +22,7 @@ use crate::prelude::*;
 /// // Create a Unix-socket client node
 /// let node = Node::builder()
 ///         /* define other node parameters */
-/// #       .version(V2)
+/// #       .version::<V2>()
 /// #       .system_id(1)
 /// #       .component_id(1)
 ///         .connection(
@@ -42,7 +42,7 @@ use crate::prelude::*;
 /// // Create a Unix-socket client node
 /// let node = Node::builder()
 ///         /* define other node parameters */
-/// #       .version(V2)
+/// #       .version::<V2>()
 /// #       .system_id(1)
 /// #       .component_id(1)
 ///         .async_connection(

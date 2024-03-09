@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use tokio::net::TcpStream;
 
 use crate::asnc::io::{Connection, ConnectionBuilder, ConnectionHandler};
+use crate::asnc::marker::AsyncConnConf;
 use crate::core::io::ChannelInfo;
 use crate::core::utils::SharedCloser;
 
@@ -22,5 +23,9 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for TcpClient {
         let handler = ConnectionHandler::spawn_from_state(channel_state);
 
         Ok((connection, handler))
+    }
+
+    fn to_conf(&self) -> AsyncConnConf<V> {
+        AsyncConnConf::new(self.clone())
     }
 }

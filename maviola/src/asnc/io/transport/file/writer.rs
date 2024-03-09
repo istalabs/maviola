@@ -3,6 +3,7 @@ use tokio::fs::File;
 use tokio::io::BufWriter;
 
 use crate::asnc::io::{Connection, ConnectionBuilder, ConnectionHandler};
+use crate::asnc::marker::AsyncConnConf;
 use crate::asnc::utils::BusyReader;
 use crate::core::io::ChannelInfo;
 use crate::core::utils::SharedCloser;
@@ -26,5 +27,9 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for FileWriter {
         let handler = ConnectionHandler::spawn_from_state(channel_state);
 
         Ok((connection, handler))
+    }
+
+    fn to_conf(&self) -> AsyncConnConf<V> {
+        AsyncConnConf::new(self.clone())
     }
 }

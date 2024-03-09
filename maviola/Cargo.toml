@@ -147,6 +147,16 @@ test = true
 required-features = ["sync"]
 
 [[example]]
+name = "network"
+test = true
+required-features = ["sync"]
+
+[[example]]
+name = "scrambler"
+test = true
+required-features = ["sync"]
+
+[[example]]
 name = "async_tcp_ping_pong"
 test = true
 required-features = ["async"]
@@ -165,6 +175,11 @@ required-features = ["async"]
 name = "async_file_rw"
 test = true
 required-features = ["sync"]
+
+[[example]]
+name = "async_network"
+test = true
+required-features = ["async"]
 
 ###########################################################
 # Metadata

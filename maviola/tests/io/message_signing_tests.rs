@@ -1,8 +1,8 @@
-use maviola::protocol::{MessageSigner, SignStrategy};
+use maviola::protocol::{FrameSigner, SignStrategy};
 
 #[test]
 fn define_signing_config() {
-    MessageSigner::builder()
+    FrameSigner::builder()
         .key("abcdef")
         .link_id(1)
         .incoming(SignStrategy::Sign)

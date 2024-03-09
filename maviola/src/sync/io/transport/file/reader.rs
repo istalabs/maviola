@@ -4,6 +4,7 @@ use std::io::BufReader;
 use crate::core::io::ChannelInfo;
 use crate::core::utils::SharedCloser;
 use crate::sync::io::{Connection, ConnectionBuilder, ConnectionHandler};
+use crate::sync::marker::ConnConf;
 use crate::sync::utils::BusyWriter;
 
 use crate::prelude::*;
@@ -24,5 +25,9 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for FileReader {
         let handler = ConnectionHandler::spawn_from_state(channel_state);
 
         Ok((connection, handler))
+    }
+
+    fn to_conf(&self) -> ConnConf<V> {
+        ConnConf::new(self.clone())
     }
 }

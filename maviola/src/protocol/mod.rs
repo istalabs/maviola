@@ -6,11 +6,19 @@
 //! <sup>[`mavio`](https://crates.io/crates/mavio)</sup>.
 
 pub mod consts;
+mod dialects;
 mod peer;
+mod processor;
 mod signature;
 
+pub use dialects::KnownDialects;
 pub use peer::Peer;
-pub use signature::{MessageSigner, MessageSignerBuilder, SignStrategy, UniqueMavTimestamp};
+pub use processor::{ProcessFrame, ProcessFrameCase};
+pub use signature::{
+    FrameSigner, FrameSignerBuilder, IntoFrameSigner, SignStrategy, UniqueMavTimestamp,
+};
+
+pub(crate) use processor::{CustomFrameProcessors, FrameProcessor};
 
 /// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
 #[doc(inline)]

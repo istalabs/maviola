@@ -2,6 +2,7 @@
 
 use std::marker::PhantomData;
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::core::marker::{Edge, NodeKind};
 use crate::core::node::NodeConf;
@@ -10,18 +11,19 @@ use crate::protocol::Peer;
 use crate::sync::marker::ConnConf;
 
 use crate::prelude::*;
+use crate::sync::node::api::{EventReceiver, FrameSender};
 use crate::sync::prelude::*;
 
-impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, SyncApi<V>> {
+impl<K: NodeKind, V: MaybeVersioned + 'static> Node<K, V, SyncApi<V>> {
     /// <sup>[`sync`](crate::sync)</sup>
     /// Instantiates node from synchronous configuration.
     ///
     /// Creates an instance of [`Node`] from [`NodeConf`].
-    pub fn try_from_conf(conf: NodeConf<K, D, V, ConnConf<V>>) -> Result<Self> {
+    pub fn try_from_conf(conf: NodeConf<K, V, ConnConf<V>>) -> Result<Self> {
         let (conn, conn_handler) = conf.connection().build()?;
 
-        let signer = conf.signer.clone().map(Arc::new);
-        let api = SyncApi::new(conn, signer.clone());
+        let processor = Arc::new(conf.make_processor());
+        let api = SyncApi::new(conn, processor.clone());
 
         let state = api.share_state();
         let is_active = Guarded::from(&state);
@@ -33,7 +35,7 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, SyncApi
             is_active,
             heartbeat_timeout: conf.heartbeat_timeout,
             heartbeat_interval: conf.heartbeat_interval,
-            _dialect: PhantomData,
+            processor,
             _version: PhantomData,
         };
 
@@ -70,6 +72,14 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, SyncApi
     }
 
     /// <sup>[`sync`](crate::sync)</sup>
+    /// Attempts to receive the next node [`Event`] within a `timeout`.
+    ///
+    /// Blocks until event received or deadline is reached.
+    pub fn recv_timeout(&self, timeout: Duration) -> Result<Event<V>> {
+        self.api.recv_event_timeout(timeout)
+    }
+
+    /// <sup>[`sync`](crate::sync)</sup>
     /// Attempts to receive MAVLink [`Event`] without blocking.
     pub fn try_recv(&self) -> Result<Event<V>> {
         self.api.try_recv_event()
@@ -89,6 +99,7 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, SyncApi
     /// <sup>[`sync`](crate::sync)</sup>
     /// Receives the next frame. Blocks until valid frame received or channel is closed.
     ///
+    /// If you want to block until the next frame within a timeout, use [`Node::recv_frame_timeout`].
     /// If you want to check for the next frame without blocking, use [`Node::try_recv_frame`].
     ///
     /// **⚠** This method skips all invalid frames. If you are interested in such frames, use
@@ -99,10 +110,24 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, SyncApi
     }
 
     /// <sup>[`sync`](crate::sync)</sup>
-    /// Attempts to receive the next valid frame.
+    /// Attempts ot receives the next frame until the timeout is reached. Blocks until valid frame
+    /// received, deadline is reached, or channel is closed.
     ///
-    /// This method returns immediately if channel is empty. If you want to block until the next
-    /// frame is received, use [`Node::recv_frame`].
+    /// If you want to block until the next frame is received, use [`Node::recv_frame`].
+    /// If you want to check for the next frame without blocking, use [`Node::try_recv_frame`].
+    ///
+    /// **⚠** This method skips all invalid frames. If you are interested in such frames, use
+    /// [Node::events] or [`Node::recv`] instead to receive [`Event::Invalid`] events that
+    /// contain invalid frame with the corresponding error.
+    pub fn recv_frame_timeout(&self, timeout: Duration) -> Result<(Frame<V>, Callback<V>)> {
+        self.api.recv_frame_timeout(timeout)
+    }
+
+    /// <sup>[`sync`](crate::sync)</sup>
+    /// Attempts to receive the next valid frame. Returns immediately if channel is empty.
+    ///
+    /// If you want to block until the next frame within a timeout, use [`Node::recv_frame_timeout`].
+    /// If you want to block until the next frame is received, use [`Node::recv_frame`].
     ///
     /// **⚠** This method skips all invalid frames. If you are interested in such frames, use
     /// [Node::events] or [`Node::try_recv`] instead to receive [`Event::Invalid`] events that
@@ -110,9 +135,17 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static> Node<K, D, V, SyncApi
     pub fn try_recv_frame(&self) -> Result<(Frame<V>, Callback<V>)> {
         self.api.try_recv_frame()
     }
+
+    pub(in crate::sync) fn event_receiver(&self) -> &EventReceiver<V> {
+        self.api.event_receiver()
+    }
+
+    pub(in crate::sync) fn frame_sender(&self) -> &FrameSender<V> {
+        self.api.frame_sender()
+    }
 }
 
-impl<D: Dialect, V: Versioned + 'static> Node<Edge<V>, D, V, SyncApi<V>> {
+impl<V: Versioned + 'static> Node<Edge<V>, V, SyncApi<V>> {
     /// <sup>[`sync`](crate::sync)</sup>
     /// Activates the node.
     ///
@@ -134,10 +167,11 @@ impl<D: Dialect, V: Versioned + 'static> Node<Edge<V>, D, V, SyncApi<V>> {
 
         self.is_active.set(true);
 
-        self.api.start_sending_heartbeats::<D>(
+        self.api.start_sending_heartbeats(
             self.kind.endpoint.clone(),
             self.heartbeat_interval,
             self.is_active.clone(),
+            self.dialect().version(),
         );
 
         Ok(())

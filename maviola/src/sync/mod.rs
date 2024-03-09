@@ -20,7 +20,7 @@
 //! // Create a TCP client node
 //! let node = Node::builder()
 //!         /* define other node parameters */
-//! #       .version(V2)
+//! #       .version::<V2>()
 //! #       .system_id(1)
 //! #       .component_id(1)
 //!         .connection(
@@ -86,6 +86,7 @@ pub mod marker;
 pub mod node;
 pub mod prelude;
 
+mod network;
 #[cfg(not(feature = "unstable"))]
 pub(crate) mod utils;
 #[cfg(feature = "unstable")]

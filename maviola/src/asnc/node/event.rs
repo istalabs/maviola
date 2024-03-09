@@ -5,12 +5,12 @@ use tokio_stream::Stream;
 use tokio_util::sync::ReusableBoxFuture;
 
 use crate::asnc::consts::EVENTS_RECV_POOLING_INTERVAL;
-use crate::asnc::io::Callback;
 use crate::asnc::node::api::EventReceiver;
 use crate::core::error::{RecvError, TryRecvError};
 use crate::core::utils::Closable;
 use crate::protocol::Peer;
 
+use crate::asnc::prelude::*;
 use crate::prelude::*;
 
 /// <sup>[`async`](crate::asnc)</sup>
@@ -24,7 +24,7 @@ pub enum Event<V: MaybeVersioned> {
     /// New [`Frame`] received.
     Frame(Frame<V>, Callback<V>),
     /// New [`Frame`] received, but it hasn't passed validation.
-    Invalid(Frame<V>, Error, Callback<V>),
+    Invalid(Frame<V>, FrameError, Callback<V>),
 }
 
 pub(crate) struct EventStream<V: MaybeVersioned + 'static> {
@@ -100,8 +100,8 @@ mod async_event_tests {
 
     #[tokio::test]
     async fn test_event_stream() {
-        let (tx, rx) = broadcast::channel(2);
-        let event_receiver = EventReceiver::new(rx, None);
+        let (tx, rx) = mpmc::channel(2);
+        let event_receiver = EventReceiver::new(rx);
         let state = Closer::new();
 
         let mut stream: EventStream<V2> = EventStream::new(event_receiver, state.to_closable());

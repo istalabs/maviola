@@ -1,15 +1,13 @@
 use std::marker::PhantomData;
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::core::io::ConnectionInfo;
-use crate::core::marker::{Edge, NoComponentId, NoConnConf, NoSystemId, NodeKind, Proxy};
+use crate::core::marker::{Edge, NodeKind, Proxy, Unset};
 use crate::core::node::api::{NoApi, NodeApi};
 use crate::core::node::NodeBuilder;
 use crate::core::utils::{Guarded, SharedCloser, Switch};
-use crate::protocol::{
-    ComponentId, Dialect, MavLinkVersion, MaybeVersioned, Message, MessageSigner, SystemId,
-    Versioned, Versionless,
-};
+use crate::protocol::{ComponentId, DialectSpec, FrameProcessor, FrameSigner, Message, SystemId};
 
 use crate::prelude::*;
 
@@ -51,22 +49,28 @@ use crate::prelude::*;
 /// not damaged during sending, and second, it guarantees that sender and receiver use the same
 /// version of a dialect. Unfortunately, that means, that in order to validate a frame, you have
 /// to know `CRC_EXTRA` of the exact message this frame encodes. You can validate incoming frames
-/// against node dialect using [`Node::validate_frame`], or use [`Frame::validate_checksum`] to
+/// against arbitrary dialect using [`Node::validate_frame`], or use [`Frame::validate_checksum`] to
 /// validate against external dialect.
 ///
 /// ## Message Signing
 ///
 /// MAVLink [message signing](https://mavlink.io/en/guide/message_signing.html) is provided by
-/// [`MessageSigner`] that can be provided upon node configuration. It can be configured with
+/// [`FrameSigner`] that can be provided upon node configuration. It can be configured with
 /// incoming and outgoing [`SignStrategy`] for a fine-grained control over what and when should be
 /// signed. It is possible to validate several authenticated links with additional keys, but only
 /// one link `ID` / key pair will be used to sign frames.
+///
+/// ## Multiple Connections
+///
+/// It is possible to create a node with multiple connections. There is special transport called
+/// [`Network`], that encapsulates several proxy nodes. Such nodes may have individual setting,
+/// such as message signing configuration.
 ///
 /// ## Examples
 ///
 /// Create a synchronous TCP server node:
 ///
-/// ```no_run
+/// ```rust,no_run
 /// use maviola::prelude::*;
 /// use maviola::sync::prelude::*;
 ///
@@ -74,8 +78,7 @@ use crate::prelude::*;
 ///
 /// // Create a node from configuration
 /// let mut node = Node::builder()
-///     .version(V2)                // restrict node to MAVLink2 protocol version
-///     .dialect::<Minimal>()       // Dialect is set to `minimal`
+///     .version::<V2>()            // restrict node to `MAVLink 2` protocol version
 ///     .id(MavLinkId::new(1, 1))   // Set system and component IDs
 ///     .connection(
 ///         TcpServer::new(addr)    // Configure TCP server connection
@@ -88,7 +91,7 @@ use crate::prelude::*;
 ///
 /// Create an asynchronous TCP server node:
 ///
-/// ```no_run
+/// ```rust,no_run
 /// # #[tokio::main(flavor = "current_thread")] async fn main() {
 /// use maviola::prelude::*;
 /// use maviola::asnc::prelude::*;
@@ -97,8 +100,7 @@ use crate::prelude::*;
 ///
 /// // Create a node from configuration
 /// let mut node = Node::builder()
-///     .version(V2)                // restrict node to MAVLink2 protocol version
-///     .dialect::<Minimal>()       // Dialect is set to `minimal`
+///     .version::<V2>()            // restrict node to `MAVLink 2` protocol version
 ///     .id(MavLinkId::new(1, 1))   // Set system and component IDs
 ///     .async_connection(
 ///         TcpServer::new(addr)    // Configure TCP server connection
@@ -119,16 +121,19 @@ use crate::prelude::*;
 /// use maviola::sync::prelude::*;
 ///
 /// let node = Node::builder()
-///     .version(V2)
+///     .version::<V2>()
 ///     .id(MavLinkId::new(1, 1))
 ///     .connection(TcpServer::new("127.0.0.1:5600").unwrap())
 ///     .signer(
-///         MessageSigner::builder()
+///         FrameSigner::builder()
+///             // Set `ID` of a signed link
 ///             .link_id(1)
+///             // Set secret key
 ///             .key("unsecure")
+///             // Reject unsigned or incorrect incoming messages
 ///             .incoming(SignStrategy::Strict)
+///             // Sign all outgoing messages
 ///             .outgoing(SignStrategy::Sign)
-///             .build()
 ///     )
 ///     .build().unwrap();
 ///
@@ -139,25 +144,44 @@ use crate::prelude::*;
 /// let (frame, _) = node.recv_frame().unwrap();
 /// assert!(frame.is_signed());
 /// ```
-pub struct Node<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> {
+///
+/// Create an asynchronous node with a network containing two TCP servers:
+///
+/// ```rust,no_run
+/// # #[tokio::main] async fn main() {
+/// use maviola::prelude::*;
+/// use maviola::asnc::prelude::*;
+///
+/// let node = Node::builder()
+///     .version::<V2>()
+///     .id(MavLinkId::new(1, 17))
+///     .async_connection(
+///         Network::asynchronous()
+///             .add_connection(TcpServer::new("127.0.0.1:5600").unwrap())
+///             .add_connection(TcpServer::new("127.0.0.1:5601").unwrap())
+///     )
+///     .build().await.unwrap();
+/// # }
+/// ```
+pub struct Node<K: NodeKind, V: MaybeVersioned + 'static, A: NodeApi<V>> {
     pub(crate) kind: K,
     pub(crate) api: A,
     pub(crate) state: SharedCloser,
     pub(crate) is_active: Guarded<SharedCloser, Switch>,
     pub(crate) heartbeat_timeout: Duration,
     pub(crate) heartbeat_interval: Duration,
-    pub(crate) _dialect: PhantomData<D>,
+    pub(crate) processor: Arc<FrameProcessor>,
     pub(crate) _version: PhantomData<V>,
 }
 
-impl Node<Proxy, Minimal, Versionless, NoApi> {
+impl Node<Proxy, Versionless, NoApi> {
     /// Instantiates an empty [`NodeBuilder`].
-    pub fn builder() -> NodeBuilder<NoSystemId, NoComponentId, Minimal, Versionless, NoConnConf> {
+    pub fn builder() -> NodeBuilder<Unset, Unset, Versionless, Unset> {
         NodeBuilder::new()
     }
 }
 
-impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> Node<K, D, V, A> {
+impl<K: NodeKind, V: MaybeVersioned + 'static, A: NodeApi<V>> Node<K, V, A> {
     /// Information about this node's connection.
     pub fn info(&self) -> &ConnectionInfo {
         self.api.info()
@@ -173,11 +197,43 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> Node<K
         self.heartbeat_timeout
     }
 
-    /// Returns a reference to [`MessageSigner`], that is responsible for
+    /// Dialect specification.
+    ///
+    /// Default dialect is `minimal`.
+    #[inline]
+    pub fn dialect(&self) -> &DialectSpec {
+        self.processor.main_dialect()
+    }
+
+    /// Known dialects specifications.
+    ///
+    /// Node can perform frame validation against known dialects. However, automatic operations,
+    /// like heartbeats, will use the main [`Node::dialect`].
+    ///
+    /// Default `minimal` dialect is always among the known dialects.
+    pub fn known_dialects(&self) -> impl Iterator<Item = &DialectSpec> {
+        self.processor.known_dialects()
+    }
+
+    /// Returns a reference to [`FrameProcessor`], that is responsible for message signing,
+    /// compatibility and incompatibility flags.
+    #[inline(always)]
+    pub fn processor(&self) -> &FrameProcessor {
+        self.api.processor()
+    }
+
+    /// Returns a reference to [`FrameSigner`], that is responsible for
     /// [message signing](https://mavlink.io/en/guide/message_signing.html).
     #[inline(always)]
-    pub fn signer(&self) -> Option<&MessageSigner> {
-        self.api.signer()
+    pub fn signer(&self) -> Option<&FrameSigner> {
+        self.api.processor().signer()
+    }
+
+    /// Returns a reference to [`CompatProcessor`], that is responsible for compatibility and
+    /// incompatibility flags.
+    #[inline(always)]
+    pub fn compat(&self) -> Option<&CompatProcessor> {
+        self.api.processor().compat()
     }
 
     /// Returns `true` if node is connected.
@@ -210,16 +266,17 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> Node<K
     ///
     /// Similar to [`Node::send_frame`], except it accepts only [`Versionless`] frames and tries
     /// to convert them into a supported versioned form. If conversion is not possible, the method
-    /// will return [`FrameError::InvalidVersion`] variant of [`Error::Frame`].
+    /// will return [`FrameError::Version`] variant of [`Error::Frame`].
     pub fn send_versionless_frame(&self, frame: &Frame<Versionless>) -> Result<()> {
         let frame = frame.try_to_versioned::<V>()?;
         self.send_frame(&frame)
     }
 
-    /// Validates incoming frame using node configuration.
-    pub fn validate_frame(&self, frame: &Frame<V>) -> Result<()> {
-        frame.validate_checksum::<D>()?;
-        Ok(())
+    /// Validates incoming frame against arbitrary dialect.
+    ///
+    /// The dialect has to be specified via [turbofish](https://turbo.fish/about) syntax.
+    pub fn validate_frame<D: Dialect>(&self, frame: &Frame<V>) -> Result<()> {
+        frame.validate_checksum::<D>().map_err(Error::from)
     }
 
     fn close(&mut self) {
@@ -229,7 +286,7 @@ impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> Node<K
     }
 }
 
-impl<D: Dialect, V: Versioned + 'static, A: NodeApi<V>> Node<Edge<V>, D, V, A> {
+impl<V: Versioned + 'static, A: NodeApi<V>> Node<Edge<V>, V, A> {
     /// Send MAVLink message.
     ///
     /// The message will be encoded according to the node's dialect specification and MAVLink
@@ -273,7 +330,8 @@ impl<D: Dialect, V: Versioned + 'static, A: NodeApi<V>> Node<Edge<V>, D, V, A> {
     /// Creates a next frame from MAVLink message.
     ///
     /// If [`Node::signer`] is set and the node has `MAVLink 2` protocol version, then frame will
-    /// be signed according to the [`MessageSigner::outgoing`] strategy.
+    /// be signed according to the [`FrameSigner::outgoing`] strategy and filled with proper
+    /// compatibility and incompatibility flags.
     pub fn next_frame(&self, message: &impl Message) -> Result<Frame<V>> {
         let mut frame = self.kind.endpoint.next_frame(message)?;
 
@@ -304,7 +362,7 @@ impl<D: Dialect, V: Versioned + 'static, A: NodeApi<V>> Node<Edge<V>, D, V, A> {
     }
 }
 
-impl<D: Dialect, V: MaybeVersioned, A: NodeApi<V>> Node<Edge<V>, D, V, A> {
+impl<V: MaybeVersioned, A: NodeApi<V>> Node<Edge<V>, V, A> {
     /// MAVLink system ID.
     pub fn system_id(&self) -> SystemId {
         self.kind.endpoint.system_id()
@@ -316,14 +374,14 @@ impl<D: Dialect, V: MaybeVersioned, A: NodeApi<V>> Node<Edge<V>, D, V, A> {
     }
 }
 
-impl<K: NodeKind, D: Dialect, V: Versioned, A: NodeApi<V>> Node<K, D, V, A> {
+impl<K: NodeKind, V: Versioned, A: NodeApi<V>> Node<K, V, A> {
     /// MAVLink version.
     pub fn version(&self) -> MavLinkVersion {
         V::version()
     }
 }
 
-impl<D: Dialect, A: NodeApi<Versionless>> Node<Edge<Versionless>, D, Versionless, A> {
+impl<A: NodeApi<Versionless>> Node<Edge<Versionless>, Versionless, A> {
     /// Send MAVLink frame with a specified MAVLink protocol version.
     ///
     /// If you want to restrict MAVLink protocol to a particular version, construct a [`Versioned`]
@@ -350,9 +408,7 @@ impl<D: Dialect, A: NodeApi<Versionless>> Node<Edge<Versionless>, D, Versionless
     }
 }
 
-impl<K: NodeKind, D: Dialect, V: MaybeVersioned + 'static, A: NodeApi<V>> Drop
-    for Node<K, D, V, A>
-{
+impl<K: NodeKind, V: MaybeVersioned + 'static, A: NodeApi<V>> Drop for Node<K, V, A> {
     fn drop(&mut self) {
         self.close()
     }
