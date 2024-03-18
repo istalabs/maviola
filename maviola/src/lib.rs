@@ -213,7 +213,6 @@
 )]
 
 #[cfg(feature = "async")]
-// #[allow(async_fn_in_trait)]
 pub mod asnc;
 pub mod core;
 pub mod prelude;

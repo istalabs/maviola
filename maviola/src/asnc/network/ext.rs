@@ -80,12 +80,12 @@ mod async_network_tests {
     use crate::dialects::minimal::messages::Heartbeat;
 
     const RECONNECT_INTERVAL: Duration = SERVER_HANG_UP_TIMEOUT;
-    // Should be at least 5-7 times bigger, than `RECONNECT_INTERVAL`, to make sure that tests will
+    // Should be at least 3-4 times bigger than `RECONNECT_INTERVAL`, to make sure that tests will
     // run in parallel
-    const WAIT_DURATION: Duration = Duration::from_millis(500);
-    // Should be at least 10 times bigger, than `RECONNECT_INTERVAL`, to make sure that tests will
+    const WAIT_DURATION: Duration = Duration::from_millis(250);
+    // Should be at least 10 times bigger than `RECONNECT_INTERVAL`, to make sure that tests will
     // run in parallel
-    const RECV_TIMEOUT: Duration = Duration::from_millis(750);
+    const RECV_TIMEOUT: Duration = Duration::from_millis(500);
 
     async fn wait() {
         tokio::time::sleep(WAIT_DURATION).await;
@@ -109,7 +109,6 @@ mod async_network_tests {
             .build()
             .await
             .unwrap();
-        wait().await;
 
         let mut client_1 = Node::builder()
             .version::<V2>()
