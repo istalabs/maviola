@@ -348,12 +348,14 @@ impl From<mpsc::TryRecvError> for Error {
 //                              Tokio: Broadcast                             //
 ///////////////////////////////////////////////////////////////////////////////
 
+#[cfg(feature = "async")]
 impl<T> From<tokio::sync::broadcast::error::SendError<T>> for SendError<T> {
     fn from(value: tokio::sync::broadcast::error::SendError<T>) -> Self {
         Self(value.0)
     }
 }
 
+#[cfg(feature = "async")]
 impl From<tokio::sync::broadcast::error::RecvError> for RecvError {
     fn from(value: tokio::sync::broadcast::error::RecvError) -> Self {
         match value {
@@ -363,6 +365,7 @@ impl From<tokio::sync::broadcast::error::RecvError> for RecvError {
     }
 }
 
+#[cfg(feature = "async")]
 impl From<tokio::sync::broadcast::error::TryRecvError> for TryRecvError {
     fn from(value: tokio::sync::broadcast::error::TryRecvError) -> Self {
         match value {
@@ -373,18 +376,21 @@ impl From<tokio::sync::broadcast::error::TryRecvError> for TryRecvError {
     }
 }
 
+#[cfg(feature = "async")]
 impl<T> From<tokio::sync::broadcast::error::SendError<T>> for Error {
     fn from(_: tokio::sync::broadcast::error::SendError<T>) -> Self {
         SyncError::Disconnected.into()
     }
 }
 
+#[cfg(feature = "async")]
 impl From<tokio::sync::broadcast::error::RecvError> for Error {
     fn from(value: tokio::sync::broadcast::error::RecvError) -> Self {
         RecvError::from(value).into()
     }
 }
 
+#[cfg(feature = "async")]
 impl From<tokio::sync::broadcast::error::TryRecvError> for Error {
     fn from(value: tokio::sync::broadcast::error::TryRecvError) -> Self {
         TryRecvError::from(value).into()
@@ -395,12 +401,14 @@ impl From<tokio::sync::broadcast::error::TryRecvError> for Error {
 //                                Tokio: MPSC                                //
 ///////////////////////////////////////////////////////////////////////////////
 
+#[cfg(feature = "async")]
 impl<T> From<tokio::sync::mpsc::error::SendError<T>> for SendError<T> {
     fn from(value: tokio::sync::mpsc::error::SendError<T>) -> Self {
         SendError(value.0)
     }
 }
 
+#[cfg(feature = "async")]
 impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Error {
     fn from(value: tokio::sync::mpsc::error::SendError<T>) -> Self {
         SendError::from(value).into()
