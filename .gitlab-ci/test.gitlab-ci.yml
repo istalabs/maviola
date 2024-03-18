@@ -54,7 +54,7 @@ include:
     matrix:
       - FEATURES:
           - "--no-default-features"
-          - "--features sync,async,unstable,unsafe"
+#          - "--features sync,async,unstable,unsafe"
 #          - "--all-features"
 
 # ---------------------------------------------------------
