@@ -363,7 +363,9 @@ dependencies = [
 
 [[package]]
 name = "mavio"
-version = "0.2.2"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f525a5b1b49394aa98eb2716f33a57c0ef177a19046aa208a6c0dfa3f6f63dd3"
 dependencies = [
  "bitflags",
  "crc-any",
