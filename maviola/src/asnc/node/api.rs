@@ -57,7 +57,7 @@ impl<V: MaybeVersioned + 'static> AsyncApi<V> {
 
         let sender = FrameSender::new(connection.sender(), processor.clone());
         let receiver = FrameReceiver::new(connection.receiver(), processor.clone());
-        let event_receiver = EventReceiver::new(events_rx).with_processor(processor.clone());
+        let event_receiver = EventReceiver::new(events_rx, processor.clone());
 
         AsyncApi {
             connection,
@@ -320,16 +320,11 @@ impl<V: MaybeVersioned> EventSender<V> {
 }
 
 impl<V: MaybeVersioned> EventReceiver<V> {
-    pub(super) fn new(receiver: mpmc::Receiver<Event<V>>) -> Self {
+    pub(super) fn new(receiver: mpmc::Receiver<Event<V>>, processor: Arc<FrameProcessor>) -> Self {
         Self {
             inner: receiver,
-            processor: Arc::new(FrameProcessor::new()),
+            processor,
         }
-    }
-
-    fn with_processor(mut self, processor: Arc<FrameProcessor>) -> Self {
-        self.processor = processor;
-        self
     }
 
     pub(super) async fn recv(&mut self) -> core::result::Result<Event<V>, RecvError> {
@@ -351,7 +346,7 @@ impl<V: MaybeVersioned> EventReceiver<V> {
     }
 
     pub(super) fn resubscribe(&self) -> Self {
-        Self::new(self.inner.resubscribe()).with_processor(self.processor.clone())
+        Self::new(self.inner.resubscribe(), self.processor.clone())
     }
 
     fn process_event(&self, event: Event<V>) -> Event<V> {
