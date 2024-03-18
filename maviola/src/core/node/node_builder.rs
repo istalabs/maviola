@@ -1,11 +1,6 @@
 use std::marker::PhantomData;
 use std::time::Duration;
 
-use crate::protocol::{
-    ComponentId, CustomFrameProcessors, IntoCompatProcessor, IntoFrameSigner, KnownDialects,
-    ProcessFrame, SystemId,
-};
-
 use crate::core::consts::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_TIMEOUT};
 use crate::core::marker::{
     Edge, HasComponentId, HasConnConf, HasSystemId, MaybeComponentId, MaybeConnConf, MaybeSystemId,
@@ -13,6 +8,12 @@ use crate::core::marker::{
 };
 use crate::core::node::node_conf::IntoNodeConf;
 use crate::core::node::NodeConf;
+#[cfg(feature = "unsafe")]
+use crate::protocol::ProcessFrame;
+use crate::protocol::{
+    ComponentId, CustomFrameProcessors, IntoCompatProcessor, IntoFrameSigner, KnownDialects,
+    SystemId,
+};
 
 use crate::prelude::*;
 
@@ -159,6 +160,7 @@ impl<S: MaybeSystemId, C: MaybeComponentId, V: MaybeVersioned, CC: MaybeConnConf
     }
 
     /// Adds a custom frame processor, that implements [`ProcessFrame`].
+    #[cfg(feature = "unsafe")]
     pub fn add_processor(
         mut self,
         name: &'static str,

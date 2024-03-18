@@ -16,6 +16,9 @@ pub use closable::{Closable, Closer, SharedCloser};
 #[doc(inline)]
 pub use flipper::{Flag, Flipper, Guarded, Switch};
 
+#[cfg(feature = "unsafe")]
+pub use mavio::utils::TryUpdateFrom;
+
 pub(crate) use heartbeat::make_heartbeat_message;
 pub(crate) use sealed::Sealed;
 pub(crate) use unique_id::UniqueId;

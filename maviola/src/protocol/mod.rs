@@ -6,6 +6,8 @@
 //! <sup>[`mavio`](https://crates.io/crates/mavio)</sup>.
 
 pub mod consts;
+#[cfg(feature = "unsafe")]
+mod custom;
 mod dialects;
 mod peer;
 mod processor;
@@ -13,12 +15,15 @@ mod signature;
 
 pub use dialects::KnownDialects;
 pub use peer::Peer;
-pub use processor::{ProcessFrame, ProcessFrameCase};
+pub use processor::FrameProcessor;
 pub use signature::{
     FrameSigner, FrameSignerBuilder, IntoFrameSigner, SignStrategy, UniqueMavTimestamp,
 };
 
-pub(crate) use processor::{CustomFrameProcessors, FrameProcessor};
+#[cfg(feature = "unsafe")]
+pub use custom::{CustomFrameProcessors, ProcessFrame, ProcessFrameCase};
+#[cfg(not(feature = "unsafe"))]
+pub(crate) type CustomFrameProcessors = std::marker::PhantomData<()>;
 
 /// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
 #[doc(inline)]

@@ -15,3 +15,6 @@ pub use crate::protocol::{
 pub use crate::core::io::{FileReader, FileWriter, TcpClient, TcpServer, UdpClient, UdpServer};
 #[cfg(unix)]
 pub use crate::core::io::{SockClient, SockServer};
+
+#[cfg(feature = "unsafe")]
+pub use crate::core::utils::TryUpdateFrom;

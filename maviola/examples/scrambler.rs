@@ -61,6 +61,9 @@ impl ProcessFrame for CustomProcessor {
     /// In some cases it makes sense to use unsafe [`UpdateFrame::update_unchecked`] to update even
     /// unknown frames for which impossible to calculate a valid checksum, but it doesn't make sense
     /// for the showcase purposes.
+    ///
+    /// As you can see, here we operate on [`MavFrame`] instead of [`Frame`]. The former is an enum,
+    /// that may hold either `MAVLink 1`, or `MAVLink 2` frames.
     fn process(
         &mut self,
         frame: &mut MavFrame,

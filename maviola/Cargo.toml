@@ -25,7 +25,7 @@ path = "src/lib.rs"
 ###########################################################
 [dependencies]
 log = "0.4.20"
-mavio = { version = "0.2.0-rc2", path = "../../mavio/mavio", features = ["extras", "minimal"] }
+mavio = { version = "0.2.1", path = "../../mavio/mavio", features = ["extras", "minimal"] }
 portpicker = "0.1.1"
 serde = { version = "1.0.193", default-features = false, features = ["derive"], optional = true }
 serde_arrays = { version = "0.1.0", default-features = false, optional = true }
@@ -67,6 +67,10 @@ serde = [
 ]
 ## Enables unstable API features.
 unstable = []
+## Unsafe features.
+unsafe = [
+    "mavio/unsafe"
+]
 
 ###########################################################
 # Dialects
@@ -154,7 +158,7 @@ required-features = ["sync"]
 [[example]]
 name = "scrambler"
 test = true
-required-features = ["sync"]
+required-features = ["sync", "unsafe"]
 
 [[example]]
 name = "async_tcp_ping_pong"
@@ -186,4 +190,4 @@ required-features = ["async"]
 ###########################################################
 [package.metadata.docs.rs]
 # Features to include into `docs.rs` documentation
-features = ["serde", "all", "unstable", "sync", "async"]
+features = ["serde", "all", "unstable", "sync", "async", "unsafe"]
