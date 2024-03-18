@@ -9,7 +9,9 @@ use tokio::sync::mpsc;
 use crate::asnc::io::{Connection, ConnectionBuilder, ConnectionHandler};
 use crate::asnc::marker::AsyncConnConf;
 use crate::asnc::utils::{MpscReader, MpscWriter};
-use crate::core::io::{ChannelInfo, ConnectionInfo};
+use crate::core::consts::{DEFAULT_UDP_HOST, SERVER_HANG_UP_TIMEOUT};
+use crate::core::io::{ChannelInfo, ConnectionConf, ConnectionInfo};
+use crate::core::utils::net::{pick_unused_port, resolve_socket_addr};
 use crate::core::utils::{Closable, Closer};
 
 use crate::prelude::*;
@@ -23,7 +25,18 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServer {
         let conn_state = Closer::new();
         let (connection, chan_factory) = Connection::new(self.info.clone(), conn_state.to_shared());
 
+        let info = self.info().clone();
+        let on_close_bind_addr =
+            resolve_socket_addr(format!("{}:{}", DEFAULT_UDP_HOST, pick_unused_port()?))?;
+
         let handler = ConnectionHandler::spawn(async move {
+            on_close_handler(
+                conn_state.to_closable(),
+                on_close_bind_addr,
+                server_addr,
+                info,
+            );
+
             let mut peers = HashMap::new();
             let mut buf = [0u8; 512];
 
@@ -104,4 +117,22 @@ impl UdpServer {
             }
         });
     }
+}
+
+fn on_close_handler(
+    state: Closable,
+    bind_addr: SocketAddr,
+    server_addr: SocketAddr,
+    info: ConnectionInfo,
+) {
+    tokio::spawn(async move {
+        while !state.is_closed() {
+            tokio::time::sleep(SERVER_HANG_UP_TIMEOUT).await;
+        }
+
+        log::debug!("[{info:?}] spawn wake-up connection to close server listening loop");
+        if let Ok(socket) = UdpSocket::bind(bind_addr).await {
+            _ = socket.connect(server_addr).await;
+        }
+    });
 }

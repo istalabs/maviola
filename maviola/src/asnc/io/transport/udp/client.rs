@@ -45,4 +45,8 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpClient {
     fn to_conf(&self) -> AsyncConnConf<V> {
         AsyncConnConf::new(self.clone())
     }
+
+    fn is_repairable(&self) -> bool {
+        true
+    }
 }
