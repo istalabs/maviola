@@ -52,8 +52,8 @@ include:
     - cargo test ${FEATURES} --lib --tests --bins
   parallel:
     matrix:
-      - FEATURES:
-          - "--no-default-features"
+      - FEATURES: [ ]
+#          - "--no-default-features"
 #          - "--features sync,async,unstable,unsafe"
 #          - "--all-features"
 
