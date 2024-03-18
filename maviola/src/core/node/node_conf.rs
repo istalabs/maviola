@@ -238,6 +238,7 @@ impl<K: NodeKind, V: MaybeVersioned, C: MaybeConnConf> IntoNodeConf<K, V, C> for
 }
 
 #[cfg(test)]
+#[cfg(feature = "sync")]
 mod tests {
     use crate::core::io::ConnectionInfo;
     use crate::core::io::TcpClient;

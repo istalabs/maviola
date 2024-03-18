@@ -121,6 +121,13 @@ impl<V: MaybeVersioned + 'static> AsyncApi<V> {
         self.event_receiver.recv().await.map_err(Error::from)
     }
 
+    pub(super) async fn recv_event_timeout(&mut self, timeout: Duration) -> Result<Event<V>> {
+        self.event_receiver
+            .recv_timeout(timeout)
+            .await
+            .map_err(Error::from)
+    }
+
     pub(super) fn try_recv_event(&mut self) -> Result<Event<V>> {
         self.event_receiver.try_recv().map_err(Error::from)
     }

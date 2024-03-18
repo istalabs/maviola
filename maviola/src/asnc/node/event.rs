@@ -96,12 +96,14 @@ impl<V: MaybeVersioned + 'static> Stream for EventStream<V> {
 mod async_event_tests {
     use super::*;
     use crate::core::utils::Closer;
+    use crate::protocol::FrameProcessor;
+    use std::sync::Arc;
     use tokio_stream::StreamExt;
 
     #[tokio::test]
     async fn test_event_stream() {
         let (tx, rx) = mpmc::channel(2);
-        let event_receiver = EventReceiver::new(rx);
+        let event_receiver = EventReceiver::new(rx, Arc::new(FrameProcessor::new()));
         let state = Closer::new();
 
         let mut stream: EventStream<V2> = EventStream::new(event_receiver, state.to_closable());

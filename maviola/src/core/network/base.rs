@@ -20,6 +20,9 @@ use crate::prelude::*;
 /// Create a synchronous node with a network containing two TCP servers:
 ///
 /// ```rust,no_run
+/// use std::time::Duration;
+/// use maviola::core::io::Retry;
+///
 /// use maviola::prelude::*;
 /// use maviola::sync::prelude::*;
 ///
@@ -38,14 +41,21 @@ use crate::prelude::*;
 ///                     .connection(TcpServer::new("127.0.0.1:5601").unwrap())
 ///                     /* other node configuration */
 ///             )
+///             // Attempt to repair disconnected nodes
+///             .retry(Retry::Attempts(10, Duration::from_secs(2)))
+///             // Stop if at least one node is down and all retry attempts have failed
+///             .stop_on_node_down(true)
 ///     )
 ///     .build().unwrap();
 /// ```
 ///
-/// Create an asynchronous node with a network containing two TCP servers:
+/// Create an asynchronous node with a network containing a TCP server and a TCP client:
 ///
 /// ```rust,no_run
 /// # #[tokio::main] async fn main() {
+/// use std::time::Duration;
+/// use maviola::core::io::Retry;
+///
 /// use maviola::prelude::*;
 /// use maviola::asnc::prelude::*;
 ///
@@ -61,9 +71,13 @@ use crate::prelude::*;
 ///                 Node::builder()
 ///                     // MAVLink version should match the parent node
 ///                     .version::<V2>()
-///                     .async_connection(TcpServer::new("127.0.0.1:5601").unwrap())
+///                     .async_connection(TcpClient::new("127.0.0.1:5601").unwrap())
 ///                     /* other node configuration */
 ///             )
+///             // Attempt to repair disconnected nodes
+///             .retry(Retry::Attempts(10, Duration::from_secs(2)))
+///             // Stop if at least one node is down and all retry attempts have failed
+///             .stop_on_node_down(true)
 ///     )
 ///     .build().await.unwrap();
 /// # }
@@ -73,6 +87,7 @@ pub struct Network<V: MaybeVersioned + 'static, C: MaybeConnConf> {
     pub(crate) info: ConnectionInfo,
     pub(crate) nodes: HashMap<UniqueId, NodeConf<Proxy, V, C>>,
     pub(crate) retry: Retry,
+    pub(crate) stop_on_node_down: bool,
     pub(crate) _version: PhantomData<V>,
 }
 
@@ -83,6 +98,7 @@ impl<V: MaybeVersioned + 'static, C: MaybeConnConf> Network<V, C> {
             info: ConnectionInfo::Network,
             nodes: Default::default(),
             retry: Default::default(),
+            stop_on_node_down: Default::default(),
             _version: Default::default(),
         }
     }
@@ -106,8 +122,20 @@ impl<V: MaybeVersioned + 'static, C: MaybeConnConf> Network<V, C> {
     ///
     /// When node goes down and it [`NodeConf::is_repairable`], then network will attempt to restore
     /// a node according to a specified strategy.
+    ///
+    /// When [`Self::retry`] is set to `true`, then the entire network will be disconnected, when
+    /// at least one node is stopped and can't be repaired.
     pub fn retry(mut self, retry: Retry) -> Self {
         self.retry = retry;
+        self
+    }
+
+    /// Defines, whether entire network should go down, when one of the nodes is disconnected.
+    ///
+    /// This option works in conjunction with [`Self::retry`]. The node will be considered down,
+    /// if all retry attempts has failed.
+    pub fn stop_on_node_down(mut self, value: bool) -> Self {
+        self.stop_on_node_down = value;
         self
     }
 }

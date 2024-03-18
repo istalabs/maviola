@@ -108,10 +108,13 @@ impl<
         log::trace!("[{info:?}] spawning connection channel");
 
         let write_handler = {
+            let info = info.clone();
             let send_handler = self.send_handler;
             let frame_writer = AsyncSender::new(self.writer);
 
-            tokio::spawn(async move { Self::write_handler(id, send_handler, frame_writer).await })
+            tokio::spawn(
+                async move { Self::write_handler(id, info, send_handler, frame_writer).await },
+            )
         };
 
         let read_handler = {
@@ -141,6 +144,7 @@ impl<
 
     async fn write_handler(
         id: UniqueId,
+        info: Arc<ChannelInfo>,
         mut send_handler: OutgoingFrameHandler<V>,
         mut frame_writer: AsyncSender<W, V>,
     ) -> Result<()> {
@@ -157,14 +161,19 @@ impl<
                 continue;
             }
 
-            if let Err(err) = frame_writer.send(out_frame.frame()).await {
-                let err = Error::from(err);
-                if let Error::Io(err) = err {
-                    if let std::io::ErrorKind::TimedOut = err.kind() {
-                        continue;
+            log::trace!("[{info:?}] received outgoing frame from API");
+            loop {
+                if let Err(err) = frame_writer.send(out_frame.frame()).await {
+                    let err = Error::from(err);
+                    if let Error::Io(err) = err {
+                        if let std::io::ErrorKind::TimedOut = err.kind() {
+                            continue;
+                        }
+                        return Err(Error::Io(err));
                     }
-                    return Err(Error::Io(err));
                 }
+                log::trace!("[{info:?}] written outgoing frame");
+                break;
             }
         }
     }
@@ -196,6 +205,7 @@ impl<
                     continue;
                 }
             };
+            log::trace!("[{info:?}] received incoming frame");
 
             let info = info.clone();
             let send_tx = sender.clone();
@@ -203,6 +213,7 @@ impl<
             let response = Callback::new(id, info.clone(), send_tx);
 
             producer.send((frame, response))?;
+            log::trace!("[{info:?}] sent incoming frame to API");
         }
     }
 

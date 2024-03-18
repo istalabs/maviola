@@ -2,16 +2,24 @@
 //!
 //! These utils are generated only when `#[cfg(test)]` is enabled.
 
-use std::thread;
-use std::time::Duration;
+use std::sync::Once;
 
-pub const WAIT_DURATION: Duration = Duration::from_micros(100);
-pub const WAIT_LONG_DURATION: Duration = Duration::from_micros(1000);
+const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Debug;
 
-pub fn wait() {
-    thread::sleep(WAIT_DURATION)
+static INIT: Once = Once::new();
+static INIT_LOGGER: Once = Once::new();
+
+pub fn init_logger() {
+    INIT_LOGGER.call_once(|| {
+        env_logger::builder()
+            // Suppress everything below `warn` for third-party modules
+            .filter_level(log::LevelFilter::Warn)
+            // Allow everything above `LOG_LEVEL` from current package
+            .filter_module(env!("CARGO_PKG_NAME"), LOG_LEVEL)
+            .init();
+    });
 }
 
-pub fn wait_long() {
-    thread::sleep(WAIT_LONG_DURATION)
+pub fn initialize() {
+    INIT.call_once(|| init_logger());
 }

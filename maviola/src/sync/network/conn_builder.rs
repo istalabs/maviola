@@ -24,6 +24,7 @@ impl<V: MaybeVersioned> ConnectionBuilder<V> for Network<V, ConnConf<V>> {
             info: self.info.clone(),
             nodes: self.nodes.clone(),
             retry: self.retry,
+            stop_on_node_down: self.stop_on_node_down,
             _version: PhantomData,
         })
     }

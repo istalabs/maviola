@@ -105,10 +105,11 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
         log::trace!("[{info:?}] spawning peer connection");
 
         let write_handler = {
+            let info = info.clone();
             let send_handler = self.send_handler;
             let frame_writer = Sender::new(self.writer);
 
-            thread::spawn(move || Self::write_handler(id, send_handler, frame_writer))
+            thread::spawn(move || Self::write_handler(id, info, send_handler, frame_writer))
         };
 
         let read_handler = {
@@ -137,6 +138,7 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
 
     fn write_handler(
         id: UniqueId,
+        info: Arc<ChannelInfo>,
         send_handler: OutgoingFrameHandler<V>,
         mut frame_writer: Sender<W, V>,
     ) -> Result<()> {
@@ -153,14 +155,19 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
                 continue;
             }
 
-            if let Err(err) = frame_writer.send(out_frame.frame()) {
-                let err = Error::from(err);
-                if let Error::Io(err) = err {
-                    if let std::io::ErrorKind::TimedOut = err.kind() {
-                        continue;
+            log::trace!("[{info:?}] received outgoing frame from API");
+            loop {
+                if let Err(err) = frame_writer.send(out_frame.frame()) {
+                    let err = Error::from(err);
+                    if let Error::Io(err) = err {
+                        if let std::io::ErrorKind::TimedOut = err.kind() {
+                            continue;
+                        }
+                        return Err(Error::Io(err));
                     }
-                    return Err(Error::Io(err));
                 }
+                log::trace!("[{info:?}] written outgoing frame");
+                break;
             }
         }
     }
@@ -192,6 +199,7 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
                     continue;
                 }
             };
+            log::trace!("[{info:?}] received incoming frame");
 
             let info = info.clone();
             let send_tx = sender.clone();
@@ -199,6 +207,7 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
             let callback = Callback::new(id, info.clone(), send_tx);
 
             producer.send((frame, callback))?;
+            log::trace!("[{info:?}] sent incoming frame to API");
         }
     }
 

@@ -16,6 +16,7 @@ impl Network<Versionless, Unset> {
             info: ConnectionInfo::Network,
             nodes: Default::default(),
             retry: Default::default(),
+            stop_on_node_down: Default::default(),
             _version: PhantomData,
         }
     }
@@ -66,7 +67,7 @@ impl<V: MaybeVersioned> Network<V, ConnConf<V>> {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[cfg(test)]
-mod sync_network_tests {
+mod tests {
     use super::*;
 
     use std::thread;
@@ -78,8 +79,10 @@ mod sync_network_tests {
     use crate::dialects::minimal::messages::Heartbeat;
 
     const RECONNECT_INTERVAL: Duration = SERVER_HANG_UP_TIMEOUT;
-    // Should be at least twice as big, as `RECONNECT_INTERVAL`
+    // Should be at least twice as big, as `RECONNECT_INTERVAL` to make sure that tests will
+    // run in parallel
     const WAIT_DURATION: Duration = Duration::from_millis(100);
+    const RECV_TIMEOUT: Duration = WAIT_DURATION;
 
     fn wait() {
         thread::sleep(WAIT_DURATION);
@@ -124,17 +127,17 @@ mod sync_network_tests {
 
         server.send(&Heartbeat::default()).unwrap();
 
-        let (frame, _) = client_1.recv_frame_timeout(WAIT_DURATION).unwrap();
+        let (frame, _) = client_1.recv_frame_timeout(RECV_TIMEOUT).unwrap();
         assert_eq!(frame.system_id(), 1);
         assert_eq!(frame.component_id(), 0);
 
-        let (frame, _) = client_2.recv_frame_timeout(WAIT_DURATION).unwrap();
+        let (frame, _) = client_2.recv_frame_timeout(RECV_TIMEOUT).unwrap();
         assert_eq!(frame.system_id(), 1);
         assert_eq!(frame.component_id(), 0);
 
         client_1.send(&Heartbeat::default()).unwrap();
 
-        let (frame, _) = server.recv_frame_timeout(WAIT_DURATION).unwrap();
+        let (frame, _) = server.recv_frame_timeout(RECV_TIMEOUT).unwrap();
         assert_eq!(frame.system_id(), 1);
         assert_eq!(frame.component_id(), 1);
     }
@@ -172,6 +175,6 @@ mod sync_network_tests {
         wait();
 
         client.send(&Heartbeat::default()).unwrap();
-        server.recv_frame_timeout(WAIT_DURATION).unwrap();
+        server.recv_frame_timeout(RECV_TIMEOUT).unwrap();
     }
 }

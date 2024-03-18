@@ -27,6 +27,13 @@ pub trait ConnectionBuilder<V: MaybeVersioned + 'static>: ConnectionConf {
 
     /// Converts connection builder to [`AsyncConnConf`]
     fn to_conf(&self) -> AsyncConnConf<V>;
+
+    /// If `true`, then this connection can be safely restored on failure.
+    ///
+    /// A blanket implementation always returns `false`.
+    fn is_repairable(&self) -> bool {
+        false
+    }
 }
 
 /// <sup>[`async`](crate::asnc)</sup>

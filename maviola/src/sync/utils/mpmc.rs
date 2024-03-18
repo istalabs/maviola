@@ -552,13 +552,20 @@ mod tests {
         assert!(handler.join().unwrap().is_err());
     }
 
-    const RECV_TIMEOUT: Duration = Duration::from_millis(5);
+    // The duration should be long enough to test on slow machines, when running tests in parallel
+    // (like in the case of CI)
+    const WAIT_DURATION: Duration = Duration::from_millis(5);
+    // The duration should be long enough to test on slow machines, when running tests in parallel
+    // (like in the case of CI)
+    const WAIT_LONG_DURATION: Duration = Duration::from_millis(500);
+    // Duration for `recv_timeout` calls
+    const RECV_TIMEOUT: Duration = WAIT_DURATION;
 
     fn wait() {
-        thread::sleep(Duration::from_micros(1500));
+        thread::sleep(WAIT_DURATION);
     }
 
     fn wait_long() {
-        thread::sleep(Duration::from_millis(200));
+        thread::sleep(WAIT_LONG_DURATION);
     }
 }

@@ -4,6 +4,7 @@ pub mod closable;
 mod flipper;
 mod heartbeat;
 pub(crate) mod net;
+#[cfg(feature = "sync")]
 mod ring;
 pub(crate) mod sealed;
 #[cfg(test)]
@@ -23,4 +24,5 @@ pub(crate) use heartbeat::make_heartbeat_message;
 pub(crate) use sealed::Sealed;
 pub(crate) use unique_id::UniqueId;
 
+#[cfg(feature = "sync")]
 pub(crate) use ring::RingBuffer;

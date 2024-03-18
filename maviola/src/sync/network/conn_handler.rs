@@ -24,6 +24,7 @@ pub(super) struct NetworkConnectionHandler<V: MaybeVersioned + 'static> {
     state: Closer,
     info: ConnectionInfo,
     retry: Retry,
+    stop_on_node_down: bool,
     node_configs: HashMap<UniqueId, NodeConf<Proxy, V, ConnConf<V>>>,
     nodes: HashMap<UniqueId, Node<Proxy, V, SyncApi<V>>>,
     producer: IncomingFrameProducer<V>,
@@ -93,6 +94,7 @@ impl<V: MaybeVersioned + 'static> NetworkConnectionHandler<V> {
             state,
             info: network.info.clone(),
             retry: network.retry,
+            stop_on_node_down: network.stop_on_node_down,
             node_configs,
             nodes,
             producer: chan_factory.producer().clone(),
@@ -123,7 +125,9 @@ impl<V: MaybeVersioned + 'static> NetworkConnectionHandler<V> {
                         }
                     }
                     RestartNodeEvent::GiveUp(id) => {
-                        self.node_configs.remove(&id);
+                        if self.on_node_give_up(id).is_err() {
+                            break;
+                        }
                     }
                 }
             }
@@ -255,6 +259,23 @@ impl<V: MaybeVersioned + 'static> NetworkConnectionHandler<V> {
                     Retry::Never => unreachable!(),
                 }
             }
+        }
+
+        Ok(())
+    }
+
+    fn on_node_give_up(&mut self, id: UniqueId) -> Result<()> {
+        if let Some(conf) = self.node_configs.get(&id) {
+            log::info!(
+                "[{:?}] give up node {:?}",
+                self.info,
+                conf.connection().info()
+            );
+        }
+        self.node_configs.remove(&id);
+
+        if self.stop_on_node_down {
+            return Err(Error::from(NodeError::Inactive));
         }
 
         Ok(())

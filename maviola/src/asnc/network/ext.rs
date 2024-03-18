@@ -16,6 +16,7 @@ impl Network<Versionless, Unset> {
             info: ConnectionInfo::Network,
             nodes: Default::default(),
             retry: Default::default(),
+            stop_on_node_down: Default::default(),
             _version: PhantomData,
         }
     }
@@ -69,7 +70,7 @@ impl<V: MaybeVersioned> Network<V, AsyncConnConf<V>> {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[cfg(test)]
-mod async_network_tests {
+mod tests {
     use super::*;
 
     use std::time::Duration;
@@ -80,12 +81,10 @@ mod async_network_tests {
     use crate::dialects::minimal::messages::Heartbeat;
 
     const RECONNECT_INTERVAL: Duration = SERVER_HANG_UP_TIMEOUT;
-    // Should be at least 3-4 times bigger than `RECONNECT_INTERVAL`, to make sure that tests will
+    // Should be at least 3-4 times bigger than `RECONNECT_INTERVAL` to make sure that tests will
     // run in parallel
     const WAIT_DURATION: Duration = Duration::from_millis(250);
-    // Should be at least 10 times bigger than `RECONNECT_INTERVAL`, to make sure that tests will
-    // run in parallel
-    const RECV_TIMEOUT: Duration = Duration::from_millis(500);
+    const RECV_TIMEOUT: Duration = WAIT_DURATION;
 
     async fn wait() {
         tokio::time::sleep(WAIT_DURATION).await;
@@ -126,6 +125,7 @@ mod async_network_tests {
             .await
             .unwrap();
 
+        wait().await;
         server.send(&Heartbeat::default()).unwrap();
 
         let (frame, _) = client_1.recv_frame_timeout(RECV_TIMEOUT).await.unwrap();
@@ -159,14 +159,15 @@ mod async_network_tests {
             .unwrap();
         wait().await;
 
-        let network = Network::synchronous()
+        let network = Network::asynchronous()
             .add_connection(TcpClient::new(addr.as_str()).unwrap())
             .retry(Retry::Always(RECONNECT_INTERVAL));
         let client = Node::builder()
             .version::<V2>()
             .id(MavLinkId::new(1, 1))
-            .connection(network)
+            .async_connection(network)
             .build()
+            .await
             .unwrap();
         wait().await;
 
@@ -175,6 +176,7 @@ mod async_network_tests {
         let mut server = Node::try_from_async_conf(server_conf.clone())
             .await
             .unwrap();
+        wait().await;
 
         // This frame will be lost
         client.send(&Heartbeat::default()).unwrap();

@@ -2,7 +2,7 @@ use crate::core::io::{ConnectionInfo, Retry};
 use crate::core::marker::Proxy;
 use crate::core::node::NodeApi;
 use crate::core::utils::{Closable, SharedCloser, UniqueId};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 
 use crate::prelude::*;
 
@@ -12,7 +12,7 @@ pub(crate) struct NetworkConnState {
     pub(crate) connection: SharedCloser,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) struct NetworkConnInfo {
     pub(crate) network: ConnectionInfo,
     pub(crate) connection: ConnectionInfo,
@@ -27,6 +27,14 @@ pub(crate) enum RestartNodeEvent<V: MaybeVersioned + 'static, A: NodeApi<V>> {
 impl NetworkConnState {
     pub(crate) fn is_closed(&self) -> bool {
         self.network.is_closed() || self.connection.is_closed()
+    }
+}
+
+impl Debug for NetworkConnInfo {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NetworkConnInfo")
+            .field("connection", &self.connection)
+            .finish_non_exhaustive()
     }
 }
 

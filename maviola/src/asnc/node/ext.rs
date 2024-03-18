@@ -77,6 +77,14 @@ impl<K: NodeKind, V: MaybeVersioned + 'static> Node<K, V, AsyncApi<V>> {
     }
 
     /// <sup>[`async`](crate::asnc)</sup>
+    /// Attempts to receive the next node [`Event`] within a `timeout`.
+    ///
+    /// Blocks until event received or deadline is reached.
+    pub async fn recv_timeout(&mut self, timeout: Duration) -> Result<Event<V>> {
+        self.api.recv_event_timeout(timeout).await
+    }
+
+    /// <sup>[`async`](crate::asnc)</sup>
     /// Attempts to receive MAVLink [`Event`] without blocking.
     ///
     /// If you are interested only in valid incoming frames, use [`Node::try_recv_frame`] instead.
