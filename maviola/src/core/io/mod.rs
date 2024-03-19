@@ -25,22 +25,26 @@
 //! Low-level I/O primitives are re-exported from [Mavio](https://crates.io/crates/mavio), a
 //! low-level MAVLink library which serves as a basis for Maviola.
 
-mod broadcast;
 mod connection_conf;
 mod connection_info;
 mod core;
 mod retry;
+mod routing;
 mod transport;
 
 pub use transport::{FileReader, FileWriter, TcpClient, TcpServer, UdpClient, UdpServer};
 #[cfg(unix)]
 pub use transport::{SockClient, SockServer};
 
-pub(crate) use broadcast::BroadcastScope;
-pub use broadcast::OutgoingFrame;
 pub use connection_conf::ConnectionConf;
-pub use connection_info::{ChannelInfo, ConnectionInfo};
+pub use connection_info::{ChannelDetails, ChannelInfo, ConnectionDetails, ConnectionInfo};
 pub use retry::Retry;
+pub use routing::{BroadcastScope, ChannelId, ConnectionId};
+
+#[cfg(feature = "unstable")]
+pub use routing::{IncomingFrame, OutgoingFrame};
+#[cfg(not(feature = "unstable"))]
+pub(crate) use routing::{IncomingFrame, OutgoingFrame};
 
 #[cfg(feature = "sync")]
 /// <sup>[`mavio`](https://crates.io/crates/mavio) | `sync`</sup>

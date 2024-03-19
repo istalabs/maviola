@@ -15,7 +15,7 @@ use crate::protocol::{Behold, Peer};
 use crate::asnc::prelude::*;
 use crate::prelude::*;
 
-impl<K: NodeKind, V: MaybeVersioned + 'static> Node<K, V, AsyncApi<V>> {
+impl<K: NodeKind, V: MaybeVersioned> Node<K, V, AsyncApi<V>> {
     /// <sup>[`async`](crate::asnc)</sup>
     /// Instantiates node from asynchronous configuration.
     ///
@@ -161,7 +161,7 @@ impl<K: NodeKind, V: MaybeVersioned + 'static> Node<K, V, AsyncApi<V>> {
     }
 }
 
-impl<V: Versioned + 'static> Node<Edge<V>, V, AsyncApi<V>> {
+impl<V: Versioned> Node<Edge<V>, V, AsyncApi<V>> {
     /// <sup>[`async`](crate::asnc)</sup>
     /// Activates the node.
     ///

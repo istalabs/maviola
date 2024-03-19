@@ -14,7 +14,7 @@ use crate::prelude::*;
 use crate::sync::node::api::{EventReceiver, FrameSender};
 use crate::sync::prelude::*;
 
-impl<K: NodeKind, V: MaybeVersioned + 'static> Node<K, V, SyncApi<V>> {
+impl<K: NodeKind, V: MaybeVersioned> Node<K, V, SyncApi<V>> {
     /// <sup>[`sync`](crate::sync)</sup>
     /// Instantiates node from synchronous configuration.
     ///
@@ -145,7 +145,7 @@ impl<K: NodeKind, V: MaybeVersioned + 'static> Node<K, V, SyncApi<V>> {
     }
 }
 
-impl<V: Versioned + 'static> Node<Edge<V>, V, SyncApi<V>> {
+impl<V: Versioned> Node<Edge<V>, V, SyncApi<V>> {
     /// <sup>[`sync`](crate::sync)</sup>
     /// Activates the node.
     ///

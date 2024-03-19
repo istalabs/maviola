@@ -6,13 +6,13 @@ use tokio::net::{UnixListener, UnixStream};
 use crate::asnc::io::{Connection, ConnectionBuilder, ConnectionHandler};
 use crate::asnc::marker::AsyncConnConf;
 use crate::core::consts::SERVER_HANG_UP_TIMEOUT;
-use crate::core::io::{ChannelInfo, ConnectionConf, ConnectionInfo};
+use crate::core::io::{ChannelDetails, ConnectionConf, ConnectionInfo};
 use crate::core::utils::{Closable, Closer};
 
 use crate::prelude::*;
 
 #[async_trait]
-impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockServer {
+impl<V: MaybeVersioned> ConnectionBuilder<V> for SockServer {
     async fn build(&self) -> Result<(Connection<V>, ConnectionHandler)> {
         let path = self.path.clone();
         let listener = UnixListener::bind(self.path.as_path())?;
@@ -23,18 +23,16 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockServer {
         let info = self.info().clone();
 
         let handler = ConnectionHandler::spawn(async move {
-            on_close_handler(conn_state.to_closable(), path.clone(), info);
+            on_close_handler(conn_state.to_closable(), path.clone(), info.clone());
 
             while !conn_state.is_closed() {
                 let (stream, _) = listener.accept().await?;
 
                 let (reader, writer) = stream.into_split();
 
-                let channel = chan_factory.build(
-                    ChannelInfo::SockServer { path: path.clone() },
-                    reader,
-                    writer,
-                );
+                let chan_info =
+                    info.make_channel_info(ChannelDetails::SockServer { path: path.clone() });
+                let channel = chan_factory.build(chan_info, reader, writer);
                 channel.spawn().await.discard();
             }
 

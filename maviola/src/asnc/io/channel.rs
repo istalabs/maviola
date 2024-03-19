@@ -1,21 +1,19 @@
-use std::sync::Arc;
-
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::asnc::consts::{
     CHANNEL_STOP_JOIN_ATTEMPTS, CHANNEL_STOP_JOIN_POOLING_INTERVAL, CHANNEL_STOP_POOLING_INTERVAL,
 };
-use crate::asnc::io::{Callback, IncomingFrameProducer, OutgoingFrameHandler, OutgoingFrameSender};
-use crate::core::io::{AsyncReceiver, AsyncSender};
+use crate::asnc::io::{IncomingFrameProducer, OutgoingFrameHandler, OutgoingFrameSender};
+use crate::core::io::{AsyncReceiver, AsyncSender, IncomingFrame};
 use crate::core::io::{ChannelInfo, ConnectionInfo};
-use crate::core::utils::{Closable, SharedCloser, UniqueId};
+use crate::core::utils::{Closable, SharedCloser};
 
 use crate::prelude::*;
 
 /// <sup>[`async`](crate::asnc)</sup>
 /// Factory that produces a channels withing associated [`AsyncConnection`](super::Connection).
 #[derive(Debug)]
-pub struct ChannelFactory<V: MaybeVersioned + 'static> {
+pub struct ChannelFactory<V: MaybeVersioned> {
     pub(crate) info: ConnectionInfo,
     pub(crate) state: Closable,
     pub(crate) sender: OutgoingFrameSender<V>,
@@ -37,8 +35,7 @@ impl<V: MaybeVersioned> ChannelFactory<V> {
             info,
             reader,
             writer,
-            sender: self.sender.clone(),
-            send_handler: self.send_handler.resubscribe(),
+            send_handler: self.send_handler.clone(),
             producer: self.producer.clone(),
         }
     }
@@ -74,18 +71,17 @@ impl<V: MaybeVersioned> ChannelFactory<V> {
 ///
 /// Channels are constructed by [`ChannelFactory`] bound to a particular
 /// [`AsyncConnection`](super::Connection).
-pub struct Channel<V: MaybeVersioned + 'static, R: AsyncRead, W: AsyncWrite> {
+pub struct Channel<V: MaybeVersioned, R: AsyncRead, W: AsyncWrite> {
     conn_state: Closable,
     info: ChannelInfo,
     reader: R,
     writer: W,
-    sender: OutgoingFrameSender<V>,
     send_handler: OutgoingFrameHandler<V>,
     producer: IncomingFrameProducer<V>,
 }
 
 impl<
-        V: MaybeVersioned + 'static,
+        V: MaybeVersioned,
         R: AsyncRead + Send + Unpin + 'static,
         W: AsyncWrite + Send + Unpin + 'static,
     > Channel<V, R, W>
@@ -100,9 +96,8 @@ impl<
     /// If caller is not interested in managing this channel, then it is required to drop returned
     /// [`SharedCloser`] or replace it with the corresponding [`Closable`].
     pub async fn spawn(self) -> SharedCloser {
-        let id = UniqueId::new();
-        let info = Arc::new(self.info);
-        let conn_state = self.conn_state.clone();
+        let info = self.info;
+        let conn_state = self.conn_state;
         let state = SharedCloser::new();
 
         log::trace!("[{info:?}] spawning connection channel");
@@ -112,22 +107,18 @@ impl<
             let send_handler = self.send_handler;
             let frame_writer = AsyncSender::new(self.writer);
 
-            tokio::spawn(
-                async move { Self::write_handler(id, info, send_handler, frame_writer).await },
-            )
+            tokio::spawn(async move { Self::write_handler(info, send_handler, frame_writer).await })
         };
 
         let read_handler = {
             let conn_state = conn_state.clone();
             let state = state.clone();
             let info = info.clone();
-            let sender = self.sender;
             let producer = self.producer;
             let frame_reader = AsyncReceiver::new(self.reader);
 
             tokio::spawn(async move {
-                Self::read_handler(state, conn_state, id, info, sender, producer, frame_reader)
-                    .await
+                Self::read_handler(state, conn_state, info, producer, frame_reader).await
             })
         };
 
@@ -143,8 +134,7 @@ impl<
     }
 
     async fn write_handler(
-        id: UniqueId,
-        info: Arc<ChannelInfo>,
+        info: ChannelInfo,
         mut send_handler: OutgoingFrameHandler<V>,
         mut frame_writer: AsyncSender<W, V>,
     ) -> Result<()> {
@@ -157,7 +147,7 @@ impl<
                 }
             };
 
-            if !out_frame.should_send_to(id) {
+            if !out_frame.should_send_to(info.id()) {
                 continue;
             }
 
@@ -181,9 +171,7 @@ impl<
     async fn read_handler(
         state: SharedCloser,
         conn_state: Closable,
-        id: UniqueId,
-        info: Arc<ChannelInfo>,
-        sender: OutgoingFrameSender<V>,
+        info: ChannelInfo,
         producer: IncomingFrameProducer<V>,
         mut frame_reader: AsyncReceiver<R, V>,
     ) -> Result<()> {
@@ -207,12 +195,7 @@ impl<
             };
             log::trace!("[{info:?}] received incoming frame");
 
-            let info = info.clone();
-            let send_tx = sender.clone();
-
-            let response = Callback::new(id, info.clone(), send_tx);
-
-            producer.send((frame, response))?;
+            producer.send(IncomingFrame::new(frame, info.clone()))?;
             log::trace!("[{info:?}] sent incoming frame to API");
         }
     }
@@ -220,7 +203,7 @@ impl<
     async fn handle_stop(
         mut state: SharedCloser,
         conn_state: Closable,
-        info: Arc<ChannelInfo>,
+        info: ChannelInfo,
         write_handler: tokio::task::JoinHandle<Result<()>>,
         read_handler: tokio::task::JoinHandle<Result<()>>,
     ) {

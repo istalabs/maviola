@@ -28,11 +28,6 @@ pub struct FrameProcessorBuilder {
 }
 
 impl FrameProcessor {
-    /// Creates a new empty frame processor.
-    pub(crate) fn new() -> Self {
-        FrameProcessor::default()
-    }
-
     /// Creates an empty builder for the frame processor.
     pub(crate) fn builder() -> FrameProcessorBuilder {
         FrameProcessorBuilder::default()

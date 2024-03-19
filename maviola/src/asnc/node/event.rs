@@ -27,13 +27,13 @@ pub enum Event<V: MaybeVersioned> {
     Invalid(Frame<V>, FrameError, Callback<V>),
 }
 
-pub(crate) struct EventStream<V: MaybeVersioned + 'static> {
+pub(crate) struct EventStream<V: MaybeVersioned> {
     inner: ReusableBoxFuture<'static, (RecvResult<V>, EventReceiver<V>, Closable)>,
 }
 
 type RecvResult<V> = core::result::Result<Event<V>, RecvError>;
 
-impl<V: MaybeVersioned + 'static> EventStream<V> {
+impl<V: MaybeVersioned> EventStream<V> {
     pub(crate) fn new(rx: EventReceiver<V>, state: Closable) -> Self {
         Self {
             inner: ReusableBoxFuture::new(make_future(rx, state)),
@@ -41,7 +41,7 @@ impl<V: MaybeVersioned + 'static> EventStream<V> {
     }
 }
 
-async fn make_future<V: MaybeVersioned + 'static>(
+async fn make_future<V: MaybeVersioned>(
     mut rx: EventReceiver<V>,
     state: Closable,
 ) -> (RecvResult<V>, EventReceiver<V>, Closable) {
@@ -72,7 +72,7 @@ async fn make_future<V: MaybeVersioned + 'static>(
     handler.await.unwrap()
 }
 
-impl<V: MaybeVersioned + 'static> Stream for EventStream<V> {
+impl<V: MaybeVersioned> Stream for EventStream<V> {
     type Item = Event<V>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -103,7 +103,7 @@ mod async_event_tests {
     #[tokio::test]
     async fn test_event_stream() {
         let (tx, rx) = mpmc::channel(2);
-        let event_receiver = EventReceiver::new(rx, Arc::new(FrameProcessor::new()));
+        let event_receiver = EventReceiver::new(rx, Arc::new(FrameProcessor::default()));
         let state = Closer::new();
 
         let mut stream: EventStream<V2> = EventStream::new(event_receiver, state.to_closable());

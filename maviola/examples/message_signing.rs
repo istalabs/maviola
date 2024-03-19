@@ -54,7 +54,7 @@ fn server_receive_unsigned_and_respond_signed(server: EdgeNode<V2>) -> Result<()
                     "[server] received signed frame with link ID: {}",
                     frame.link_id().unwrap()
                 );
-                callback.respond_others(&frame).unwrap();
+                callback.broadcast(&frame).unwrap();
                 log::info!("[server] respond with signed frames to everyone but sender");
                 break;
             }

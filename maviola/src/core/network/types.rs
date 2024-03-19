@@ -18,7 +18,7 @@ pub(crate) struct NetworkConnInfo {
     pub(crate) connection: ConnectionInfo,
 }
 
-pub(crate) enum RestartNodeEvent<V: MaybeVersioned + 'static, A: NodeApi<V>> {
+pub(crate) enum RestartNodeEvent<V: MaybeVersioned, A: NodeApi<V>> {
     New(UniqueId, Node<Proxy, V, A>),
     Retry(UniqueId, Retry),
     GiveUp(UniqueId),

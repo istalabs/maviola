@@ -9,7 +9,7 @@ use crate::sync::node::api::FrameSender;
 
 use crate::prelude::*;
 
-pub(in crate::sync::node) struct HeartbeatEmitter<V: Versioned + 'static> {
+pub(in crate::sync::node) struct HeartbeatEmitter<V: Versioned> {
     pub(in crate::sync::node) info: ConnectionInfo,
     pub(in crate::sync::node) endpoint: Endpoint<V>,
     pub(in crate::sync::node) interval: Duration,
@@ -18,7 +18,7 @@ pub(in crate::sync::node) struct HeartbeatEmitter<V: Versioned + 'static> {
     pub(in crate::sync::node) _version: PhantomData<V>,
 }
 
-impl<V: Versioned + 'static> HeartbeatEmitter<V> {
+impl<V: Versioned> HeartbeatEmitter<V> {
     pub(in crate::sync::node) fn spawn(self, mut is_active: Guarded<SharedCloser, Switch>) {
         let heartbeat_message = make_heartbeat_message(self.dialect_version);
 

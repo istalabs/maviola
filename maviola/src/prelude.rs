@@ -2,10 +2,10 @@
 //!
 //! This module contains basic imports for Maviola.
 
-pub use crate::core::error::{Error, Result};
+pub use crate::core::error::{Error, Result, SendResult};
 pub use crate::core::error::{FrameError, NodeError, SyncError};
 pub use crate::core::network::Network;
-pub use crate::core::node::Node;
+pub use crate::core::node::{CallbackApi, Node};
 pub use crate::dialects::Minimal;
 pub use crate::protocol::{
     CompatProcessor, CompatStrategy, Dialect, Endpoint, Frame, FrameSigner, MavLinkId,

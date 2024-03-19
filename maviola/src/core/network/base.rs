@@ -1,4 +1,4 @@
-use crate::core::io::{ConnectionConf, ConnectionInfo, Retry};
+use crate::core::io::{ConnectionConf, ConnectionDetails, ConnectionInfo, Retry};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
@@ -83,7 +83,7 @@ use crate::prelude::*;
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Network<V: MaybeVersioned + 'static, C: MaybeConnConf> {
+pub struct Network<V: MaybeVersioned, C: MaybeConnConf> {
     pub(crate) info: ConnectionInfo,
     pub(crate) nodes: HashMap<UniqueId, NodeConf<Proxy, V, C>>,
     pub(crate) retry: Retry,
@@ -91,11 +91,11 @@ pub struct Network<V: MaybeVersioned + 'static, C: MaybeConnConf> {
     pub(crate) _version: PhantomData<V>,
 }
 
-impl<V: MaybeVersioned + 'static, C: MaybeConnConf> Network<V, C> {
+impl<V: MaybeVersioned, C: MaybeConnConf> Network<V, C> {
     /// Creates a new network.
     pub fn new() -> Self {
         Self {
-            info: ConnectionInfo::Network,
+            info: ConnectionInfo::new(ConnectionDetails::Network),
             nodes: Default::default(),
             retry: Default::default(),
             stop_on_node_down: Default::default(),
@@ -140,7 +140,7 @@ impl<V: MaybeVersioned + 'static, C: MaybeConnConf> Network<V, C> {
     }
 }
 
-impl<V: MaybeVersioned + 'static, C: MaybeConnConf> ConnectionConf for Network<V, C> {
+impl<V: MaybeVersioned, C: MaybeConnConf> ConnectionConf for Network<V, C> {
     fn info(&self) -> &ConnectionInfo {
         &self.info
     }

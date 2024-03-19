@@ -2,11 +2,13 @@
 
 pub(in crate::asnc) mod api;
 mod build_ext;
+mod callback;
 mod event;
 mod ext;
 pub(super) mod handler;
 
 pub use api::AsyncApi;
+pub use callback::Callback;
 pub use event::Event;
 
 use crate::core::marker::{Edge, Proxy};

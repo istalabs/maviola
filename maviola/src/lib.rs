@@ -75,7 +75,7 @@
 //!             if let Ok(Minimal::Heartbeat(msg)) = frame.decode::<Minimal>() {
 //!                 // Respond with the same heartbeat message to all clients,
 //!                 // except the one that sent this message
-//!                 callback.respond_others(&server.next_frame(&msg)?)?;
+//!                 callback.broadcast(&server.next_frame(&msg)?)?;
 //!             }
 //!         }
 //!         Event::Invalid(frame, err, callback) => {
@@ -136,7 +136,7 @@
 //!             if let Ok(Minimal::Heartbeat(msg)) = frame.decode::<Minimal>() {
 //!                 // Respond with the same heartbeat message to all clients,
 //!                 // except the one that sent this message
-//!                 callback.respond_others(&server.next_frame(&msg)?)?;
+//!                 callback.broadcast(&server.next_frame(&msg)?)?;
 //!             }
 //!         }
 //!         Event::Invalid(frame, err, callback) => {

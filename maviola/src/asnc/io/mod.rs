@@ -13,33 +13,30 @@
 //! In most cases channels and connections are hidden to library user. Dealing with these
 //! abstractions is necessary only to those who are interested in creating custom connections.
 
-mod callback;
+mod bus;
 mod channel;
 mod connection;
 mod transport;
-mod types;
 
-pub use callback::Callback;
+pub(super) use bus::{incoming_channel, outgoing_channel};
 
+/// <sup>`⍚` |</sup>
+#[cfg(feature = "unstable")]
+pub use bus::{
+    IncomingFrameProducer, IncomingFrameReceiver, OutgoingFrameHandler, OutgoingFrameSender,
+};
 /// <sup>`⍚` |</sup>
 #[cfg(feature = "unstable")]
 pub use channel::{Channel, ChannelFactory};
 /// <sup>`⍚` |</sup>
 #[cfg(feature = "unstable")]
 pub use connection::{Connection, ConnectionBuilder, ConnectionHandler};
-/// <sup>`⍚` |</sup>
-#[cfg(feature = "unstable")]
-pub use types::{
-    IncomingFrameProducer, IncomingFrameReceiver, OutgoingFrameHandler, OutgoingFrameSender,
-};
 
 #[cfg(not(feature = "unstable"))]
-pub(crate) use channel::ChannelFactory;
-#[cfg(not(feature = "unstable"))]
-pub(crate) use connection::{Connection, ConnectionBuilder, ConnectionHandler};
-#[cfg(not(feature = "unstable"))]
-pub(crate) use types::{
+pub(in crate::asnc) use bus::{
     IncomingFrameProducer, IncomingFrameReceiver, OutgoingFrameHandler, OutgoingFrameSender,
 };
-
-pub(crate) use connection::{ConnReceiver, ConnSender};
+#[cfg(not(feature = "unstable"))]
+pub(in crate::asnc) use channel::ChannelFactory;
+#[cfg(not(feature = "unstable"))]
+pub(in crate::asnc) use connection::{Connection, ConnectionBuilder, ConnectionHandler};

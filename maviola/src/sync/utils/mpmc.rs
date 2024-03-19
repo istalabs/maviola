@@ -40,7 +40,10 @@ use std::sync::{mpsc, Arc, RwLock};
 use std::thread;
 use std::time::Duration;
 
-use crate::core::error::{RecvError, RecvTimeoutError, SendError, TryRecvError};
+use crate::core::error::{
+    RecvError, RecvResult, RecvTimeoutError, RecvTimeoutResult, SendError, SendResult,
+    TryRecvError, TryRecvResult,
+};
 use crate::core::utils::{Closable, Closer, RingBuffer, UniqueId};
 
 const POOLING_TIMEOUT: Duration = Duration::from_micros(50);
@@ -89,7 +92,7 @@ impl<T> Sender<T> {
     /// not be sent.
     ///
     /// Behaves identical to [`mpsc::Sender::send`], but returns [`SendError`].
-    pub fn send(&self, value: T) -> Result<(), SendError<T>> {
+    pub fn send(&self, value: T) -> SendResult<T> {
         if self.state.is_closed() {
             return Err(SendError(value));
         }
@@ -128,7 +131,7 @@ impl<T: Clone + Sync + Send + 'static> Receiver<T> {
     /// corresponding channel has hung up.
     ///
     /// Behaves identical to [`mpsc::Receiver::recv`] but returns [`RecvError`].
-    pub fn recv(&self) -> Result<T, RecvError> {
+    pub fn recv(&self) -> RecvResult<T> {
         self.inner.recv().map_err(RecvError::from)
     }
 
@@ -136,7 +139,7 @@ impl<T: Clone + Sync + Send + 'static> Receiver<T> {
     /// corresponding channel has hung up, or if it waits more than `timeout`.
     ///
     /// Behaves identical to [`mpsc::Receiver::recv_timeout`] but returns [`RecvTimeoutError`].
-    pub fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError> {
+    pub fn recv_timeout(&self, timeout: Duration) -> RecvTimeoutResult<T> {
         self.inner
             .recv_timeout(timeout)
             .map_err(RecvTimeoutError::from)
@@ -145,7 +148,7 @@ impl<T: Clone + Sync + Send + 'static> Receiver<T> {
     /// Attempts to return a pending value on this receiver without blocking.
     ///
     /// Behaves identical to [`mpsc::Receiver::try_recv`] but returns [`TryRecvError`].
-    pub fn try_recv(&self) -> Result<T, TryRecvError> {
+    pub fn try_recv(&self) -> TryRecvResult<T> {
         self.inner.try_recv().map_err(TryRecvError::from)
     }
 

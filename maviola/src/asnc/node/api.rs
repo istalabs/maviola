@@ -8,13 +8,16 @@ use tokio::sync::RwLock;
 use tokio_stream::Stream;
 
 use crate::asnc::consts::CONN_BROADCAST_CHAN_CAPACITY;
-use crate::asnc::io::{Callback, ConnReceiver, ConnSender, Connection, ConnectionHandler};
+use crate::asnc::io::{Connection, ConnectionHandler, IncomingFrameReceiver, OutgoingFrameSender};
 use crate::asnc::node::event::EventStream;
 use crate::asnc::node::handler::{HeartbeatEmitter, InactivePeersHandler, IncomingFramesHandler};
 use crate::asnc::node::Event;
-use crate::core::error::{RecvError, RecvTimeoutError, SendError, TryRecvError};
-use crate::core::io::{ConnectionInfo, OutgoingFrame};
-use crate::core::node::NodeApi;
+use crate::core::error::{
+    RecvError, RecvResult, RecvTimeoutError, RecvTimeoutResult, SendError, TryRecvError,
+    TryRecvResult,
+};
+use crate::core::io::{BroadcastScope, ConnectionInfo, IncomingFrame, OutgoingFrame};
+use crate::core::node::{NodeApi, NodeApiInternal};
 use crate::core::utils::{Guarded, Sealed, SharedCloser, Switch};
 use crate::protocol::{DialectVersion, Endpoint, FrameProcessor, Peer};
 
@@ -23,7 +26,7 @@ use crate::prelude::*;
 
 /// <sup>[`async`](crate::asnc)</sup>
 /// Synchronous API for MAVLink [`Node`].
-pub struct AsyncApi<V: MaybeVersioned + 'static> {
+pub struct AsyncApi<V: MaybeVersioned> {
     connection: Connection<V>,
     sender: FrameSender<V>,
     receiver: FrameReceiver<V>,
@@ -33,8 +36,8 @@ pub struct AsyncApi<V: MaybeVersioned + 'static> {
     event_receiver: EventReceiver<V>,
 }
 
-impl<V: MaybeVersioned + 'static> Sealed for AsyncApi<V> {}
-impl<V: MaybeVersioned + 'static> NodeApi<V> for AsyncApi<V> {
+impl<V: MaybeVersioned> Sealed for AsyncApi<V> {}
+impl<V: MaybeVersioned> NodeApiInternal<V> for AsyncApi<V> {
     #[inline(always)]
     fn info(&self) -> &ConnectionInfo {
         self.connection.info()
@@ -46,17 +49,23 @@ impl<V: MaybeVersioned + 'static> NodeApi<V> for AsyncApi<V> {
     }
 
     #[inline(always)]
+    fn route_frame(&self, frame: &Frame<V>, scope: BroadcastScope) -> Result<()> {
+        self.route_frame(frame, scope)
+    }
+
+    #[inline(always)]
     fn processor(&self) -> &FrameProcessor {
         self.processor()
     }
 }
+impl<V: MaybeVersioned> NodeApi<V> for AsyncApi<V> {}
 
-impl<V: MaybeVersioned + 'static> AsyncApi<V> {
+impl<V: MaybeVersioned> AsyncApi<V> {
     pub(super) fn new(connection: Connection<V>, processor: Arc<FrameProcessor>) -> Self {
         let (events_tx, events_rx) = mpmc::channel(CONN_BROADCAST_CHAN_CAPACITY);
 
         let sender = FrameSender::new(connection.sender(), processor.clone());
-        let receiver = FrameReceiver::new(connection.receiver(), processor.clone());
+        let receiver = FrameReceiver::new(connection.receiver(), sender.clone(), processor.clone());
         let event_receiver = EventReceiver::new(events_rx, processor.clone());
 
         AsyncApi {
@@ -104,6 +113,10 @@ impl<V: MaybeVersioned + 'static> AsyncApi<V> {
 
     pub(super) fn send_frame(&self, frame: &Frame<V>) -> Result<()> {
         self.sender.send(frame)
+    }
+
+    pub(super) fn route_frame(&self, frame: &Frame<V>, scope: BroadcastScope) -> Result<()> {
+        self.sender.send_scoped(frame, scope)
     }
 
     pub(super) fn frame_sender(&self) -> &FrameSender<V> {
@@ -169,6 +182,7 @@ impl<V: MaybeVersioned + 'static> AsyncApi<V> {
             peers: self.peers.clone(),
             receiver: self.connection.receiver(),
             event_sender: self.event_sender.clone(),
+            sender: self.sender.clone(),
         };
         handler.spawn(self.connection.share_state().to_closable());
     }
@@ -197,7 +211,7 @@ impl<V: Versioned> AsyncApi<V> {
             info: self.info().clone(),
             endpoint,
             interval,
-            sender: self.connection.sender(),
+            sender: self.sender.clone(),
             dialect_version,
             _version: PhantomData::<V>,
         };
@@ -209,15 +223,16 @@ impl<V: Versioned> AsyncApi<V> {
 //                                 PRIVATE                                   //
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
-pub(in crate::asnc) struct FrameSender<V: MaybeVersioned + 'static> {
-    inner: ConnSender<V>,
+#[derive(Clone, Debug)]
+pub(in crate::asnc) struct FrameSender<V: MaybeVersioned> {
+    inner: OutgoingFrameSender<V>,
     processor: Arc<FrameProcessor>,
 }
 
-pub(super) struct FrameReceiver<V: MaybeVersioned + 'static> {
-    inner: ConnReceiver<V>,
+pub(super) struct FrameReceiver<V: MaybeVersioned> {
+    receiver: IncomingFrameReceiver<V>,
     processor: Arc<FrameProcessor>,
+    sender: FrameSender<V>,
 }
 
 #[derive(Clone)]
@@ -226,13 +241,13 @@ pub(super) struct EventSender<V: MaybeVersioned> {
 }
 
 #[derive(Clone)]
-pub(in crate::asnc) struct EventReceiver<V: MaybeVersioned + 'static> {
+pub(in crate::asnc) struct EventReceiver<V: MaybeVersioned> {
     inner: mpmc::Receiver<Event<V>>,
     processor: Arc<FrameProcessor>,
 }
 
-impl<V: MaybeVersioned + 'static> FrameSender<V> {
-    pub(super) fn new(sender: ConnSender<V>, processor: Arc<FrameProcessor>) -> Self {
+impl<V: MaybeVersioned> FrameSender<V> {
+    pub(super) fn new(sender: OutgoingFrameSender<V>, processor: Arc<FrameProcessor>) -> Self {
         Self {
             inner: sender,
             processor,
@@ -242,34 +257,54 @@ impl<V: MaybeVersioned + 'static> FrameSender<V> {
     pub(super) fn send(&self, frame: &Frame<V>) -> Result<()> {
         let mut frame = frame.clone();
         self.processor.process_outgoing(&mut frame)?;
-        self.inner.send(frame)
+        self.inner.send(frame).map_err(Error::from)
+    }
+
+    fn send_scoped(&self, frame: &Frame<V>, scope: BroadcastScope) -> Result<()> {
+        let mut frame = frame.clone();
+        self.processor.process_outgoing(&mut frame)?;
+        self.inner
+            .send_raw(OutgoingFrame::scoped(frame, scope))
+            .map_err(Error::from)
     }
 
     pub(in crate::asnc) fn send_raw(
         &self,
         frame: OutgoingFrame<V>,
-    ) -> core::result::Result<(), SendError<OutgoingFrame<V>>> {
+    ) -> SendResult<OutgoingFrame<V>> {
         self.inner.send_raw(frame)
+    }
+
+    pub(in crate::asnc) fn processor(&self) -> &FrameProcessor {
+        self.processor.as_ref()
+    }
+
+    pub(in crate::asnc) fn set_processor(&mut self, processor: Arc<FrameProcessor>) {
+        self.processor = processor;
     }
 }
 
-impl<V: MaybeVersioned + 'static> FrameReceiver<V> {
-    pub(super) fn new(receiver: ConnReceiver<V>, processor: Arc<FrameProcessor>) -> Self {
+impl<V: MaybeVersioned> FrameReceiver<V> {
+    pub(super) fn new(
+        receiver: IncomingFrameReceiver<V>,
+        sender: FrameSender<V>,
+        processor: Arc<FrameProcessor>,
+    ) -> Self {
         Self {
-            inner: receiver,
+            receiver,
             processor,
+            sender,
         }
     }
 
-    pub(super) async fn recv(
-        &mut self,
-    ) -> core::result::Result<(Frame<V>, Callback<V>), RecvError> {
+    pub(super) async fn recv(&mut self) -> RecvResult<(Frame<V>, Callback<V>)> {
         loop {
-            return match self.inner.recv().await {
-                Ok((mut frame, mut callback)) => {
-                    if self.process_frame(&mut frame, &mut callback).is_err() {
-                        continue;
-                    }
+            return match self.receiver.recv().await {
+                Ok(frame) => {
+                    let (frame, callback) = match self.process_frame(frame) {
+                        Ok(value) => value,
+                        Err(_) => continue,
+                    };
                     Ok((frame, callback))
                 }
                 Err(err) => Err(err),
@@ -280,13 +315,14 @@ impl<V: MaybeVersioned + 'static> FrameReceiver<V> {
     pub(super) async fn recv_timeout(
         &mut self,
         timeout: Duration,
-    ) -> core::result::Result<(Frame<V>, Callback<V>), RecvTimeoutError> {
+    ) -> RecvTimeoutResult<(Frame<V>, Callback<V>)> {
         loop {
-            return match self.inner.recv_timeout(timeout).await {
-                Ok((mut frame, mut callback)) => {
-                    if self.process_frame(&mut frame, &mut callback).is_err() {
-                        continue;
-                    }
+            return match self.receiver.recv_timeout(timeout).await {
+                Ok(frame) => {
+                    let (frame, callback) = match self.process_frame(frame) {
+                        Ok(value) => value,
+                        Err(_) => continue,
+                    };
                     Ok((frame, callback))
                 }
                 Err(err) => Err(err),
@@ -294,24 +330,24 @@ impl<V: MaybeVersioned + 'static> FrameReceiver<V> {
         }
     }
 
-    pub(super) fn try_recv(
-        &mut self,
-    ) -> core::result::Result<(Frame<V>, Callback<V>), TryRecvError> {
-        match self.inner.try_recv() {
-            Ok((mut frame, mut callback)) => {
-                if self.process_frame(&mut frame, &mut callback).is_err() {
-                    return Err(TryRecvError::Empty);
-                }
+    pub(super) fn try_recv(&mut self) -> TryRecvResult<(Frame<V>, Callback<V>)> {
+        match self.receiver.try_recv() {
+            Ok(frame) => {
+                let (frame, callback) = match self.process_frame(frame) {
+                    Ok(value) => value,
+                    Err(_) => return Err(TryRecvError::Empty),
+                };
                 Ok((frame, callback))
             }
             Err(err) => Err(err),
         }
     }
 
-    fn process_frame(&self, frame: &mut Frame<V>, callback: &mut Callback<V>) -> Result<()> {
-        callback.set_processor(self.processor.clone());
-        self.processor.process_incoming(frame)?;
-        Ok(())
+    fn process_frame(&self, frame: IncomingFrame<V>) -> Result<(Frame<V>, Callback<V>)> {
+        let (mut frame, channel) = frame.into();
+        self.processor.process_incoming(&mut frame)?;
+        let callback = Callback::new(channel, self.sender.clone());
+        Ok((frame, callback))
     }
 }
 

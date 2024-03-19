@@ -12,14 +12,14 @@ pub struct AsyncConnConf<V: MaybeVersioned>(pub(crate) Box<dyn ConnectionBuilder
 unsafe impl<V: MaybeVersioned> Sync for AsyncConnConf<V> {}
 
 impl<V: MaybeVersioned> Sealed for AsyncConnConf<V> {}
-impl<V: MaybeVersioned + 'static> HasConnConf for AsyncConnConf<V> {
+impl<V: MaybeVersioned> HasConnConf for AsyncConnConf<V> {
     fn is_repairable(&self) -> bool {
         self.0.is_repairable()
     }
 }
 impl<V: MaybeVersioned> MaybeConnConf for AsyncConnConf<V> {}
 
-impl<V: MaybeVersioned + 'static> AsyncConnConf<V> {
+impl<V: MaybeVersioned> AsyncConnConf<V> {
     pub(in crate::asnc) fn new(builder: impl ConnectionBuilder<V> + 'static) -> Self {
         Self(Box::new(builder))
     }
@@ -29,7 +29,7 @@ impl<V: MaybeVersioned + 'static> AsyncConnConf<V> {
     }
 }
 
-impl<V: MaybeVersioned + 'static> Clone for AsyncConnConf<V> {
+impl<V: MaybeVersioned> Clone for AsyncConnConf<V> {
     fn clone(&self) -> Self {
         self.0.to_conf()
     }

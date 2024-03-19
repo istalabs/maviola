@@ -18,7 +18,7 @@ pub(in crate::sync::node) struct InactivePeersHandler<V: MaybeVersioned> {
     pub(in crate::sync::node) event_sender: EventSender<V>,
 }
 
-impl<V: MaybeVersioned + 'static> InactivePeersHandler<V> {
+impl<V: MaybeVersioned> InactivePeersHandler<V> {
     pub(in crate::sync::node) fn spawn(self, state: Closable) {
         thread::spawn(move || {
             while !state.is_closed() {

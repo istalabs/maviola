@@ -1,6 +1,6 @@
 use std::net::{SocketAddr, ToSocketAddrs};
 
-use crate::core::io::{ConnectionConf, ConnectionInfo};
+use crate::core::io::{ConnectionConf, ConnectionDetails, ConnectionInfo};
 use crate::core::utils::net::resolve_socket_addr;
 
 use crate::prelude::*;
@@ -67,7 +67,7 @@ impl TcpServer {
     /// available.
     pub fn new(addr: impl ToSocketAddrs) -> Result<Self> {
         let addr = resolve_socket_addr(addr)?;
-        let info = ConnectionInfo::TcpServer { bind_addr: addr };
+        let info = ConnectionInfo::new(ConnectionDetails::TcpServer { bind_addr: addr });
         Ok(Self { addr, info })
     }
 }

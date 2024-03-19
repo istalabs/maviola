@@ -5,13 +5,13 @@ use tokio::io::BufReader;
 use crate::asnc::io::{Connection, ConnectionBuilder, ConnectionHandler};
 use crate::asnc::marker::AsyncConnConf;
 use crate::asnc::utils::BusyWriter;
-use crate::core::io::ChannelInfo;
+use crate::core::io::ChannelDetails;
 use crate::core::utils::SharedCloser;
 
 use crate::prelude::*;
 
 #[async_trait]
-impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for FileReader {
+impl<V: MaybeVersioned> ConnectionBuilder<V> for FileReader {
     async fn build(&self) -> Result<(Connection<V>, ConnectionHandler)> {
         let path = self.path.clone();
         let file = File::open(path.as_path()).await?;
@@ -21,7 +21,10 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for FileReader {
 
         let (connection, chan_factory) = Connection::new(self.info.clone(), SharedCloser::new());
 
-        let channel = chan_factory.build(ChannelInfo::FileReader { path }, reader, writer);
+        let chan_info = connection
+            .info()
+            .make_channel_info(ChannelDetails::FileReader { path });
+        let channel = chan_factory.build(chan_info, reader, writer);
         let channel_state = channel.spawn().await;
 
         let handler = ConnectionHandler::spawn_from_state(channel_state);

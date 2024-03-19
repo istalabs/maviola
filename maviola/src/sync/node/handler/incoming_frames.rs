@@ -2,38 +2,45 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::thread;
 
-use crate::core::error::TryRecvError;
+use crate::core::consts::INCOMING_FRAMES_POOLING_INTERVAL;
+use crate::core::error::RecvTimeoutError;
 use crate::core::io::ConnectionInfo;
 use crate::core::utils::Closable;
 use crate::protocol::Peer;
-use crate::sync::io::{Callback, ConnReceiver};
-use crate::sync::node::api::EventSender;
-use crate::sync::node::Event;
+use crate::sync::io::IncomingFrameReceiver;
+use crate::sync::node::api::{EventSender, FrameSender};
+use crate::sync::node::{Callback, Event};
 
 use crate::prelude::*;
 
-pub(in crate::sync::node) struct IncomingFramesHandler<V: MaybeVersioned + 'static> {
+pub(in crate::sync::node) struct IncomingFramesHandler<V: MaybeVersioned> {
     pub(in crate::sync::node) info: ConnectionInfo,
     pub(in crate::sync::node) peers: Arc<RwLock<HashMap<MavLinkId, Peer>>>,
-    pub(in crate::sync::node) receiver: ConnReceiver<V>,
+    pub(in crate::sync::node) receiver: IncomingFrameReceiver<V>,
     pub(in crate::sync::node) event_sender: EventSender<V>,
+    pub(in crate::sync::node) sender: FrameSender<V>,
 }
 
-impl<V: MaybeVersioned + 'static> IncomingFramesHandler<V> {
+impl<V: MaybeVersioned> IncomingFramesHandler<V> {
     pub(in crate::sync::node) fn spawn(self, state: Closable) {
         thread::spawn(move || {
             let info = &self.info;
 
             while !state.is_closed() {
-                let (frame, callback) = match self.receiver.try_recv() {
-                    Ok((frame, callback)) => (frame, callback),
-                    Err(err) => match err {
-                        TryRecvError::Disconnected => {
-                            break;
+                let (frame, callback) =
+                    match self.receiver.recv_timeout(INCOMING_FRAMES_POOLING_INTERVAL) {
+                        Ok(frame) => {
+                            let (frame, channel) = frame.into();
+                            let callback = Callback::new(channel, self.sender.clone());
+                            (frame, callback)
                         }
-                        _ => continue,
-                    },
-                };
+                        Err(err) => match err {
+                            RecvTimeoutError::Disconnected => {
+                                break;
+                            }
+                            _ => continue,
+                        },
+                    };
 
                 if let Ok(Minimal::Heartbeat(_)) = frame.decode() {
                     let peer = Peer::new(frame.system_id(), frame.component_id());

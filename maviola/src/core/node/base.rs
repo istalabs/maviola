@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::core::io::ConnectionInfo;
+use crate::core::io::{BroadcastScope, ConnectionInfo};
 use crate::core::marker::{Edge, NodeKind, Proxy, Unset};
 use crate::core::node::api::{NoApi, NodeApi};
 use crate::core::node::NodeBuilder;
@@ -163,7 +163,7 @@ use crate::prelude::*;
 ///     .build().await.unwrap();
 /// # }
 /// ```
-pub struct Node<K: NodeKind, V: MaybeVersioned + 'static, A: NodeApi<V>> {
+pub struct Node<K: NodeKind, V: MaybeVersioned, A: NodeApi<V>> {
     pub(crate) kind: K,
     pub(crate) api: A,
     pub(crate) state: SharedCloser,
@@ -181,7 +181,7 @@ impl Node<Proxy, Versionless, NoApi> {
     }
 }
 
-impl<K: NodeKind, V: MaybeVersioned + 'static, A: NodeApi<V>> Node<K, V, A> {
+impl<K: NodeKind, V: MaybeVersioned, A: NodeApi<V>> Node<K, V, A> {
     /// Information about this node's connection.
     pub fn info(&self) -> &ConnectionInfo {
         self.api.info()
@@ -216,7 +216,7 @@ impl<K: NodeKind, V: MaybeVersioned + 'static, A: NodeApi<V>> Node<K, V, A> {
     }
 
     /// Returns a reference to [`FrameProcessor`], that is responsible for message signing,
-    /// compatibility and incompatibility flags.
+    /// compatibility and incompatibility flags, and custom message processing.
     #[inline(always)]
     pub fn processor(&self) -> &FrameProcessor {
         self.api.processor()
@@ -244,15 +244,9 @@ impl<K: NodeKind, V: MaybeVersioned + 'static, A: NodeApi<V>> Node<K, V, A> {
         !self.state.is_closed()
     }
 
-    /// Send MAVLink [`Frame`].
+    /// Sends MAVLink [`Frame`].
     ///
-    /// The [`Frame`] will be sent with as many fields preserved as possible. However, the
-    /// following properties could be updated based on the [`Node::signer`] configuration
-    /// (`MAVLink 2` frames only):
-    ///
-    /// * [`signature`](Frame::signature)
-    /// * [`link_id`](Frame::link_id)
-    /// * [`timestamp`](Frame::timestamp)
+    /// The [`Frame`] may be transformed according to [`Node::processor`] configuration.
     ///
     /// To send MAVLink messages instead of raw frames, construct an [`Edge`] node and use
     /// [`Node::send_versioned`] for node which is [`Versionless`] and [`Node::send`] for
@@ -262,14 +256,16 @@ impl<K: NodeKind, V: MaybeVersioned + 'static, A: NodeApi<V>> Node<K, V, A> {
         self.api.send_frame(frame)
     }
 
-    /// Attempts to send versionless MAVLink frame.
+    /// Broadcasts MAVLink frame according to the specified broadcast `scope`.
     ///
-    /// Similar to [`Node::send_frame`], except it accepts only [`Versionless`] frames and tries
-    /// to convert them into a supported versioned form. If conversion is not possible, the method
-    /// will return [`FrameError::Version`] variant of [`Error::Frame`].
-    pub fn send_versionless_frame(&self, frame: &Frame<Versionless>) -> Result<()> {
-        let frame = frame.try_to_versioned::<V>()?;
-        self.send_frame(&frame)
+    /// Using [`BroadcastScope::All`] is similar to just calling [`Node::send_frame`].
+    ///
+    /// To broadcast MAVLink messages instead of raw frames, construct an [`Edge`] node and use
+    /// [`Node::broadcast_versioned`] for node which is [`Versionless`] and [`Node::broadcast`] for
+    /// [`Versioned`] nodes. In the latter case, message will be encoded according to MAVLink
+    /// protocol version defined for a node.
+    pub fn broadcast_frame(&self, frame: &Frame<V>, scope: BroadcastScope) -> Result<()> {
+        self.api.route_frame(frame, scope)
     }
 
     /// Validates incoming frame against arbitrary dialect.
@@ -282,21 +278,35 @@ impl<K: NodeKind, V: MaybeVersioned + 'static, A: NodeApi<V>> Node<K, V, A> {
     fn close(&mut self) {
         self.state.close();
 
-        log::debug!("{:?}: node is closed", self.info());
+        log::debug!("[{:?}]: node is closed", self.info());
     }
 }
 
-impl<V: Versioned + 'static, A: NodeApi<V>> Node<Edge<V>, V, A> {
-    /// Send MAVLink message.
+impl<V: Versioned, A: NodeApi<V>> Node<Edge<V>, V, A> {
+    /// Sends MAVLink message.
     ///
     /// The message will be encoded according to the node's dialect specification and MAVLink
     /// protocol version.
     ///
     /// If you want to send messages within different MAVLink protocols simultaneously, you have
-    /// to construct a [`Versionless`] node and use [`Node::send_versioned`]
+    /// to construct a [`Versionless`] node and use [`Node::send_versioned`].
     pub fn send(&self, message: &impl Message) -> Result<()> {
         let frame = self.next_frame(message)?;
         self.api.send_frame(&frame)
+    }
+
+    /// Broadcasts MAVLink message according to the specified broadcast `scope`.
+    ///
+    /// The message will be encoded according to the node's dialect specification and MAVLink
+    /// protocol version.
+    ///
+    /// Using [`BroadcastScope::All`] is similar to just calling [`Node::send`].
+    ///
+    /// If you want to broadcast messages within different MAVLink protocols simultaneously, you
+    /// have to construct a [`Versionless`] node and use [`Node::broadcast_versioned`].
+    pub fn broadcast(&self, message: &impl Message, scope: BroadcastScope) -> Result<()> {
+        let frame = self.next_frame(message)?;
+        self.api.route_frame(&frame, scope)
     }
 
     /// Returns `true`, if node is active.
@@ -382,13 +392,28 @@ impl<K: NodeKind, V: Versioned, A: NodeApi<V>> Node<K, V, A> {
 }
 
 impl<A: NodeApi<Versionless>> Node<Edge<Versionless>, Versionless, A> {
-    /// Send MAVLink frame with a specified MAVLink protocol version.
+    /// Sends MAVLink frame with a specified MAVLink protocol version.
     ///
     /// If you want to restrict MAVLink protocol to a particular version, construct a [`Versioned`]
     /// node and simply send messages by calling [`Node::send`].
     pub fn send_versioned<V: Versioned>(&self, message: &impl Message) -> Result<()> {
         let frame = self.next_frame_versioned::<V>(message)?;
         self.api.send_frame(&frame)
+    }
+
+    /// Broadcasts MAVLink frame with a specified MAVLink protocol version.
+    ///
+    /// Using [`BroadcastScope::All`] is similar to just calling [`Node::broadcast_versioned`].
+    ///
+    /// If you want to restrict MAVLink protocol to a particular version, construct a [`Versioned`]
+    /// node and simply send messages by calling [`Node::broadcast`].
+    pub fn broadcast_versioned<V: Versioned>(
+        &self,
+        message: &impl Message,
+        scope: BroadcastScope,
+    ) -> Result<()> {
+        let frame = self.next_frame_versioned::<V>(message)?;
+        self.api.route_frame(&frame, scope)
     }
 
     /// Create a next frame from MAVLink message with a specified protocol version.
@@ -408,7 +433,7 @@ impl<A: NodeApi<Versionless>> Node<Edge<Versionless>, Versionless, A> {
     }
 }
 
-impl<K: NodeKind, V: MaybeVersioned + 'static, A: NodeApi<V>> Drop for Node<K, V, A> {
+impl<K: NodeKind, V: MaybeVersioned, A: NodeApi<V>> Drop for Node<K, V, A> {
     fn drop(&mut self) {
         self.close()
     }

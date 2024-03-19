@@ -5,14 +5,12 @@ use std::thread::JoinHandle;
 
 use crate::core::consts::NETWORK_POOLING_INTERVAL;
 use crate::core::error::RecvTimeoutError;
-use crate::core::io::{ConnectionInfo, Retry};
+use crate::core::io::{ConnectionInfo, IncomingFrame, Retry};
 use crate::core::marker::Proxy;
 use crate::core::network::types::{NetworkConnInfo, NetworkConnState, RestartNodeEvent};
 use crate::core::node::NodeConf;
 use crate::core::utils::{Closer, UniqueId};
-use crate::sync::io::{
-    ChannelFactory, IncomingFrameProducer, OutgoingFrameHandler, OutgoingFrameSender,
-};
+use crate::sync::io::{ChannelFactory, IncomingFrameProducer, OutgoingFrameHandler};
 use crate::sync::marker::ConnConf;
 use crate::sync::node::api::{EventReceiver, FrameSender};
 use crate::sync::node::{Event, SyncApi};
@@ -20,7 +18,7 @@ use crate::sync::node::{Event, SyncApi};
 use crate::prelude::*;
 
 /// Manages the entire [`Network`] connection.
-pub(super) struct NetworkConnectionHandler<V: MaybeVersioned + 'static> {
+pub(super) struct NetworkConnectionHandler<V: MaybeVersioned> {
     state: Closer,
     info: ConnectionInfo,
     retry: Retry,
@@ -29,23 +27,21 @@ pub(super) struct NetworkConnectionHandler<V: MaybeVersioned + 'static> {
     nodes: HashMap<UniqueId, Node<Proxy, V, SyncApi<V>>>,
     producer: IncomingFrameProducer<V>,
     send_handler: OutgoingFrameHandler<V>,
-    sender: OutgoingFrameSender<V>,
     closed_nodes_chan: ClosedNodesChannel,
     node_events_chan: RestartEventsChannel<V>,
 }
 
 /// Handles incoming events of a particular [`Node`] withing a [`Network`].
-struct IncomingEventsHandler<V: MaybeVersioned + 'static> {
+struct IncomingEventsHandler<V: MaybeVersioned> {
     id: UniqueId,
     info: NetworkConnInfo,
     state: NetworkConnState,
     receiver: EventReceiver<V>,
     producer: IncomingFrameProducer<V>,
-    sender: OutgoingFrameSender<V>,
 }
 
 /// Handles outgoing frames of a particular [`Node`] withing a [`Network`].
-struct OutgoingFramesHandler<V: MaybeVersioned + 'static> {
+struct OutgoingFramesHandler<V: MaybeVersioned> {
     id: UniqueId,
     info: NetworkConnInfo,
     state: NetworkConnState,
@@ -70,12 +66,12 @@ struct ClosedNodesChannel {
 }
 
 /// Channel, that communicates [`Node`] restart events.
-struct RestartEventsChannel<V: MaybeVersioned + 'static> {
+struct RestartEventsChannel<V: MaybeVersioned> {
     tx: mpsc::Sender<RestartNodeEvent<V, SyncApi<V>>>,
     rx: mpsc::Receiver<RestartNodeEvent<V, SyncApi<V>>>,
 }
 
-impl<V: MaybeVersioned + 'static> NetworkConnectionHandler<V> {
+impl<V: MaybeVersioned> NetworkConnectionHandler<V> {
     pub(super) fn new(
         state: Closer,
         network: &Network<V, ConnConf<V>>,
@@ -99,7 +95,6 @@ impl<V: MaybeVersioned + 'static> NetworkConnectionHandler<V> {
             nodes,
             producer: chan_factory.producer().clone(),
             send_handler: chan_factory.send_handler().clone(),
-            sender: chan_factory.sender().clone(),
             closed_nodes_chan: ClosedNodesChannel::new(),
             node_events_chan: RestartEventsChannel::synchronous(),
         })
@@ -324,7 +319,6 @@ impl<V: MaybeVersioned + 'static> NetworkConnectionHandler<V> {
             state: state.clone(),
             receiver: node.event_receiver().clone(),
             producer: self.producer.clone(),
-            sender: self.sender.clone(),
         }
         .spawn();
 
@@ -352,6 +346,7 @@ impl<V: MaybeVersioned + 'static> NetworkConnectionHandler<V> {
 }
 
 impl<V: MaybeVersioned> IncomingEventsHandler<V> {
+    /// Spawns incoming events handler.
     fn spawn(self) -> JoinHandle<UniqueId> {
         thread::spawn(move || {
             let id = self.id.clone();
@@ -365,11 +360,12 @@ impl<V: MaybeVersioned> IncomingEventsHandler<V> {
         })
     }
 
+    /// Handles incoming events.
     fn handle(self) -> Result<()> {
         let state = self.state.clone();
 
         while !state.is_closed() {
-            let (frame, mut callback) = match self.receiver.recv_timeout(NETWORK_POOLING_INTERVAL) {
+            let (frame, callback) = match self.receiver.recv_timeout(NETWORK_POOLING_INTERVAL) {
                 Ok(event) => match event {
                     Event::Frame(frame, callback) => (frame, callback),
                     _ => continue,
@@ -380,9 +376,8 @@ impl<V: MaybeVersioned> IncomingEventsHandler<V> {
                 },
             };
 
-            callback.set_sender(self.sender.clone());
-
-            self.producer.send((frame, callback))?;
+            self.producer
+                .send(IncomingFrame::new(frame, callback.into()))?;
         }
 
         Ok(())
@@ -390,6 +385,7 @@ impl<V: MaybeVersioned> IncomingEventsHandler<V> {
 }
 
 impl<V: MaybeVersioned> OutgoingFramesHandler<V> {
+    /// Spawns outgoing frames handler.
     fn spawn(self) -> JoinHandle<UniqueId> {
         thread::spawn(move || {
             let id = self.id.clone();
@@ -403,17 +399,22 @@ impl<V: MaybeVersioned> OutgoingFramesHandler<V> {
         })
     }
 
+    /// Handles outgoing frames.
     fn handle(self) -> Result<()> {
         let state = self.state.clone();
 
         while !state.is_closed() {
-            let frame = match self.send_handler.recv_timeout(NETWORK_POOLING_INTERVAL) {
+            let mut frame = match self.send_handler.recv_timeout(NETWORK_POOLING_INTERVAL) {
                 Ok(value) => value,
                 Err(err) => match err {
                     RecvTimeoutError::Disconnected => break,
                     RecvTimeoutError::Timeout | RecvTimeoutError::Lagged(_) => continue,
                 },
             };
+
+            if !frame.matches_connection_reroute(self.info.network.id()) {
+                continue;
+            }
 
             self.sender.send_raw(frame)?;
         }
@@ -423,6 +424,8 @@ impl<V: MaybeVersioned> OutgoingFramesHandler<V> {
 }
 
 impl NodeStateHandler {
+    /// Spawns state handler, that monitors nodes state and notifies [`NetworkConnectionHandler`]
+    /// when node is down.
     fn spawn(self) {
         let id = self.id;
         let info = self.info.clone();
@@ -437,6 +440,7 @@ impl NodeStateHandler {
         });
     }
 
+    /// Waits until node is closed.
     fn handle(self) -> Result<()> {
         while !self.state.is_closed() {
             if self.in_handler.is_finished() || self.out_handler.is_finished() {

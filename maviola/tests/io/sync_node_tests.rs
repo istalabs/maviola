@@ -1,3 +1,5 @@
+#![cfg(feature = "sync")]
+
 use std::collections::HashMap;
 use std::sync::Once;
 use std::thread;
@@ -340,28 +342,4 @@ fn node_no_version() {
     } else {
         panic!("invalid event!")
     }
-}
-
-#[test]
-fn send_versionless_frames() {
-    let port = unused_port();
-    let node_v2 = make_tcp_server_node_v2(port);
-
-    let frame_v2 = node_v2
-        .next_frame(&minimal::messages::Heartbeat::default())
-        .unwrap();
-    node_v2
-        .send_versionless_frame(&frame_v2.into_versionless())
-        .unwrap();
-
-    let frame_v1 = Frame::builder()
-        .version(V1)
-        .system_id(1)
-        .component_id(1)
-        .sequence(0)
-        .message(&minimal::messages::Heartbeat::default())
-        .unwrap()
-        .build();
-    let send_result = node_v2.send_versionless_frame(&frame_v1.to_versionless());
-    assert!(send_result.is_err());
 }

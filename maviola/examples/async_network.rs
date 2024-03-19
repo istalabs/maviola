@@ -58,7 +58,7 @@ async fn run(addr_1: &str, addr_2: &str) -> Result<()> {
     // Get frame from the first address
     let (frame, callback) = server.recv_frame().await?;
     // Broadcast frame to everyone except sender
-    callback.respond_others(&frame)?;
+    callback.broadcast(&frame)?;
     wait().await;
 
     // Get frame at the second address

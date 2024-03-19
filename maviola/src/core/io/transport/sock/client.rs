@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::core::io::{ConnectionConf, ConnectionInfo};
+use crate::core::io::{ConnectionConf, ConnectionDetails, ConnectionInfo};
 
 use crate::prelude::*;
 
@@ -72,7 +72,7 @@ impl SockClient {
             )));
         }
 
-        let info = ConnectionInfo::SockClient { path: path.clone() };
+        let info = ConnectionInfo::new(ConnectionDetails::SockClient { path: path.clone() });
         Ok(Self { path, info })
     }
 }

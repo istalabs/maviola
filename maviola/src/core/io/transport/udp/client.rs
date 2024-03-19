@@ -1,7 +1,7 @@
 use std::net::{SocketAddr, ToSocketAddrs};
 
 use crate::core::consts::DEFAULT_UDP_HOST;
-use crate::core::io::{ConnectionConf, ConnectionInfo};
+use crate::core::io::{ConnectionConf, ConnectionDetails, ConnectionInfo};
 use crate::core::utils::net::resolve_socket_addr;
 
 use crate::prelude::*;
@@ -77,7 +77,7 @@ impl UdpClient {
     /// available.
     pub fn new(addr: impl ToSocketAddrs) -> Result<Self> {
         let addr = resolve_socket_addr(addr)?;
-        let info = ConnectionInfo::UdpClient { remote_addr: addr };
+        let info = ConnectionInfo::new(ConnectionDetails::UdpClient { remote_addr: addr });
         let host = DEFAULT_UDP_HOST.into();
         Ok(Self {
             addr,

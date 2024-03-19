@@ -65,15 +65,15 @@
 //!
 //! It is possible to create a custom connection by implementing a
 //! [`ConnectionBuilder`](io::ConnectionBuilder) trait. For Custom connections there are reserved
-//! [`ConnectionInfo::Custom`](crate::core::io::ConnectionInfo::Custom) and
-//! [`ChannelInfo::Custom`](crate::core::io::ChannelInfo::Custom) variants. Check for other relevant
-//! abstractions in [`io`] module.
+//! [`ConnectionDetails::Custom`](crate::core::io::ConnectionDetails::Custom) and
+//! [`ChannelDetails::Custom`](crate::core::io::ChannelDetails::Custom) variants. Check for other
+//! relevant abstractions in [`io`] module.
 //!
 //! ## Low-level I/O
 //!
-//! Low-level I/O primitives are available in [`crate::core::io`]. Most of these abstractions are
-//! re-exported from [Mavio](https://crates.io/crates/mavio), a low-level MAVLink library which
-//! serves as a basis for Maviola.
+//! Low-level I/O primitives are available in [`core::io`](crate::core::io). Most of these
+//! abstractions are re-exported from [Mavio](https://crates.io/crates/mavio), a low-level MAVLink
+//! library which serves as a basis for Maviola.
 
 #[cfg(doc)]
 use crate::prelude::*;

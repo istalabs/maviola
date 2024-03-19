@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::thread;
 
 use crate::core::consts::SERVER_HANG_UP_TIMEOUT;
-use crate::core::io::{ChannelInfo, ConnectionConf, ConnectionInfo};
+use crate::core::io::{ChannelDetails, ConnectionConf, ConnectionInfo};
 use crate::core::utils::{Closable, Closer};
 use crate::sync::consts::{SOCK_ACCEPT_INTERVAL, SOCK_READ_TIMEOUT, SOCK_WRITE_TIMEOUT};
 use crate::sync::io::{Connection, ConnectionBuilder, ConnectionHandler};
@@ -11,7 +11,7 @@ use crate::sync::io::{Connection, ConnectionBuilder, ConnectionHandler};
 use crate::prelude::*;
 use crate::sync::marker::ConnConf;
 
-impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockServer {
+impl<V: MaybeVersioned> ConnectionBuilder<V> for SockServer {
     fn build(&self) -> Result<(Connection<V>, ConnectionHandler)> {
         let path = self.path.clone();
         let listener = UnixListener::bind(self.path.as_path())?;
@@ -23,7 +23,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockServer {
         let info = self.info().clone();
 
         let handler = ConnectionHandler::spawn(move || -> Result<()> {
-            on_close_handler(conn_state.to_closable(), path.clone(), info);
+            on_close_handler(conn_state.to_closable(), path.clone(), info.clone());
 
             while !conn_state.is_closed() {
                 let writer = match listener.accept() {
@@ -42,11 +42,9 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for SockServer {
                 writer.set_write_timeout(SOCK_WRITE_TIMEOUT)?;
                 reader.set_read_timeout(SOCK_READ_TIMEOUT)?;
 
-                let channel = chan_factory.build(
-                    ChannelInfo::SockServer { path: path.clone() },
-                    reader,
-                    writer,
-                );
+                let chan_info =
+                    info.make_channel_info(ChannelDetails::SockServer { path: path.clone() });
+                let channel = chan_factory.build(chan_info, reader, writer);
                 channel.spawn().discard();
             }
 

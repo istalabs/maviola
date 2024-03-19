@@ -10,9 +10,7 @@ use crate::sync::node::{EdgeNode, ProxyNode, SyncApi};
 
 use crate::prelude::*;
 
-impl<S: MaybeSystemId, C: MaybeComponentId, V: MaybeVersioned + 'static>
-    NodeBuilder<S, C, V, Unset>
-{
+impl<S: MaybeSystemId, C: MaybeComponentId, V: MaybeVersioned> NodeBuilder<S, C, V, Unset> {
     /// <sup>[`sync`](crate::sync)</sup>
     /// Set synchronous [`NodeConf::connection`].
     pub fn connection(
@@ -50,7 +48,7 @@ impl<K: NodeKind, V: MaybeVersioned> NodeConf<K, V, ConnConf<V>> {
     }
 }
 
-impl<V: MaybeVersioned + 'static> NodeBuilder<Unset, Unset, V, ConnConf<V>> {
+impl<V: MaybeVersioned> NodeBuilder<Unset, Unset, V, ConnConf<V>> {
     /// <sup>[`sync`](crate::sync)</sup>
     /// Creates a [`ProxyNode`] with synchronous API.
     pub fn build(self) -> Result<ProxyNode<V>> {
@@ -58,7 +56,7 @@ impl<V: MaybeVersioned + 'static> NodeBuilder<Unset, Unset, V, ConnConf<V>> {
     }
 }
 
-impl<V: MaybeVersioned + 'static> NodeBuilder<HasSystemId, HasComponentId, V, ConnConf<V>> {
+impl<V: MaybeVersioned> NodeBuilder<HasSystemId, HasComponentId, V, ConnConf<V>> {
     /// <sup>[`sync`](crate::sync)</sup>
     /// Creates an [`EdgeNode`] with synchronous API.
     pub fn build(self) -> Result<EdgeNode<V>> {

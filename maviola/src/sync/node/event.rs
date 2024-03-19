@@ -4,8 +4,8 @@ use crate::core::error::TryRecvError;
 use crate::core::utils::Closable;
 use crate::protocol::Peer;
 use crate::sync::consts::EVENTS_RECV_POOLING_INTERVAL;
-use crate::sync::io::Callback;
 use crate::sync::node::api::EventReceiver;
+use crate::sync::node::Callback;
 
 use crate::prelude::*;
 
@@ -23,12 +23,12 @@ pub enum Event<V: MaybeVersioned> {
     Invalid(Frame<V>, FrameError, Callback<V>),
 }
 
-pub(crate) struct EventsIterator<V: MaybeVersioned + 'static> {
+pub(crate) struct EventsIterator<V: MaybeVersioned> {
     receiver: EventReceiver<V>,
     state: Closable,
 }
 
-impl<V: MaybeVersioned + 'static> EventsIterator<V> {
+impl<V: MaybeVersioned> EventsIterator<V> {
     pub fn new(receiver: EventReceiver<V>, state: Closable) -> Self {
         Self { receiver, state }
     }

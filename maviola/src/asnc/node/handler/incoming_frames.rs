@@ -3,33 +3,43 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
-use crate::asnc::io::{Callback, ConnReceiver};
-use crate::asnc::node::api::EventSender;
-use crate::asnc::node::Event;
-use crate::core::error::RecvError;
+use crate::asnc::io::IncomingFrameReceiver;
+use crate::asnc::node::api::{EventSender, FrameSender};
+use crate::asnc::node::{Callback, Event};
+use crate::core::consts::INCOMING_FRAMES_POOLING_INTERVAL;
+use crate::core::error::RecvTimeoutError;
 use crate::core::io::ConnectionInfo;
 use crate::core::utils::Closable;
 use crate::protocol::Peer;
 
 use crate::prelude::*;
 
-pub(in crate::asnc::node) struct IncomingFramesHandler<V: MaybeVersioned + 'static> {
+pub(in crate::asnc::node) struct IncomingFramesHandler<V: MaybeVersioned> {
     pub(in crate::asnc::node) info: ConnectionInfo,
     pub(in crate::asnc::node) peers: Arc<RwLock<HashMap<MavLinkId, Peer>>>,
-    pub(in crate::asnc::node) receiver: ConnReceiver<V>,
+    pub(in crate::asnc::node) receiver: IncomingFrameReceiver<V>,
     pub(in crate::asnc::node) event_sender: EventSender<V>,
+    pub(in crate::asnc::node) sender: FrameSender<V>,
 }
 
-impl<V: MaybeVersioned + 'static> IncomingFramesHandler<V> {
+impl<V: MaybeVersioned> IncomingFramesHandler<V> {
     pub(in crate::asnc::node) fn spawn(mut self, state: Closable) {
         tokio::spawn(async move {
             let info = &self.info;
 
             while !state.is_closed() {
-                let (frame, callback) = match self.receiver.recv().await {
-                    Ok((frame, callback)) => (frame, callback),
+                let (frame, callback) = match self
+                    .receiver
+                    .recv_timeout(INCOMING_FRAMES_POOLING_INTERVAL)
+                    .await
+                {
+                    Ok(frame) => {
+                        let (frame, channel) = frame.into();
+                        let callback = Callback::new(channel, self.sender.clone());
+                        (frame, callback)
+                    }
                     Err(err) => match err {
-                        RecvError::Disconnected => {
+                        RecvTimeoutError::Disconnected => {
                             break;
                         }
                         _ => continue,

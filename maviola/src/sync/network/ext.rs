@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::core::io::ConnectionInfo;
+use crate::core::io::{ConnectionDetails, ConnectionInfo};
 use crate::core::marker::Unset;
 use crate::core::utils::UniqueId;
 use crate::sync::io::ConnectionBuilder;
@@ -13,7 +13,7 @@ impl Network<Versionless, Unset> {
     /// Creates a network builder with empty configuration.
     pub fn synchronous<V: MaybeVersioned>() -> Network<V, ConnConf<V>> {
         Network {
-            info: ConnectionInfo::Network,
+            info: ConnectionInfo::new(ConnectionDetails::Network),
             nodes: Default::default(),
             retry: Default::default(),
             stop_on_node_down: Default::default(),

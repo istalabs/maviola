@@ -4,7 +4,7 @@ use std::sync::mpsc;
 use std::thread;
 
 use crate::core::consts::{DEFAULT_UDP_HOST, SERVER_HANG_UP_TIMEOUT};
-use crate::core::io::{ChannelInfo, ConnectionConf, ConnectionInfo};
+use crate::core::io::{ChannelDetails, ConnectionConf, ConnectionInfo};
 use crate::core::utils::net::{pick_unused_port, resolve_socket_addr};
 use crate::core::utils::{Closable, Closer};
 use crate::sync::io::{Connection, ConnectionBuilder, ConnectionHandler};
@@ -13,7 +13,7 @@ use crate::sync::utils::{MpscReader, MpscWriter};
 use crate::prelude::*;
 use crate::sync::marker::ConnConf;
 
-impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServer {
+impl<V: MaybeVersioned> ConnectionBuilder<V> for UdpServer {
     fn build(&self) -> Result<(Connection<V>, ConnectionHandler)> {
         let server_addr = self.addr;
         let udp_socket = UdpSocket::bind(server_addr)?;
@@ -30,7 +30,7 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServer {
                 conn_state.to_closable(),
                 on_close_bind_addr,
                 server_addr,
-                info,
+                info.clone(),
             );
 
             let mut peers = HashMap::new();
@@ -55,14 +55,11 @@ impl<V: MaybeVersioned + 'static> ConnectionBuilder<V> for UdpServer {
                     let writer = MpscWriter::new(writer_tx);
                     let reader = MpscReader::new(reader_rx);
 
-                    let channel = chan_factory.build(
-                        ChannelInfo::UdpServer {
-                            server_addr,
-                            peer_addr,
-                        },
-                        reader,
-                        writer,
-                    );
+                    let chan_info = info.make_channel_info(ChannelDetails::UdpServer {
+                        server_addr,
+                        peer_addr,
+                    });
+                    let channel = chan_factory.build(chan_info, reader, writer);
                     channel.spawn().discard();
 
                     Self::handle_peer_sends(

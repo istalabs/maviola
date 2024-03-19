@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::core::io::{ConnectionConf, ConnectionInfo};
+use crate::core::io::{ConnectionConf, ConnectionDetails, ConnectionInfo};
 
 use crate::prelude::*;
 
@@ -77,7 +77,7 @@ impl FileReader {
             )));
         }
 
-        let info = ConnectionInfo::FileReader { path: path.clone() };
+        let info = ConnectionInfo::new(ConnectionDetails::FileReader { path: path.clone() });
         Ok(Self { path, info })
     }
 }

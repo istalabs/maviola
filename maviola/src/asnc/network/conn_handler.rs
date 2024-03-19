@@ -4,15 +4,13 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
 use crate::asnc::consts::{NETWORK_CLOSED_CHAN_CAPACITY, NETWORK_RETRY_EVENTS_CHAN_CAPACITY};
-use crate::asnc::io::{
-    ChannelFactory, IncomingFrameProducer, OutgoingFrameHandler, OutgoingFrameSender,
-};
+use crate::asnc::io::{ChannelFactory, IncomingFrameProducer, OutgoingFrameHandler};
 use crate::asnc::marker::AsyncConnConf;
 use crate::asnc::node::api::{EventReceiver, FrameSender};
 use crate::asnc::node::{AsyncApi, Event};
 use crate::core::consts::NETWORK_POOLING_INTERVAL;
 use crate::core::error::RecvTimeoutError;
-use crate::core::io::{ConnectionInfo, Retry};
+use crate::core::io::{ConnectionInfo, IncomingFrame, Retry};
 use crate::core::marker::Proxy;
 use crate::core::network::types::{NetworkConnInfo, NetworkConnState, RestartNodeEvent};
 use crate::core::node::NodeConf;
@@ -21,7 +19,7 @@ use crate::core::utils::{Closer, UniqueId};
 use crate::prelude::*;
 
 /// Manages the entire [`Network`] connection.
-pub(super) struct NetworkConnectionHandler<V: MaybeVersioned + 'static> {
+pub(super) struct NetworkConnectionHandler<V: MaybeVersioned> {
     state: Closer,
     info: ConnectionInfo,
     retry: Retry,
@@ -30,23 +28,21 @@ pub(super) struct NetworkConnectionHandler<V: MaybeVersioned + 'static> {
     nodes: HashMap<UniqueId, Node<Proxy, V, AsyncApi<V>>>,
     producer: IncomingFrameProducer<V>,
     send_handler: OutgoingFrameHandler<V>,
-    sender: OutgoingFrameSender<V>,
     closed_nodes_chan: ClosedNodesChannel,
     node_events_chan: RestartEventsChannel<V>,
 }
 
 /// Handles incoming events of a particular [`Node`] withing a [`Network`].
-struct IncomingEventsHandler<V: MaybeVersioned + 'static> {
+struct IncomingEventsHandler<V: MaybeVersioned> {
     id: UniqueId,
     info: NetworkConnInfo,
     state: NetworkConnState,
     receiver: EventReceiver<V>,
     producer: IncomingFrameProducer<V>,
-    sender: OutgoingFrameSender<V>,
 }
 
 /// Handles outgoing frames of a particular [`Node`] withing a [`Network`].
-struct OutgoingFramesHandler<V: MaybeVersioned + 'static> {
+struct OutgoingFramesHandler<V: MaybeVersioned> {
     id: UniqueId,
     info: NetworkConnInfo,
     state: NetworkConnState,
@@ -71,12 +67,12 @@ struct ClosedNodesChannel {
 }
 
 /// Channel, that communicates [`Node`] restart events.
-struct RestartEventsChannel<V: MaybeVersioned + 'static> {
+struct RestartEventsChannel<V: MaybeVersioned> {
     tx: mpsc::Sender<RestartNodeEvent<V, AsyncApi<V>>>,
     rx: mpsc::Receiver<RestartNodeEvent<V, AsyncApi<V>>>,
 }
 
-impl<V: MaybeVersioned + 'static> NetworkConnectionHandler<V> {
+impl<V: MaybeVersioned> NetworkConnectionHandler<V> {
     pub(super) async fn new(
         state: Closer,
         network: &Network<V, AsyncConnConf<V>>,
@@ -100,7 +96,6 @@ impl<V: MaybeVersioned + 'static> NetworkConnectionHandler<V> {
             nodes,
             producer: chan_factory.producer().clone(),
             send_handler: chan_factory.send_handler().clone(),
-            sender: chan_factory.sender().clone(),
             closed_nodes_chan: ClosedNodesChannel::new(),
             node_events_chan: RestartEventsChannel::synchronous(),
         })
@@ -336,7 +331,6 @@ impl<V: MaybeVersioned + 'static> NetworkConnectionHandler<V> {
             state: state.clone(),
             receiver: node.event_receiver().clone(),
             producer: self.producer.clone(),
-            sender: self.sender.clone(),
         }
         .spawn();
 
@@ -364,6 +358,7 @@ impl<V: MaybeVersioned + 'static> NetworkConnectionHandler<V> {
 }
 
 impl<V: MaybeVersioned> IncomingEventsHandler<V> {
+    /// Spawns incoming events handler.
     fn spawn(self) -> JoinHandle<UniqueId> {
         tokio::spawn(async move {
             let id = self.id.clone();
@@ -377,25 +372,25 @@ impl<V: MaybeVersioned> IncomingEventsHandler<V> {
         })
     }
 
+    /// Handles incoming events.
     async fn handle(mut self) -> Result<()> {
         let state = self.state.clone();
 
         while !state.is_closed() {
-            let (frame, mut callback) =
-                match self.receiver.recv_timeout(NETWORK_POOLING_INTERVAL).await {
-                    Ok(event) => match event {
-                        Event::Frame(frame, callback) => (frame, callback),
-                        _ => continue,
-                    },
-                    Err(err) => match err {
-                        RecvTimeoutError::Disconnected => break,
-                        RecvTimeoutError::Timeout | RecvTimeoutError::Lagged(_) => continue,
-                    },
-                };
+            let (frame, callback) = match self.receiver.recv_timeout(NETWORK_POOLING_INTERVAL).await
+            {
+                Ok(event) => match event {
+                    Event::Frame(frame, callback) => (frame, callback),
+                    _ => continue,
+                },
+                Err(err) => match err {
+                    RecvTimeoutError::Disconnected => break,
+                    RecvTimeoutError::Timeout | RecvTimeoutError::Lagged(_) => continue,
+                },
+            };
 
-            callback.set_sender(self.sender.clone());
-
-            self.producer.send((frame, callback))?;
+            self.producer
+                .send(IncomingFrame::new(frame, callback.into()))?;
         }
 
         Ok(())
@@ -403,6 +398,7 @@ impl<V: MaybeVersioned> IncomingEventsHandler<V> {
 }
 
 impl<V: MaybeVersioned> OutgoingFramesHandler<V> {
+    /// Spawns outgoing frames handler.
     fn spawn(self) -> JoinHandle<UniqueId> {
         tokio::spawn(async move {
             let id = self.id.clone();
@@ -416,11 +412,12 @@ impl<V: MaybeVersioned> OutgoingFramesHandler<V> {
         })
     }
 
+    /// Handles outgoing frames.
     async fn handle(mut self) -> Result<()> {
         let state = self.state.clone();
 
         while !state.is_closed() {
-            let frame = match self
+            let mut frame = match self
                 .send_handler
                 .recv_timeout(NETWORK_POOLING_INTERVAL)
                 .await
@@ -432,6 +429,10 @@ impl<V: MaybeVersioned> OutgoingFramesHandler<V> {
                 },
             };
 
+            if !frame.matches_connection_reroute(self.info.network.id()) {
+                continue;
+            }
+
             self.sender.send_raw(frame)?;
         }
 
@@ -440,6 +441,8 @@ impl<V: MaybeVersioned> OutgoingFramesHandler<V> {
 }
 
 impl NodeStateHandler {
+    /// Spawns state handler, that monitors nodes state and notifies [`NetworkConnectionHandler`]
+    /// when node is down.
     fn spawn(self) {
         let id = self.id;
         let info = self.info.clone();
@@ -455,6 +458,7 @@ impl NodeStateHandler {
         });
     }
 
+    /// Waits until node is closed.
     async fn handle(self) -> Result<()> {
         while !self.state.is_closed() {
             if self.in_handler.is_finished() || self.out_handler.is_finished() {

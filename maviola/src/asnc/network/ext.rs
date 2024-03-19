@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::asnc::io::ConnectionBuilder;
 use crate::asnc::marker::AsyncConnConf;
-use crate::core::io::ConnectionInfo;
+use crate::core::io::{ConnectionDetails, ConnectionInfo};
 use crate::core::marker::Unset;
 use crate::core::utils::UniqueId;
 
@@ -13,7 +13,7 @@ impl Network<Versionless, Unset> {
     /// Creates a network builder with empty configuration.
     pub fn asynchronous<V: MaybeVersioned>() -> Network<V, AsyncConnConf<V>> {
         Network {
-            info: ConnectionInfo::Network,
+            info: ConnectionInfo::new(ConnectionDetails::Network),
             nodes: Default::default(),
             retry: Default::default(),
             stop_on_node_down: Default::default(),

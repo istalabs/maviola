@@ -19,7 +19,7 @@ pub(in crate::asnc::node) struct InactivePeersHandler<V: MaybeVersioned> {
     pub(in crate::asnc::node) event_sender: EventSender<V>,
 }
 
-impl<V: MaybeVersioned + 'static> InactivePeersHandler<V> {
+impl<V: MaybeVersioned> InactivePeersHandler<V> {
     pub(in crate::asnc::node) fn spawn(self, state: Closable) {
         tokio::spawn(async move {
             while !state.is_closed() {

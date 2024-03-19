@@ -25,11 +25,11 @@ path = "src/lib.rs"
 ###########################################################
 [dependencies]
 log = "0.4.20"
-mavio = { version = "0.2.1", features = ["extras", "minimal", "sha2", "std"] }
+mavio = { version = "0.2.3", features = ["extras", "minimal", "sha2", "std"] }
 portpicker = "0.1.1"
 serde = { version = "1.0.193", default-features = false, features = ["derive"], optional = true }
 serde_arrays = { version = "0.1.0", default-features = false, optional = true }
-thiserror = "1.0.56"
+thiserror = "1.0.58"
 
 # Async dependencies
 async-stream = { version = "0.3.5", optional = true }

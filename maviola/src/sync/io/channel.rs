@@ -1,21 +1,20 @@
 use std::io::{Read, Write};
-use std::sync::Arc;
 use std::thread;
 
-use crate::core::io::{ChannelInfo, ConnectionInfo};
+use crate::core::io::{ChannelInfo, ConnectionInfo, IncomingFrame};
 use crate::core::io::{Receiver, Sender};
-use crate::core::utils::{Closable, SharedCloser, UniqueId};
+use crate::core::utils::{Closable, SharedCloser};
 use crate::sync::consts::{
     CHANNEL_STOP_JOIN_ATTEMPTS, CHANNEL_STOP_JOIN_POOLING_INTERVAL, CHANNEL_STOP_POOLING_INTERVAL,
 };
-use crate::sync::io::{Callback, IncomingFrameProducer, OutgoingFrameHandler, OutgoingFrameSender};
+use crate::sync::io::{IncomingFrameProducer, OutgoingFrameHandler, OutgoingFrameSender};
 
 use crate::prelude::*;
 
 /// <sup>[`sync`](crate::sync)</sup>
 /// Factory that produces channels withing associated [`Connection`](super::Connection).
 #[derive(Clone, Debug)]
-pub struct ChannelFactory<V: MaybeVersioned + 'static> {
+pub struct ChannelFactory<V: MaybeVersioned> {
     pub(super) info: ConnectionInfo,
     pub(super) state: Closable,
     pub(super) sender: OutgoingFrameSender<V>,
@@ -37,7 +36,6 @@ impl<V: MaybeVersioned> ChannelFactory<V> {
             info,
             reader,
             writer,
-            sender: self.sender.clone(),
             send_handler: self.send_handler.clone(),
             producer: self.producer.clone(),
         }
@@ -74,19 +72,16 @@ impl<V: MaybeVersioned> ChannelFactory<V> {
 ///
 /// Channels are constructed by [`ChannelFactory`] bound to a particular
 /// [`Connection`](super::Connection).
-pub struct Channel<V: MaybeVersioned + 'static, R: Read, W: Write> {
+pub struct Channel<V: MaybeVersioned, R: Read, W: Write> {
     conn_state: Closable,
     info: ChannelInfo,
     reader: R,
     writer: W,
-    sender: OutgoingFrameSender<V>,
     send_handler: OutgoingFrameHandler<V>,
     producer: IncomingFrameProducer<V>,
 }
 
-impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 'static>
-    Channel<V, R, W>
-{
+impl<V: MaybeVersioned, R: Read + Send + 'static, W: Write + Send + 'static> Channel<V, R, W> {
     /// Spawn this channel.
     ///
     /// Returns [`SharedCloser`] which can be used to control channel state. The state of the
@@ -97,9 +92,8 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
     /// If caller is not interested in managing this channel, then it is required to drop returned
     /// [`SharedCloser`] or replace it with the corresponding [`Closable`].
     pub fn spawn(self) -> SharedCloser {
-        let id = UniqueId::new();
-        let info = Arc::new(self.info);
-        let conn_state = self.conn_state.clone();
+        let info = self.info;
+        let conn_state = self.conn_state;
         let state = SharedCloser::new();
 
         log::trace!("[{info:?}] spawning peer connection");
@@ -109,19 +103,18 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
             let send_handler = self.send_handler;
             let frame_writer = Sender::new(self.writer);
 
-            thread::spawn(move || Self::write_handler(id, info, send_handler, frame_writer))
+            thread::spawn(move || Self::write_handler(info, send_handler, frame_writer))
         };
 
         let read_handler = {
             let conn_state = conn_state.clone();
             let state = state.clone();
             let info = info.clone();
-            let sender = self.sender;
             let producer = self.producer;
             let frame_reader = Receiver::new(self.reader);
 
             thread::spawn(move || {
-                Self::read_handler(state, conn_state, id, info, sender, producer, frame_reader)
+                Self::read_handler(state, conn_state, info, producer, frame_reader)
             })
         };
 
@@ -137,8 +130,7 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
     }
 
     fn write_handler(
-        id: UniqueId,
-        info: Arc<ChannelInfo>,
+        info: ChannelInfo,
         send_handler: OutgoingFrameHandler<V>,
         mut frame_writer: Sender<W, V>,
     ) -> Result<()> {
@@ -151,7 +143,7 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
                 }
             };
 
-            if !out_frame.should_send_to(id) {
+            if !out_frame.should_send_to(info.id()) {
                 continue;
             }
 
@@ -175,9 +167,7 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
     fn read_handler(
         state: SharedCloser,
         conn_state: Closable,
-        id: UniqueId,
-        info: Arc<ChannelInfo>,
-        sender: OutgoingFrameSender<V>,
+        info: ChannelInfo,
         producer: IncomingFrameProducer<V>,
         mut frame_reader: Receiver<R, V>,
     ) -> Result<()> {
@@ -201,12 +191,7 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
             };
             log::trace!("[{info:?}] received incoming frame");
 
-            let info = info.clone();
-            let send_tx = sender.clone();
-
-            let callback = Callback::new(id, info.clone(), send_tx);
-
-            producer.send((frame, callback))?;
+            producer.send(IncomingFrame::new(frame, info.clone()))?;
             log::trace!("[{info:?}] sent incoming frame to API");
         }
     }
@@ -214,7 +199,7 @@ impl<V: MaybeVersioned + 'static, R: Read + Send + 'static, W: Write + Send + 's
     fn handle_stop(
         mut state: SharedCloser,
         conn_state: Closable,
-        info: Arc<ChannelInfo>,
+        info: ChannelInfo,
         write_handler: thread::JoinHandle<Result<()>>,
         read_handler: thread::JoinHandle<Result<()>>,
     ) {

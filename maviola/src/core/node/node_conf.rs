@@ -240,7 +240,7 @@ impl<K: NodeKind, V: MaybeVersioned, C: MaybeConnConf> IntoNodeConf<K, V, C> for
 #[cfg(test)]
 #[cfg(feature = "sync")]
 mod tests {
-    use crate::core::io::ConnectionInfo;
+    use crate::core::io::ConnectionDetails;
     use crate::core::io::TcpClient;
 
     use super::*;
@@ -275,8 +275,8 @@ mod tests {
         assert_eq!(node_conf.system_id(), 10);
         assert_eq!(node_conf.component_id(), 42);
         assert!(matches!(
-            node_conf.connection().info(),
-            ConnectionInfo::TcpClient { .. }
+            node_conf.connection().info().details(),
+            ConnectionDetails::TcpClient { .. }
         ));
     }
 }
