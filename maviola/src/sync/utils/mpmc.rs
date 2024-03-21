@@ -557,7 +557,7 @@ mod tests {
 
     // The duration should be long enough to test on slow machines, when running tests in parallel
     // (like in the case of CI)
-    const WAIT_DURATION: Duration = Duration::from_millis(5);
+    const WAIT_DURATION: Duration = Duration::from_millis(10);
     // The duration should be long enough to test on slow machines, when running tests in parallel
     // (like in the case of CI)
     const WAIT_LONG_DURATION: Duration = Duration::from_millis(500);

@@ -49,12 +49,12 @@ include:
     # Run linters
     - cargo clippy ${FEATURES}
     # Run tests
-  #    - cargo test ${FEATURES} --lib --tests --bins
+    - cargo test ${FEATURES} --lib --tests --bins
   parallel:
     matrix:
       - FEATURES:
           - "--no-default-features"
-#          - "--features sync,async,unstable,unsafe"
+          - "--features sync,async,unstable,unsafe"
 #          - "--all-features"
 
 # ---------------------------------------------------------
