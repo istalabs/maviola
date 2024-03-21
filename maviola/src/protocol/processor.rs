@@ -18,6 +18,7 @@ pub struct FrameProcessor {
     compat: Option<CompatProcessor>,
     signer: Option<FrameSigner>,
     dialects: KnownDialects,
+    #[cfg(feature = "unsafe")]
     processors: CustomFrameProcessors,
 }
 

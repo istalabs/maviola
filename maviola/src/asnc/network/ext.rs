@@ -11,7 +11,7 @@ use crate::prelude::*;
 impl Network<Versionless, Unset> {
     /// <sup>[`async`](crate::asnc)</sup>
     /// Creates a network builder with empty configuration.
-    pub fn asynchronous<V: MaybeVersioned>() -> Network<V, AsyncConnConf<V>> {
+    pub fn asnc<V: MaybeVersioned>() -> Network<V, AsyncConnConf<V>> {
         Network {
             info: ConnectionInfo::new(ConnectionDetails::Network),
             nodes: Default::default(),
@@ -91,7 +91,7 @@ mod tests {
         let addr_1 = format!("127.0.0.1:{}", pick_unused_port().unwrap());
         let addr_2 = format!("127.0.0.1:{}", pick_unused_port().unwrap());
 
-        let network = Network::asynchronous()
+        let network = Network::asnc()
             .add_connection(TcpServer::new(addr_1.as_str()).unwrap())
             .add_connection(TcpServer::new(addr_2.as_str()).unwrap());
 
@@ -151,7 +151,7 @@ mod tests {
             .unwrap();
         wait().await;
 
-        let network = Network::asynchronous()
+        let network = Network::asnc()
             .add_connection(TcpClient::new(addr.as_str()).unwrap())
             .retry(Retry::Always(RECONNECT_INTERVAL));
         let client = Node::asnc::<V2>()

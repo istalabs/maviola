@@ -11,7 +11,7 @@ use crate::prelude::*;
 impl Network<Versionless, Unset> {
     /// <sup>[`sync`](crate::sync)</sup>
     /// Creates a network builder with empty configuration.
-    pub fn synchronous<V: MaybeVersioned>() -> Network<V, ConnConf<V>> {
+    pub fn sync<V: MaybeVersioned>() -> Network<V, ConnConf<V>> {
         Network {
             info: ConnectionInfo::new(ConnectionDetails::Network),
             nodes: Default::default(),
@@ -92,7 +92,7 @@ mod tests {
         let addr_1 = format!("127.0.0.1:{}", pick_unused_port().unwrap());
         let addr_2 = format!("127.0.0.1:{}", pick_unused_port().unwrap());
 
-        let network = Network::synchronous()
+        let network = Network::sync()
             .add_node(Node::sync::<V2>().connection(TcpServer::new(addr_1.as_str()).unwrap()))
             .add_connection(TcpServer::new(addr_2.as_str()).unwrap());
 
@@ -146,7 +146,7 @@ mod tests {
         let server = Node::try_from_conf(server_conf.clone()).unwrap();
         wait();
 
-        let network = Network::synchronous()
+        let network = Network::sync()
             .add_connection(TcpClient::new(addr.as_str()).unwrap())
             .retry(Retry::Always(RECONNECT_INTERVAL));
         let client = Node::sync::<V2>()

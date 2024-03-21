@@ -153,7 +153,7 @@ use crate::prelude::*;
 /// let node = Node::asnc::<V2>()
 ///     .id(MavLinkId::new(1, 17))
 ///     .connection(
-///         Network::asynchronous()
+///         Network::asnc()
 ///             .add_connection(TcpServer::new("127.0.0.1:5600").unwrap())
 ///             .add_connection(TcpServer::new("127.0.0.1:5601").unwrap())
 ///     )

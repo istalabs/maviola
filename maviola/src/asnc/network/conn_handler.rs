@@ -140,10 +140,11 @@ impl<V: MaybeVersioned> NetworkConnectionHandler<V> {
                         break;
                     }
                 }
-                Err(err) => match err {
-                    mpsc::error::TryRecvError::Disconnected => break,
-                    _ => {}
-                },
+                Err(err) => {
+                    if err == mpsc::error::TryRecvError::Disconnected {
+                        break;
+                    }
+                }
             };
 
             if self.node_configs.is_empty() {
@@ -361,7 +362,7 @@ impl<V: MaybeVersioned> IncomingEventsHandler<V> {
     /// Spawns incoming events handler.
     fn spawn(self) -> JoinHandle<UniqueId> {
         tokio::spawn(async move {
-            let id = self.id.clone();
+            let id = self.id;
             let info = self.info.clone();
 
             if let Err(err) = self.handle().await {
@@ -401,7 +402,7 @@ impl<V: MaybeVersioned> OutgoingFramesHandler<V> {
     /// Spawns outgoing frames handler.
     fn spawn(self) -> JoinHandle<UniqueId> {
         tokio::spawn(async move {
-            let id = self.id.clone();
+            let id = self.id;
             let info = self.info.clone();
 
             if let Err(err) = self.handle().await {

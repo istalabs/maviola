@@ -62,6 +62,7 @@ pub enum ConnectionDetails {
     /// Network with multiple connections.
     Network,
     /// Custom connection.
+    #[cfg(feature = "unstable")]
     Custom {
         /// Name of the custom connection.
         name: String,
@@ -136,6 +137,7 @@ pub enum ChannelDetails {
         path: PathBuf,
     },
     /// Custom channel.
+    #[cfg(feature = "unstable")]
     Custom {
         /// Name of the custom connection.
         conn_name: String,
@@ -193,7 +195,7 @@ impl ConnectionInfo {
     }
 
     fn make_channel_info_inner(&self, details: ChannelDetails) -> ChannelInfo {
-        ChannelInfo::new(self.id.clone(), details)
+        ChannelInfo::new(self.id, details)
     }
 }
 

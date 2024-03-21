@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-use crate::core::io::{ConnectionConf, ConnectionDetails, ConnectionInfo, Retry};
+use crate::core::io::{ConnectionConf, ConnectionInfo, Retry};
 use crate::core::marker::{MaybeConnConf, NodeKind, Proxy};
 use crate::core::node::{IntoNodeConf, NodeConf};
 use crate::core::utils::UniqueId;
@@ -30,7 +30,7 @@ use crate::prelude::*;
 /// let node = Node::sync::<V2>()
 ///     .id(MavLinkId::new(1, 17))
 ///     .connection(
-///         Network::synchronous()
+///         Network::sync()
 ///             // We can either specify a connection
 ///             .add_connection(TcpServer::new("127.0.0.1:5600").unwrap())
 ///             // Or the entire proxy node configuration
@@ -60,7 +60,7 @@ use crate::prelude::*;
 /// let node = Node::asnc::<V2>()
 ///     .id(MavLinkId::new(1, 17))
 ///     .connection(
-///         Network::asynchronous()
+///         Network::asnc()
 ///             // We can either specify a connection
 ///             .add_connection(TcpServer::new("127.0.0.1:5600").unwrap())
 ///             // Or the entire proxy node configuration
@@ -87,17 +87,6 @@ pub struct Network<V: MaybeVersioned, C: MaybeConnConf> {
 }
 
 impl<V: MaybeVersioned, C: MaybeConnConf> Network<V, C> {
-    /// Creates a new network.
-    pub fn new() -> Self {
-        Self {
-            info: ConnectionInfo::new(ConnectionDetails::Network),
-            nodes: Default::default(),
-            retry: Default::default(),
-            stop_on_node_down: Default::default(),
-            _version: Default::default(),
-        }
-    }
-
     /// Adds node configuration to the network.
     ///
     /// Accepts anything that can be converted into a [`NodeConf`].

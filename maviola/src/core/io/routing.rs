@@ -76,7 +76,7 @@ impl ChannelId {
     /// `connection_id`.
     pub(crate) fn new(connection_id: ConnectionId) -> Self {
         Self {
-            connection: connection_id.clone(),
+            connection: connection_id,
             channel: UniqueId::new(),
         }
     }
@@ -170,9 +170,7 @@ impl<V: MaybeVersioned> OutgoingFrame<V> {
     /// * Returns `true` for all other cases.
     pub(crate) fn matches_connection_reroute(&mut self, connection_id: &ConnectionId) -> bool {
         match self.scope() {
-            BroadcastScope::ExceptConnection(conn_id) if connection_id == conn_id => {
-                return false;
-            }
+            BroadcastScope::ExceptConnection(conn_id) if connection_id == conn_id => false,
             BroadcastScope::ExactConnection(conn_id) if connection_id == conn_id => {
                 self.set_scope(BroadcastScope::All);
                 true

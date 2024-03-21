@@ -27,7 +27,7 @@ fn make_network_node_server(addr_1: &str, addr_2: &str) -> Result<EdgeNode<V2>> 
     Node::sync()
         .id(MavLinkId::new(1, 0))
         .connection(
-            Network::synchronous()
+            Network::sync()
                 .add_connection(TcpServer::new(addr_1)?)
                 .add_connection(TcpServer::new(addr_2)?),
         )

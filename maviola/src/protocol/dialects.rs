@@ -28,7 +28,7 @@ impl KnownDialects {
     pub fn with_dialect(mut self, dialect: &'static DialectSpec) -> Self {
         self = self.with_known_dialect(dialect);
         self.main = dialect.name();
-        return self;
+        self
     }
 
     /// Adds dialect specification as a secondary (known) dialect.
@@ -36,7 +36,7 @@ impl KnownDialects {
         if !self.contains(dialect.name()) {
             self.dialects.push(dialect);
         }
-        return self;
+        self
     }
 
     /// Allow unknown dialects (default is `false`).
@@ -73,12 +73,10 @@ impl KnownDialects {
 
     /// Returns dialect specification by dialect name.
     pub fn get(&self, name: &str) -> Option<&'static DialectSpec> {
-        for &dialect in &self.dialects {
-            if dialect.name() == name {
-                return Some(dialect);
-            }
-        }
-        None
+        self.dialects
+            .iter()
+            .find(|&&dialect| dialect.name() == name)
+            .copied()
     }
 
     /// Checks if message `id` belongs to the main dialect.
@@ -104,12 +102,10 @@ impl KnownDialects {
         if self.contains_message_id(id) {
             return Some(self.main());
         }
-        for &dialect in &self.dialects {
-            if dialect.name() != self.main && dialect.message_info(id).is_ok() {
-                return Some(dialect);
-            }
-        }
-        None
+        self.dialects
+            .iter()
+            .find(|&&dialect| dialect.name() != self.main && dialect.message_info(id).is_ok())
+            .copied()
     }
 
     /// Get MAVLink message info by specified message `id` from the known dialects.

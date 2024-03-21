@@ -117,6 +117,7 @@ impl<V: MaybeVersioned> IncomingFrameProducer<V> {
     }
 
     /// Sends incoming frame.
+    #[allow(clippy::result_large_err)]
     pub fn send(&self, frame: IncomingFrame<V>) -> SendResult<IncomingFrame<V>> {
         self.sender.send(frame)
     }

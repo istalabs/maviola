@@ -26,7 +26,7 @@ async fn make_network_node_server(addr_1: &str, addr_2: &str) -> Result<EdgeNode
     Node::asnc()
         .id(MavLinkId::new(1, 0))
         .connection(
-            Network::asynchronous()
+            Network::asnc()
                 .add_connection(TcpServer::new(addr_1)?)
                 .add_connection(TcpServer::new(addr_2)?),
         )

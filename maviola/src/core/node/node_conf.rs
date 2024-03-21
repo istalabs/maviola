@@ -152,7 +152,7 @@ impl<K: NodeKind, V: MaybeVersioned, C: HasConnConf> NodeConf<K, V, C> {
         if let Some(signer) = self.signer.clone() {
             builder = builder.signer(signer);
         }
-        if let Some(compat) = self.compat.clone() {
+        if let Some(compat) = self.compat {
             builder = builder.compat(compat);
         }
 

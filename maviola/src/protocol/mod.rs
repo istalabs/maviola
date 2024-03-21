@@ -23,7 +23,8 @@ pub use signature::{
 #[cfg(feature = "unsafe")]
 pub use custom::{CustomFrameProcessors, ProcessFrame, ProcessFrameCase};
 #[cfg(not(feature = "unsafe"))]
-pub(crate) type CustomFrameProcessors = std::marker::PhantomData<()>;
+#[derive(Clone, Debug, Default)]
+pub(crate) struct CustomFrameProcessors;
 
 /// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
 #[doc(inline)]

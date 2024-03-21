@@ -524,7 +524,7 @@ pub mod builder {
         /// Set [`FrameSigner::exclude`].
         pub fn exclude(self, message_ids: &[MessageId]) -> Self {
             Self {
-                exclude: HashSet::from_iter(message_ids.iter().map(|&id| id)),
+                exclude: HashSet::from_iter(message_ids.iter().copied()),
                 ..self
             }
         }
