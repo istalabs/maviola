@@ -221,6 +221,15 @@ pub mod protocol;
 #[cfg(feature = "sync")]
 pub mod sync;
 
+#[cfg(doc)]
+#[cfg(all(
+    feature = "sync",
+    feature = "async",
+    feature = "unstable",
+    feature = "unsafe"
+))]
+pub mod docs;
+
 #[doc(inline = true)]
 /// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
 /// MAVLink dialects
