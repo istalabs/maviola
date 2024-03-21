@@ -1,6 +1,6 @@
 use crate::core::io::{BroadcastScope, ConnectionInfo};
 use crate::core::utils::Sealed;
-use crate::protocol::FrameProcessor;
+use crate::protocol::{FrameProcessor, Unset};
 
 use crate::prelude::*;
 
@@ -26,10 +26,7 @@ pub trait NodeApiInternal<V: MaybeVersioned>: Sealed {
 /// ⚠ This trait is sealed ⚠
 pub trait NodeApi<V: MaybeVersioned>: NodeApiInternal<V> {}
 
-/// Node without a defined API.
-pub struct NoApi;
-impl Sealed for NoApi {}
-impl<V: MaybeVersioned> NodeApiInternal<V> for NoApi {
+impl<V: MaybeVersioned> NodeApiInternal<V> for Unset {
     fn info(&self) -> &ConnectionInfo {
         ConnectionInfo::unknown()
     }
@@ -46,4 +43,4 @@ impl<V: MaybeVersioned> NodeApiInternal<V> for NoApi {
         unreachable!()
     }
 }
-impl<V: MaybeVersioned> NodeApi<V> for NoApi {}
+impl<V: MaybeVersioned> NodeApi<V> for Unset {}

@@ -30,8 +30,7 @@ fn spawn_client(path: PathBuf, component_id: ComponentId) {
     let whoami = format!("client #{component_id}");
 
     thread::spawn(move || -> Result<()> {
-        let mut client = Node::builder()
-            .version::<V2>()
+        let mut client = Node::sync::<V2>()
             .system_id(31)
             .component_id(component_id)
             .heartbeat_interval(HEARTBEAT_INTERVAL)
@@ -63,8 +62,7 @@ fn spawn_client(path: PathBuf, component_id: ComponentId) {
 }
 
 fn run(path: PathBuf) -> Result<()> {
-    let mut server = Node::builder()
-        .version::<V2>()
+    let mut server = Node::sync::<V2>()
         .system_id(17)
         .component_id(42)
         .heartbeat_interval(HEARTBEAT_INTERVAL)

@@ -11,8 +11,7 @@ fn port() -> Port {
 }
 
 fn make_server(address: &str, link_id: SignedLinkId, key: &str) -> Result<EdgeNode<V2>> {
-    let server = Node::builder()
-        .version::<V2>()
+    let server = Node::sync()
         .id(MavLinkId::new(1, 0))
         .connection(TcpServer::new(address)?)
         .signer(FrameSigner::new(link_id, key))
@@ -22,8 +21,7 @@ fn make_server(address: &str, link_id: SignedLinkId, key: &str) -> Result<EdgeNo
 }
 
 fn make_unauthorized_client(address: &str) -> Result<EdgeNode<V2>> {
-    let unauthorized_client = Node::builder()
-        .version::<V2>()
+    let unauthorized_client = Node::sync()
         .id(MavLinkId::new(1, 1))
         .connection(TcpClient::new(address)?)
         .build()?;
@@ -32,8 +30,7 @@ fn make_unauthorized_client(address: &str) -> Result<EdgeNode<V2>> {
 }
 
 fn make_authorized_client(address: &str, link_id: SignedLinkId, key: &str) -> Result<EdgeNode<V2>> {
-    let authorised_client = Node::builder()
-        .version::<V2>()
+    let authorised_client = Node::sync()
         .id(MavLinkId::new(1, 2))
         .connection(TcpClient::new(address)?)
         .signer(FrameSigner::new(link_id, key))

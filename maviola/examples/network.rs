@@ -24,8 +24,7 @@ fn addr(port: Port) -> String {
 }
 
 fn make_network_node_server(addr_1: &str, addr_2: &str) -> Result<EdgeNode<V2>> {
-    Node::builder()
-        .version::<V2>()
+    Node::sync()
         .id(MavLinkId::new(1, 0))
         .connection(
             Network::synchronous()
@@ -36,8 +35,7 @@ fn make_network_node_server(addr_1: &str, addr_2: &str) -> Result<EdgeNode<V2>> 
 }
 
 fn make_client(addr: &str, component_id: ComponentId) -> Result<EdgeNode<V2>> {
-    Node::builder()
-        .version::<V2>()
+    Node::sync()
         .id(MavLinkId::new(1, component_id))
         .connection(TcpClient::new(addr)?)
         .build()

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
@@ -59,6 +60,11 @@ impl<V: MaybeVersioned> NodeApiInternal<V> for AsyncApi<V> {
     }
 }
 impl<V: MaybeVersioned> NodeApi<V> for AsyncApi<V> {}
+impl<V: MaybeVersioned> Debug for AsyncApi<V> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AsyncApi").finish_non_exhaustive()
+    }
+}
 
 impl<V: MaybeVersioned> AsyncApi<V> {
     pub(super) fn new(connection: Connection<V>, processor: Arc<FrameProcessor>) -> Self {

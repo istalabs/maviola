@@ -23,9 +23,8 @@ use crate::prelude::*;
 /// let addr = "127.0.0.1:5600";
 ///
 /// // Create a TCP server node
-/// let node = Node::builder()
+/// let node = Node::sync::<V2>()
 ///         /* define other node parameters */
-/// #       .version::<V2>()
 /// #       .system_id(1)
 /// #       .component_id(1)
 ///         .connection(
@@ -43,12 +42,11 @@ use crate::prelude::*;
 /// let addr = "127.0.0.1:5600";
 ///
 /// // Create a TCP server node
-/// let node = Node::builder()
+/// let node = Node::asnc::<V2>()
 ///         /* define other node parameters */
-/// #       .version::<V2>()
 /// #       .system_id(1)
 /// #       .component_id(1)
-///         .async_connection(
+///         .connection(
 ///             TcpServer::new(addr)    // Configure TCP server connection
 ///                 .unwrap()
 ///         ).build().await.unwrap();

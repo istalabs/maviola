@@ -26,9 +26,8 @@ use crate::prelude::*;
 /// let host = "127.0.0.1";
 ///
 /// // Create a UDP client node
-/// let node = Node::builder()
+/// let node = Node::sync::<V2>()
 ///         /* define other node parameters */
-/// #       .version::<V2>()
 /// #       .system_id(1)
 /// #       .component_id(1)
 ///         .connection(
@@ -49,12 +48,11 @@ use crate::prelude::*;
 /// let host = "127.0.0.1";
 ///
 /// // Create a UDP client node
-/// let node = Node::builder()
+/// let node = Node::asnc::<V2>()
 ///         /* define other node parameters */
-/// #       .version::<V2>()
 /// #       .system_id(1)
 /// #       .component_id(1)
-///         .async_connection(
+///         .connection(
 ///             UdpClient::new(addr)    // Configure UDP client connection
 ///                 .unwrap()
 ///                 .with_host(host)        // set bind host (random port will be used for bind addr)

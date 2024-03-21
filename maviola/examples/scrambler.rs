@@ -96,23 +96,20 @@ impl ProcessFrame for CustomProcessor {
 
 fn run(addr: &str) -> Result<()> {
     // A server that knows, how to scramble and unscramble messages
-    let server = Node::builder()
-        .version::<V2>()
+    let server = Node::sync::<V2>()
         .id(MavLinkId::new(1, 0))
         .connection(TcpServer::new(addr)?)
         .add_processor("scrambler", CustomProcessor::default())
         .build()?;
     // A client that knows, how to scramble and unscramble messages
-    let secure_client = Node::builder()
-        .version::<V2>()
+    let secure_client = Node::sync::<V2>()
         .id(MavLinkId::new(1, 0))
         .connection(TcpClient::new(addr)?)
         .add_processor("scrambler", CustomProcessor::default())
         .build()?;
     // A regular client, that knows nothing about scrambling algorithm and will fail to decode
     // messages
-    let unsecure_client = Node::builder()
-        .version::<V2>()
+    let unsecure_client = Node::sync::<V2>()
         .id(MavLinkId::new(1, 0))
         .connection(TcpClient::new(addr)?)
         .build()?;

@@ -29,13 +29,12 @@ async fn spawn_client(path: PathBuf, component_id: ComponentId) {
     let whoami = format!("client #{component_id}");
 
     tokio::spawn(async move {
-        let mut client = Node::builder()
-            .version::<V2>()
+        let mut client = Node::asnc::<V2>()
             .system_id(31)
             .component_id(component_id)
             .heartbeat_interval(HEARTBEAT_INTERVAL)
             .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-            .async_connection(SockClient::new(path)?)
+            .connection(SockClient::new(path)?)
             .build()
             .await?;
         client.activate().await?;
@@ -64,13 +63,12 @@ async fn spawn_client(path: PathBuf, component_id: ComponentId) {
 }
 
 async fn run(path: PathBuf) -> Result<()> {
-    let mut server = Node::builder()
-        .version::<V2>()
+    let mut server = Node::asnc::<V2>()
         .system_id(17)
         .component_id(42)
         .heartbeat_interval(HEARTBEAT_INTERVAL)
         .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-        .async_connection(SockServer::new(path.as_path())?)
+        .connection(SockServer::new(path.as_path())?)
         .build()
         .await?;
     server.activate().await?;

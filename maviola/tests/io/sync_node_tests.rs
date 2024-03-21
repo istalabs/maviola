@@ -56,8 +56,7 @@ fn initialize() {
 }
 
 pub fn make_tcp_server_node_v2(port: Port) -> EdgeNode<V2> {
-    Node::builder()
-        .version::<V2>()
+    Node::sync::<V2>()
         .system_id(DEFAULT_TCP_SERVER_SYS_ID)
         .component_id(DEFAULT_TCP_SERVER_COMP_ID)
         .connection(TcpServer::new(make_addr(port)).unwrap())
@@ -66,8 +65,7 @@ pub fn make_tcp_server_node_v2(port: Port) -> EdgeNode<V2> {
 }
 
 pub fn make_tcp_client_node_v2(port: Port, component_id: u8) -> EdgeNode<V2> {
-    Node::builder()
-        .version::<V2>()
+    Node::sync::<V2>()
         .system_id(DEFAULT_TCP_CLIENT_SYS_ID)
         .component_id(component_id)
         .connection(TcpClient::new(make_addr(port)).unwrap())
@@ -148,8 +146,7 @@ fn events_are_received() {
     initialize();
 
     let port = unused_port();
-    let server_node = Node::builder()
-        .version::<V2>()
+    let server_node = Node::sync::<V2>()
         .system_id(1)
         .component_id(1)
         .connection(TcpServer::new(make_addr(port)).unwrap())
@@ -184,8 +181,7 @@ fn heartbeats_are_sent() {
     initialize();
 
     let port = unused_port();
-    let mut server_node = Node::builder()
-        .version::<V2>()
+    let mut server_node = Node::sync::<V2>()
         .system_id(1)
         .component_id(1)
         .connection(TcpServer::new(make_addr(port)).unwrap())
@@ -206,12 +202,13 @@ fn heartbeats_are_sent() {
 }
 
 #[test]
-fn node_no_id_no_dialect_no_version() {
+fn node_no_id_no_version() {
     initialize();
 
     let port = unused_port();
     let server_node = make_tcp_server_node_v2(port);
     let client_node = Node::builder()
+        .sync()
         .connection(TcpClient::new(make_addr(port)).unwrap())
         .build()
         .unwrap();
@@ -257,37 +254,12 @@ fn node_no_id_no_dialect_no_version() {
 }
 
 #[test]
-fn node_no_id_no_version() {
-    initialize();
-
-    let port = unused_port();
-    let server_node = make_tcp_server_node_v2(port);
-    let client_node = Node::builder()
-        .connection(TcpClient::new(make_addr(port)).unwrap())
-        .build()
-        .unwrap();
-    wait();
-
-    server_node
-        .send(&minimal::messages::Heartbeat::default())
-        .unwrap();
-    wait_long();
-
-    assert!(matches!(client_node.try_recv().unwrap(), Event::NewPeer(_)));
-    assert!(matches!(
-        client_node.try_recv().unwrap(),
-        Event::Frame(_, _)
-    ));
-}
-
-#[test]
 fn node_no_id() {
     initialize();
 
     let port = unused_port();
     let server_node = make_tcp_server_node_v2(port);
-    let client_node = Node::builder()
-        .version::<V2>()
+    let client_node = Node::sync::<V2>()
         .connection(TcpClient::new(make_addr(port)).unwrap())
         .build()
         .unwrap();
@@ -313,6 +285,7 @@ fn node_no_version() {
     let port = unused_port();
     let server_node = make_tcp_server_node_v2(port);
     let client_node = Node::builder()
+        .sync()
         .system_id(42)
         .component_id(142)
         .connection(TcpClient::new(make_addr(port)).unwrap())

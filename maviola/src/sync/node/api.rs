@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -54,6 +55,11 @@ impl<V: MaybeVersioned> NodeApiInternal<V> for SyncApi<V> {
     }
 }
 impl<V: MaybeVersioned> NodeApi<V> for SyncApi<V> {}
+impl<V: MaybeVersioned> Debug for SyncApi<V> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SyncApi").finish_non_exhaustive()
+    }
+}
 
 impl<V: MaybeVersioned> SyncApi<V> {
     pub(super) fn new(connection: Connection<V>, processor: Arc<FrameProcessor>) -> Self {

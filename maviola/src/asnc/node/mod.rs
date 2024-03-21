@@ -3,6 +3,7 @@
 pub(in crate::asnc) mod api;
 mod build_ext;
 mod callback;
+mod conf_ext;
 mod event;
 mod ext;
 pub(super) mod handler;
@@ -33,11 +34,10 @@ use crate::core::node::Node;
 /// let addr = "127.0.0.1:5600";
 ///
 /// // Create a node from configuration
-/// let mut node = Node::builder()
-///     .version::<V2>()                // restrict node to MAVLink2 protocol version
+/// let mut node = Node::asnc::<V2>()
 ///     .system_id(1)               // System `ID`
 ///     .component_id(1)            // Component `ID`
-///     .async_connection(
+///     .connection(
 ///         TcpServer::new(addr)    // Configure TCP server connection
 ///             .unwrap()
 ///     ).build().await.unwrap();

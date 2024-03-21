@@ -6,7 +6,7 @@ mod callback;
 mod node_builder;
 mod node_conf;
 
-pub use api::{NoApi, NodeApi};
+pub use api::NodeApi;
 pub use base::Node;
 pub use callback::CallbackApi;
 pub use node_builder::NodeBuilder;

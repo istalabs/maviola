@@ -7,7 +7,7 @@ use crate::core::marker::{
     Proxy, Unset,
 };
 use crate::core::node::node_conf::IntoNodeConf;
-use crate::core::node::NodeConf;
+use crate::core::node::{NodeApi, NodeConf};
 #[cfg(feature = "unsafe")]
 use crate::protocol::ProcessFrame;
 use crate::protocol::{
@@ -19,8 +19,13 @@ use crate::prelude::*;
 
 /// Builder for [`Node`] and [`NodeConf`].
 #[derive(Clone, Debug)]
-pub struct NodeBuilder<S: MaybeSystemId, C: MaybeComponentId, V: MaybeVersioned, CC: MaybeConnConf>
-{
+pub struct NodeBuilder<
+    S: MaybeSystemId,
+    C: MaybeComponentId,
+    V: MaybeVersioned,
+    CC: MaybeConnConf,
+    A: NodeApi<V>,
+> {
     pub(crate) system_id: S,
     pub(crate) component_id: C,
     pub(crate) conn_conf: CC,
@@ -31,10 +36,11 @@ pub struct NodeBuilder<S: MaybeSystemId, C: MaybeComponentId, V: MaybeVersioned,
     pub(crate) compat: Option<CompatProcessor>,
     pub(crate) processors: CustomFrameProcessors,
     pub(crate) _version: PhantomData<V>,
+    pub(crate) _api: PhantomData<A>,
 }
 
-impl NodeBuilder<Unset, Unset, Versionless, Unset> {
-    /// Instantiate an empty [`NodeBuilder`].
+impl NodeBuilder<Unset, Unset, Versionless, Unset, Unset> {
+    /// Instantiate an empty versionless [`NodeBuilder`].
     pub fn new() -> Self {
         Self {
             system_id: Unset,
@@ -47,13 +53,35 @@ impl NodeBuilder<Unset, Unset, Versionless, Unset> {
             compat: None,
             processors: Default::default(),
             _version: PhantomData,
+            _api: PhantomData,
         }
     }
 }
 
-impl<V: MaybeVersioned, CC: MaybeConnConf> NodeBuilder<Unset, Unset, V, CC> {
+impl<S: MaybeSystemId, C: MaybeComponentId, V: MaybeVersioned, CC: MaybeConnConf>
+    NodeBuilder<S, C, V, CC, Unset>
+{
+    /// Set [`NodeConf::version`].
+    pub fn version<Version: MaybeVersioned>(self) -> NodeBuilder<S, C, Version, CC, Unset> {
+        NodeBuilder {
+            system_id: self.system_id,
+            component_id: self.component_id,
+            conn_conf: self.conn_conf,
+            heartbeat_timeout: self.heartbeat_timeout,
+            heartbeat_interval: self.heartbeat_interval,
+            dialects: self.dialects,
+            signer: self.signer,
+            compat: self.compat,
+            processors: self.processors,
+            _version: PhantomData,
+            _api: PhantomData,
+        }
+    }
+}
+
+impl<V: MaybeVersioned, CC: MaybeConnConf, A: NodeApi<V>> NodeBuilder<Unset, Unset, V, CC, A> {
     /// Set [`NodeConf::system_id`] and [`NodeConf::component_id`].
-    pub fn id(self, id: MavLinkId) -> NodeBuilder<HasSystemId, HasComponentId, V, CC> {
+    pub fn id(self, id: MavLinkId) -> NodeBuilder<HasSystemId, HasComponentId, V, CC, A> {
         NodeBuilder {
             system_id: HasSystemId(id.system),
             component_id: HasComponentId(id.component),
@@ -65,13 +93,16 @@ impl<V: MaybeVersioned, CC: MaybeConnConf> NodeBuilder<Unset, Unset, V, CC> {
             compat: self.compat,
             processors: self.processors,
             _version: self._version,
+            _api: self._api,
         }
     }
 }
 
-impl<C: MaybeComponentId, V: MaybeVersioned, CC: MaybeConnConf> NodeBuilder<Unset, C, V, CC> {
+impl<C: MaybeComponentId, V: MaybeVersioned, CC: MaybeConnConf, A: NodeApi<V>>
+    NodeBuilder<Unset, C, V, CC, A>
+{
     /// Set [`NodeConf::system_id`].
-    pub fn system_id(self, system_id: SystemId) -> NodeBuilder<HasSystemId, C, V, CC> {
+    pub fn system_id(self, system_id: SystemId) -> NodeBuilder<HasSystemId, C, V, CC, A> {
         NodeBuilder {
             system_id: HasSystemId(system_id),
             component_id: self.component_id,
@@ -83,13 +114,19 @@ impl<C: MaybeComponentId, V: MaybeVersioned, CC: MaybeConnConf> NodeBuilder<Unse
             compat: self.compat,
             processors: self.processors,
             _version: self._version,
+            _api: self._api,
         }
     }
 }
 
-impl<S: MaybeSystemId, V: MaybeVersioned, CC: MaybeConnConf> NodeBuilder<S, Unset, V, CC> {
+impl<S: MaybeSystemId, V: MaybeVersioned, CC: MaybeConnConf, A: NodeApi<V>>
+    NodeBuilder<S, Unset, V, CC, A>
+{
     /// Set [`NodeConf::component_id`].
-    pub fn component_id(self, component_id: ComponentId) -> NodeBuilder<S, HasComponentId, V, CC> {
+    pub fn component_id(
+        self,
+        component_id: ComponentId,
+    ) -> NodeBuilder<S, HasComponentId, V, CC, A> {
         NodeBuilder {
             system_id: self.system_id,
             component_id: HasComponentId(component_id),
@@ -101,12 +138,18 @@ impl<S: MaybeSystemId, V: MaybeVersioned, CC: MaybeConnConf> NodeBuilder<S, Unse
             compat: self.compat,
             processors: self.processors,
             _version: self._version,
+            _api: self._api,
         }
     }
 }
 
-impl<S: MaybeSystemId, C: MaybeComponentId, V: MaybeVersioned, CC: MaybeConnConf>
-    NodeBuilder<S, C, V, CC>
+impl<
+        S: MaybeSystemId,
+        C: MaybeComponentId,
+        V: MaybeVersioned,
+        CC: MaybeConnConf,
+        A: NodeApi<V>,
+    > NodeBuilder<S, C, V, CC, A>
 {
     /// Set [`NodeConf::heartbeat_timeout`].
     pub fn heartbeat_timeout(self, heartbeat_timeout: Duration) -> Self {
@@ -171,25 +214,9 @@ impl<S: MaybeSystemId, C: MaybeComponentId, V: MaybeVersioned, CC: MaybeConnConf
     }
 }
 
-impl<S: MaybeSystemId, C: MaybeComponentId, CC: MaybeConnConf> NodeBuilder<S, C, Versionless, CC> {
-    /// Set [`NodeConf::version`].
-    pub fn version<Version: MaybeVersioned>(self) -> NodeBuilder<S, C, Version, CC> {
-        NodeBuilder {
-            system_id: self.system_id,
-            component_id: self.component_id,
-            conn_conf: self.conn_conf,
-            heartbeat_timeout: self.heartbeat_timeout,
-            heartbeat_interval: self.heartbeat_interval,
-            dialects: self.dialects,
-            signer: self.signer,
-            compat: self.compat,
-            processors: self.processors,
-            _version: PhantomData,
-        }
-    }
-}
-
-impl<V: Versioned, CC: MaybeConnConf> NodeBuilder<HasSystemId, HasComponentId, V, CC> {
+impl<V: Versioned, CC: MaybeConnConf, A: NodeApi<V>>
+    NodeBuilder<HasSystemId, HasComponentId, V, CC, A>
+{
     /// Set [`NodeConf::heartbeat_interval`].
     ///
     /// This parameter makes sense only for nodes that are identified, has a specified dialect
@@ -203,7 +230,7 @@ impl<V: Versioned, CC: MaybeConnConf> NodeBuilder<HasSystemId, HasComponentId, V
     pub fn heartbeat_interval(
         self,
         heartbeat_interval: Duration,
-    ) -> NodeBuilder<HasSystemId, HasComponentId, V, CC> {
+    ) -> NodeBuilder<HasSystemId, HasComponentId, V, CC, A> {
         NodeBuilder {
             heartbeat_interval,
             ..self
@@ -211,7 +238,7 @@ impl<V: Versioned, CC: MaybeConnConf> NodeBuilder<HasSystemId, HasComponentId, V
     }
 }
 
-impl<V: MaybeVersioned, CC: HasConnConf> NodeBuilder<Unset, Unset, V, CC> {
+impl<V: MaybeVersioned, CC: HasConnConf, A: NodeApi<V>> NodeBuilder<Unset, Unset, V, CC, A> {
     /// Build and instance of [`NodeConf`] without defined [`NodeConf::system_id`] and
     /// [`NodeConf::component_id`].
     pub fn conf(self) -> NodeConf<Proxy, V, CC> {
@@ -229,7 +256,9 @@ impl<V: MaybeVersioned, CC: HasConnConf> NodeBuilder<Unset, Unset, V, CC> {
     }
 }
 
-impl<V: MaybeVersioned, CC: HasConnConf> NodeBuilder<HasSystemId, HasComponentId, V, CC> {
+impl<V: MaybeVersioned, CC: HasConnConf, A: NodeApi<V>>
+    NodeBuilder<HasSystemId, HasComponentId, V, CC, A>
+{
     /// Build and instance of [`NodeConf`] with defined [`NodeConf::system_id`] and
     /// [`NodeConf::component_id`].
     pub fn conf(self) -> NodeConf<Edge<V>, V, CC> {
@@ -249,22 +278,23 @@ impl<V: MaybeVersioned, CC: HasConnConf> NodeBuilder<HasSystemId, HasComponentId
     }
 }
 
-impl Default for NodeBuilder<Unset, Unset, Versionless, Unset> {
+impl Default for NodeBuilder<Unset, Unset, Versionless, Unset, Unset> {
+    /// Instantiate an empty versionless [`NodeBuilder`].
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<V: MaybeVersioned, C: HasConnConf> IntoNodeConf<Proxy, V, C>
-    for NodeBuilder<Unset, Unset, V, C>
+impl<V: MaybeVersioned, C: HasConnConf, A: NodeApi<V>> IntoNodeConf<Proxy, V, C>
+    for NodeBuilder<Unset, Unset, V, C, A>
 {
     fn into_node_conf(self) -> NodeConf<Proxy, V, C> {
         self.conf()
     }
 }
 
-impl<V: MaybeVersioned, C: HasConnConf> IntoNodeConf<Edge<V>, V, C>
-    for NodeBuilder<HasSystemId, HasComponentId, V, C>
+impl<V: MaybeVersioned, C: HasConnConf, A: NodeApi<V>> IntoNodeConf<Edge<V>, V, C>
+    for NodeBuilder<HasSystemId, HasComponentId, V, C, A>
 {
     fn into_node_conf(self) -> NodeConf<Edge<V>, V, C> {
         self.conf()

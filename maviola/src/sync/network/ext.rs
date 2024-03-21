@@ -29,7 +29,7 @@ impl<V: MaybeVersioned> Network<V, ConnConf<V>> {
         mut self,
         conn_conf: impl ConnectionBuilder<V> + 'static,
     ) -> Network<V, ConnConf<V>> {
-        let node = Node::builder().version::<V>().connection(conn_conf).conf();
+        let node = Node::sync::<V>().connection(conn_conf).conf();
         self.nodes.insert(UniqueId::new(), node);
 
         Network {
@@ -48,8 +48,7 @@ impl<V: MaybeVersioned> Network<V, ConnConf<V>> {
         conn_conf: impl ConnectionBuilder<V> + 'static,
         signer: FrameSigner,
     ) -> Network<V, ConnConf<V>> {
-        let node = Node::builder()
-            .version::<V>()
+        let node = Node::sync::<V>()
             .connection(conn_conf)
             .signer(signer)
             .conf();
@@ -94,32 +93,25 @@ mod tests {
         let addr_2 = format!("127.0.0.1:{}", pick_unused_port().unwrap());
 
         let network = Network::synchronous()
-            .add_node(
-                Node::builder()
-                    .version::<V2>()
-                    .connection(TcpServer::new(addr_1.as_str()).unwrap()),
-            )
+            .add_node(Node::sync::<V2>().connection(TcpServer::new(addr_1.as_str()).unwrap()))
             .add_connection(TcpServer::new(addr_2.as_str()).unwrap());
 
         assert_eq!(network.nodes.len(), 2);
 
-        let server = Node::builder()
-            .version::<V2>()
+        let server = Node::sync::<V2>()
             .id(MavLinkId::new(1, 0))
             .connection(network)
             .build()
             .unwrap();
         wait();
 
-        let client_1 = Node::builder()
-            .version::<V2>()
+        let client_1 = Node::sync::<V2>()
             .id(MavLinkId::new(1, 1))
             .connection(TcpClient::new(addr_1.as_str()).unwrap())
             .build()
             .unwrap();
 
-        let client_2 = Node::builder()
-            .version::<V2>()
+        let client_2 = Node::sync::<V2>()
             .id(MavLinkId::new(1, 2))
             .connection(TcpClient::new(addr_2.as_str()).unwrap())
             .build()
@@ -146,8 +138,7 @@ mod tests {
     fn network_reconnect() {
         let addr = format!("127.0.0.1:{}", pick_unused_port().unwrap());
 
-        let server_conf = Node::builder()
-            .version::<V2>()
+        let server_conf = Node::sync::<V2>()
             .id(MavLinkId::new(1, 0))
             .connection(TcpServer::new(addr.as_str()).unwrap())
             .conf();
@@ -158,8 +149,7 @@ mod tests {
         let network = Network::synchronous()
             .add_connection(TcpClient::new(addr.as_str()).unwrap())
             .retry(Retry::Always(RECONNECT_INTERVAL));
-        let client = Node::builder()
-            .version::<V2>()
+        let client = Node::sync::<V2>()
             .id(MavLinkId::new(1, 1))
             .connection(network)
             .build()

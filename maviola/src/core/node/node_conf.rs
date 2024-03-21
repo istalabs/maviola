@@ -4,9 +4,7 @@ use std::marker::PhantomData;
 use std::time::Duration;
 
 use crate::core::consts::DEFAULT_HEARTBEAT_INTERVAL;
-use crate::core::marker::{
-    Edge, HasComponentId, HasConnConf, HasSystemId, MaybeConnConf, NodeKind, Proxy, Unset,
-};
+use crate::core::marker::{Edge, HasConnConf, MaybeConnConf, NodeKind, Proxy, Unset};
 use crate::core::node::NodeBuilder;
 use crate::protocol::{
     ComponentId, CustomFrameProcessors, DialectSpec, FrameProcessor, FrameSigner, KnownDialects,
@@ -47,14 +45,14 @@ impl NodeConf<Proxy, Versionless, Unset> {
     ///
     /// # Usage
     ///
-    /// Create node configuration.
+    /// Create a synchronous node configuration.
     ///
     /// ```rust
     /// use maviola::core::node::NodeConf;
     /// use maviola::core::io::TcpClient;
-    /// use maviola::dialects::Minimal;
     ///
     /// let node = NodeConf::builder()
+    ///     .sync()
     ///     .system_id(10)
     ///     .component_id(42)
     ///     .connection(TcpClient::new("localhost:5600").unwrap())
@@ -71,10 +69,11 @@ impl NodeConf<Proxy, Versionless, Unset> {
     /// use maviola::core::io::TcpClient;
     ///
     /// let node = NodeConf::builder()
+    ///     .sync()
     ///     .connection(TcpClient::new("localhost:5600").unwrap())
     ///     .conf();
     /// ```
-    pub fn builder() -> NodeBuilder<Unset, Unset, Versionless, Unset> {
+    pub fn builder() -> NodeBuilder<Unset, Unset, Versionless, Unset, Unset> {
         NodeBuilder::new()
     }
 }
@@ -175,42 +174,6 @@ impl<V: Versioned, C: HasConnConf> NodeConf<Edge<V>, V, C> {
     }
 }
 
-impl<V: MaybeVersioned, C: HasConnConf> NodeConf<Edge<V>, V, C> {
-    /// Creates a [`NodeBuilder`] initialised with current configuration.
-    pub fn update(self) -> NodeBuilder<HasSystemId, HasComponentId, V, C> {
-        NodeBuilder {
-            system_id: HasSystemId(self.kind.endpoint.system_id()),
-            component_id: HasComponentId(self.kind.endpoint.component_id()),
-            conn_conf: self.connection_conf,
-            heartbeat_timeout: self.heartbeat_timeout,
-            heartbeat_interval: self.heartbeat_timeout,
-            dialects: self.dialects,
-            signer: self.signer,
-            compat: self.compat,
-            processors: self.processors,
-            _version: PhantomData,
-        }
-    }
-}
-
-impl<V: MaybeVersioned, C: HasConnConf> NodeConf<Proxy, V, C> {
-    /// Creates a [`NodeBuilder`] initialised with current configuration.
-    pub fn update(self) -> NodeBuilder<Unset, Unset, V, C> {
-        NodeBuilder {
-            system_id: Unset,
-            component_id: Unset,
-            conn_conf: self.connection_conf,
-            heartbeat_timeout: self.heartbeat_timeout,
-            heartbeat_interval: self.heartbeat_timeout,
-            dialects: self.dialects,
-            signer: self.signer,
-            compat: self.compat,
-            processors: self.processors,
-            _version: PhantomData,
-        }
-    }
-}
-
 impl<K: NodeKind, V: MaybeVersioned, C: MaybeConnConf> NodeConf<K, V, C> {
     /// Converts arbitrary node configuration into a [`Proxy`] by stripping unnecessary information.
     ///
@@ -248,6 +211,7 @@ mod tests {
     #[test]
     fn node_conf_no_dialect_builder_workflow() {
         let node = NodeConf::builder()
+            .sync()
             .system_id(10)
             .component_id(42)
             .connection(TcpClient::new("localhost:5600").unwrap())
@@ -260,6 +224,7 @@ mod tests {
     #[test]
     fn node_conf_no_dialect_no_id_builder_workflow() {
         NodeConf::builder()
+            .sync()
             .connection(TcpClient::new("localhost:5600").unwrap())
             .conf();
     }
@@ -267,6 +232,7 @@ mod tests {
     #[test]
     fn node_conf_builder_workflow() {
         let node_conf = NodeConf::builder()
+            .sync()
             .system_id(10)
             .component_id(42)
             .connection(TcpClient::new("localhost:5600").unwrap())

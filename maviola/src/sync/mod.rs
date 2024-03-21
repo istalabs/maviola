@@ -8,9 +8,9 @@
 //!
 //! ## Usage
 //!
-//! To use synchronous API, you have to configure node to use asynchronous connection using
-//! [`NodeBuilder::connection`](crate::core::node::NodeBuilder::connection).
-//! For example, the following snippet will create a synchronous TCP client:
+//! To use asynchronous API, you have to first configure node builder using
+//! [`Node::sync`](crate::core::node::Node::sync). For example, the following snippet will create
+//! an asynchronous TCP client:
 //!
 //! ```rust,no_run
 //! use maviola::prelude::*;
@@ -18,9 +18,8 @@
 //! let addr = "127.0.0.1:5600";
 //!
 //! // Create a TCP client node
-//! let node = Node::builder()
+//! let node = Node::sync::<V2>()
 //!         /* define other node parameters */
-//! #       .version::<V2>()
 //! #       .system_id(1)
 //! #       .component_id(1)
 //!         .connection(

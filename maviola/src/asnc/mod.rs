@@ -8,9 +8,9 @@
 //!
 //! ## Usage
 //!
-//! To use asynchronous API, you have to configure node to use asynchronous connection using
-//! [`NodeBuilder::async_connection`](crate::core::node::NodeBuilder::async_connection).
-//! For example, the following snippet will create an asynchronous TCP client:
+//! To use asynchronous API, you have to first configure node builder using
+//! [`Node::asnc`](crate::core::node::Node::asnc). For example, the following snippet will create
+//! an asynchronous TCP client:
 //!
 //! ```rust,no_run
 //! # #[tokio::main] async fn main() {
@@ -19,15 +19,15 @@
 //! let addr = "127.0.0.1:5600";
 //!
 //! // Create a TCP client node
-//! let node = Node::builder()
+//! let node = Node::asnc::<V2>()
 //!         /* define other node parameters */
-//! #       .version::<V2>()
 //! #       .system_id(1)
 //! #       .component_id(1)
-//!         .async_connection(
+//!         .connection(
 //!             TcpClient::new(addr)    // Configure TCP client connection
 //!                 .unwrap()
-//!         ).build().await.unwrap();
+//!         )
+//!         .build().await.unwrap();
 //! # }
 //! ```
 //!

@@ -1,5 +1,6 @@
 //! # 🔒 Asynchronous I/O extensions for node
 
+use mavio::protocol::Unset;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
@@ -7,14 +8,26 @@ use tokio_stream::Stream;
 
 use crate::asnc::marker::AsyncConnConf;
 use crate::asnc::node::api::{EventReceiver, FrameSender};
-use crate::core::marker::{Edge, NodeKind};
-use crate::core::node::NodeConf;
+use crate::core::marker::{Edge, NodeKind, Proxy};
+use crate::core::node::{NodeBuilder, NodeConf};
 use crate::core::utils::Guarded;
 use crate::error::NodeError;
 use crate::protocol::{Behold, Peer};
 
 use crate::asnc::prelude::*;
 use crate::prelude::*;
+
+impl Node<Proxy, Versionless, Unset> {
+    /// <sup>[`async`](crate::asnc)</sup>
+    /// Instantiate an empty [`NodeBuilder`] with specified MAVLink protocol version in asynchronous
+    /// mode.
+    ///
+    /// The version either should be specified using [turbofish](https://turbo.fish/about) syntax
+    /// or can be derived by Rust compiler.
+    pub fn asnc<V: MaybeVersioned>() -> NodeBuilder<Unset, Unset, V, Unset, AsyncApi<V>> {
+        NodeBuilder::asynchronous().version::<V>()
+    }
+}
 
 impl<K: NodeKind, V: MaybeVersioned> Node<K, V, AsyncApi<V>> {
     /// <sup>[`async`](crate::asnc)</sup>

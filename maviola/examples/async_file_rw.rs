@@ -19,11 +19,10 @@ fn report_frame<V: MaybeVersioned>(frame: &Frame<V>) {
 }
 
 async fn run(path: PathBuf) -> Result<()> {
-    let writer = Node::builder()
-        .version::<V2>()
+    let writer = Node::asnc::<V2>()
         .system_id(17)
         .component_id(42)
-        .async_connection(FileWriter::new(path.as_path())?)
+        .connection(FileWriter::new(path.as_path())?)
         .build()
         .await?;
 
@@ -36,11 +35,10 @@ async fn run(path: PathBuf) -> Result<()> {
     drop(writer);
     log::warn!("[writer] finished");
 
-    let reader = Node::builder()
-        .version::<V2>()
+    let reader = Node::asnc::<V2>()
         .system_id(17)
         .component_id(42)
-        .async_connection(FileReader::new(path.as_path())?)
+        .connection(FileReader::new(path.as_path())?)
         .build()
         .await?;
 

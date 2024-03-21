@@ -18,9 +18,8 @@ use crate::prelude::*;
 /// let path = "/tmp/maviola.bin";
 ///
 /// // Create a node that writes binary output to a file
-/// let node = Node::builder()
+/// let node = Node::sync::<V2>()
 ///         /* define other node parameters */
-/// #       .version::<V2>()
 /// #       .system_id(1)
 /// #       .component_id(1)
 ///         .connection(
@@ -40,12 +39,11 @@ use crate::prelude::*;
 /// let path = "/tmp/maviola.bin";
 ///
 /// // Create a node that writes binary output to a file
-/// let node = Node::builder()
+/// let node = Node::asnc::<V2>()
 ///         /* define other node parameters */
-/// #       .version::<V2>()
 /// #       .system_id(1)
 /// #       .component_id(1)
-///         .async_connection(
+///         .connection(
 ///             FileWriter::new(path)    // Configure file reader connection
 ///                 .unwrap()
 ///         ).build().await.unwrap();

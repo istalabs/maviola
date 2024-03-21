@@ -1,11 +1,12 @@
 //! # 🔒 Synchronous I/O extensions for node
 
+use mavio::protocol::Unset;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::core::marker::{Edge, NodeKind};
-use crate::core::node::NodeConf;
+use crate::core::marker::{Edge, NodeKind, Proxy};
+use crate::core::node::{NodeBuilder, NodeConf};
 use crate::core::utils::Guarded;
 use crate::error::NodeError;
 use crate::protocol::Peer;
@@ -14,6 +15,18 @@ use crate::sync::node::api::{EventReceiver, FrameSender};
 
 use crate::prelude::*;
 use crate::sync::prelude::*;
+
+impl Node<Proxy, Versionless, Unset> {
+    /// <sup>[`sync`](crate::sync)</sup>
+    /// Instantiate an empty [`NodeBuilder`] with specified MAVLink protocol version in asynchronous
+    /// mode.
+    ///
+    /// The version either should be specified using [turbofish](https://turbo.fish/about) syntax
+    /// or can be derived by Rust compiler.
+    pub fn sync<V: MaybeVersioned>() -> NodeBuilder<Unset, Unset, V, Unset, SyncApi<V>> {
+        NodeBuilder::synchronous().version::<V>()
+    }
+}
 
 impl<K: NodeKind, V: MaybeVersioned> Node<K, V, SyncApi<V>> {
     /// <sup>[`sync`](crate::sync)</sup>

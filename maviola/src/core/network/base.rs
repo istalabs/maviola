@@ -1,7 +1,8 @@
-use crate::core::io::{ConnectionConf, ConnectionDetails, ConnectionInfo, Retry};
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::marker::PhantomData;
 
+use crate::core::io::{ConnectionConf, ConnectionDetails, ConnectionInfo, Retry};
 use crate::core::marker::{MaybeConnConf, NodeKind, Proxy};
 use crate::core::node::{IntoNodeConf, NodeConf};
 use crate::core::utils::UniqueId;
@@ -26,8 +27,7 @@ use crate::prelude::*;
 /// use maviola::prelude::*;
 /// use maviola::sync::prelude::*;
 ///
-/// let node = Node::builder()
-///     .version::<V2>()
+/// let node = Node::sync::<V2>()
 ///     .id(MavLinkId::new(1, 17))
 ///     .connection(
 ///         Network::synchronous()
@@ -35,9 +35,7 @@ use crate::prelude::*;
 ///             .add_connection(TcpServer::new("127.0.0.1:5600").unwrap())
 ///             // Or the entire proxy node configuration
 ///             .add_node(
-///                 Node::builder()
-///                     // MAVLink version should match the parent node
-///                     .version::<V2>()
+///                 Node::sync()
 ///                     .connection(TcpServer::new("127.0.0.1:5601").unwrap())
 ///                     /* other node configuration */
 ///             )
@@ -59,19 +57,16 @@ use crate::prelude::*;
 /// use maviola::prelude::*;
 /// use maviola::asnc::prelude::*;
 ///
-/// let node = Node::builder()
-///     .version::<V2>()
+/// let node = Node::asnc::<V2>()
 ///     .id(MavLinkId::new(1, 17))
-///     .async_connection(
+///     .connection(
 ///         Network::asynchronous()
 ///             // We can either specify a connection
 ///             .add_connection(TcpServer::new("127.0.0.1:5600").unwrap())
 ///             // Or the entire proxy node configuration
 ///             .add_node(
-///                 Node::builder()
-///                     // MAVLink version should match the parent node
-///                     .version::<V2>()
-///                     .async_connection(TcpClient::new("127.0.0.1:5601").unwrap())
+///                 Node::asnc()
+///                     .connection(TcpClient::new("127.0.0.1:5601").unwrap())
 ///                     /* other node configuration */
 ///             )
 ///             // Attempt to repair disconnected nodes

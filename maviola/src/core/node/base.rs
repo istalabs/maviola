@@ -4,8 +4,7 @@ use std::time::Duration;
 
 use crate::core::io::{BroadcastScope, ConnectionInfo};
 use crate::core::marker::{Edge, NodeKind, Proxy, Unset};
-use crate::core::node::api::{NoApi, NodeApi};
-use crate::core::node::NodeBuilder;
+use crate::core::node::{NodeApi, NodeBuilder};
 use crate::core::utils::{Guarded, SharedCloser, Switch};
 use crate::protocol::{ComponentId, DialectSpec, FrameProcessor, FrameSigner, Message, SystemId};
 
@@ -76,9 +75,9 @@ use crate::prelude::*;
 ///
 /// let addr = "127.0.0.1:5600";
 ///
-/// // Create a node from configuration
-/// let mut node = Node::builder()
-///     .version::<V2>()            // restrict node to `MAVLink 2` protocol version
+/// // Create a node from synchronous configuration
+/// // with MAVLink protocol set to `V2`
+/// let mut node = Node::sync::<V2>()
 ///     .id(MavLinkId::new(1, 1))   // Set system and component IDs
 ///     .connection(
 ///         TcpServer::new(addr)    // Configure TCP server connection
@@ -98,11 +97,11 @@ use crate::prelude::*;
 ///
 /// let addr = "127.0.0.1:5600";
 ///
-/// // Create a node from configuration
-/// let mut node = Node::builder()
-///     .version::<V2>()            // restrict node to `MAVLink 2` protocol version
+/// // Create a node from asynchronous configuration
+/// // with MAVLink protocol set to `V2`
+/// let mut node = Node::asnc::<V2>()
 ///     .id(MavLinkId::new(1, 1))   // Set system and component IDs
-///     .async_connection(
+///     .connection(
 ///         TcpServer::new(addr)    // Configure TCP server connection
 ///             .unwrap()
 ///     ).build().await.unwrap();
@@ -120,8 +119,7 @@ use crate::prelude::*;
 /// use maviola::prelude::*;
 /// use maviola::sync::prelude::*;
 ///
-/// let node = Node::builder()
-///     .version::<V2>()
+/// let node = Node::sync::<V2>()
 ///     .id(MavLinkId::new(1, 1))
 ///     .connection(TcpServer::new("127.0.0.1:5600").unwrap())
 ///     .signer(
@@ -152,10 +150,9 @@ use crate::prelude::*;
 /// use maviola::prelude::*;
 /// use maviola::asnc::prelude::*;
 ///
-/// let node = Node::builder()
-///     .version::<V2>()
+/// let node = Node::asnc::<V2>()
 ///     .id(MavLinkId::new(1, 17))
-///     .async_connection(
+///     .connection(
 ///         Network::asynchronous()
 ///             .add_connection(TcpServer::new("127.0.0.1:5600").unwrap())
 ///             .add_connection(TcpServer::new("127.0.0.1:5601").unwrap())
@@ -174,9 +171,9 @@ pub struct Node<K: NodeKind, V: MaybeVersioned, A: NodeApi<V>> {
     pub(crate) _version: PhantomData<V>,
 }
 
-impl Node<Proxy, Versionless, NoApi> {
+impl Node<Proxy, Versionless, Unset> {
     /// Instantiates an empty [`NodeBuilder`].
-    pub fn builder() -> NodeBuilder<Unset, Unset, Versionless, Unset> {
+    pub fn builder() -> NodeBuilder<Unset, Unset, Versionless, Unset, Unset> {
         NodeBuilder::new()
     }
 }

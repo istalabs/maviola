@@ -35,13 +35,12 @@ async fn spawn_client(addr: &str, component_id: ComponentId) {
     let whoami = format!("client #{component_id}");
 
     tokio::spawn(async move {
-        let mut client = Node::builder()
-            .version::<V2>()
+        let mut client = Node::asnc::<V2>()
             .system_id(31)
             .component_id(component_id)
             .heartbeat_interval(HEARTBEAT_INTERVAL)
             .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-            .async_connection(TcpClient::new(client_addr)?)
+            .connection(TcpClient::new(client_addr)?)
             .build()
             .await?;
         client.activate().await?;
@@ -71,13 +70,12 @@ async fn spawn_client(addr: &str, component_id: ComponentId) {
 
 async fn run(addr: &str) -> Result<()> {
     let server_addr = addr.to_string();
-    let mut server = Node::builder()
-        .version::<V2>()
+    let mut server = Node::asnc::<V2>()
         .system_id(17)
         .component_id(42)
         .heartbeat_interval(HEARTBEAT_INTERVAL)
         .heartbeat_timeout(HEARTBEAT_TIMEOUT)
-        .async_connection(TcpServer::new(server_addr)?)
+        .connection(TcpServer::new(server_addr)?)
         .build()
         .await?;
     server.activate().await?;

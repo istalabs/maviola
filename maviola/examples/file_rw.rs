@@ -24,8 +24,7 @@ fn report_frame<V: MaybeVersioned>(frame: &Frame<V>) {
 }
 
 fn run(path: PathBuf) -> Result<()> {
-    let writer = Node::builder()
-        .version::<V2>()
+    let writer = Node::sync::<V2>()
         .system_id(17)
         .component_id(42)
         .connection(FileWriter::new(path.as_path())?)
@@ -40,8 +39,7 @@ fn run(path: PathBuf) -> Result<()> {
     wait();
     log::warn!("[writer] finished");
 
-    let reader = Node::builder()
-        .version::<V2>()
+    let reader = Node::sync::<V2>()
         .system_id(17)
         .component_id(42)
         .connection(FileReader::new(path.as_path())?)
