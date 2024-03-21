@@ -181,7 +181,7 @@ impl<
     ///
     /// Dialect should be specified via [turbofish](https://turbo.fish/about) syntax.
     ///
-    /// Default dialect is `minimal`.
+    /// Default dialect is [`DefaultDialect`].
     pub fn dialect<D: Dialect>(mut self) -> Self {
         self.dialects = self.dialects.with_dialect(D::spec());
         self
@@ -194,8 +194,8 @@ impl<
     ///
     /// Dialect should be specified via [turbofish](https://turbo.fish/about) syntax.
     ///
-    /// Default `minimal` is always among the known dialects. Internally, dialect names are used as
-    /// a dialect `ID`. So, it is technically possible to replace default dialect, but we strongly
+    /// Main dialect is always among the known dialects. Internally, dialect names are used as
+    /// a dialect `ID`. So, it is technically possible to replace main dialect, but we strongly
     /// advice against doing that.
     pub fn add_dialect<D: Dialect>(mut self) -> Self {
         self.dialects = self.dialects.with_known_dialect(D::spec());

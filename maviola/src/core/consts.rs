@@ -5,11 +5,17 @@ use std::time::Duration;
 mod default_dialect {
     #[cfg(feature = "all")]
     pub use crate::dialects::All as DefaultDialect;
+
     #[cfg(all(not(feature = "all"), feature = "ardupilotmega"))]
     pub use crate::dialects::Ardupilotmega as DefaultDialect;
+
     #[cfg(all(not(feature = "ardupilotmega"), feature = "common"))]
     pub use crate::dialects::Common as DefaultDialect;
-    #[cfg(not(feature = "common"))]
+
+    #[cfg(all(not(feature = "common"), feature = "standard"))]
+    pub use crate::dialects::Standard as DefaultDialect;
+
+    #[cfg(not(feature = "standard"))]
     pub use crate::dialects::Minimal as DefaultDialect;
 }
 
@@ -18,15 +24,19 @@ mod default_dialect {
 /// This dialect will be used as default by all Maviola entities and re-exported in
 /// [`prelude`](crate::prelude).
 ///
-/// The rules for determining the default dialect are the following order of dialect inclusion:
+/// The rules for determining the default dialect are defined by the following order of canonical dialect inclusion:
 ///
 /// [`all`](https://mavlink.io/en/messages/all.html) >
 /// [`ardupilotmega`](https://mavlink.io/en/messages/common.html) >
 /// [`common`](https://mavlink.io/en/messages/common.html) >
+/// [`standard`]((https://mavlink.io/en/messages/standard.html))
 /// [`minimal`]((https://mavlink.io/en/messages/minimal.html))
 ///
 /// That means, that if you enabled `ardupilotmega` dialect but not `all`, then the former is the
-/// "greatest" dialect that include others, and it will be chosen as a default dialect.
+/// most general canonical dialect, and it will be chosen as a default one.
+///
+/// **⚠** Minimal dialect will be set as default even if `minimal` cargo feature is not enabled as
+/// this dialect is required by Maviola internals.
 ///
 /// ---
 #[doc(inline)]

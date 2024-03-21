@@ -113,7 +113,7 @@ impl<K: NodeKind, V: MaybeVersioned, C: HasConnConf> NodeConf<K, V, C> {
 
     /// Dialect specification.
     ///
-    /// Default dialect is `minimal`.
+    /// Default dialect is [`DefaultDialect`].
     #[inline(always)]
     pub fn dialect(&self) -> &DialectSpec {
         self.dialects.main()
@@ -124,7 +124,7 @@ impl<K: NodeKind, V: MaybeVersioned, C: HasConnConf> NodeConf<K, V, C> {
     /// Node can perform frame validation against known dialects. However, automatic operations,
     /// like heartbeats, will use the main [`NodeConf::dialect`].
     ///
-    /// Default `minimal` dialect is always among the known dialects.
+    /// Main [`NodeConf::dialect`] is always among the known dialects.
     pub fn known_dialects(&self) -> impl Iterator<Item = &DialectSpec> {
         self.dialects.known()
     }

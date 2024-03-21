@@ -47,9 +47,10 @@ use crate::prelude::*;
 /// validate its checksum. The checksum serves two purposes: first, it ensures, that message was
 /// not damaged during sending, and second, it guarantees that sender and receiver use the same
 /// version of a dialect. Unfortunately, that means, that in order to validate a frame, you have
-/// to know `CRC_EXTRA` of the exact message this frame encodes. You can validate incoming frames
-/// against arbitrary dialect using [`Node::validate_frame`], or use [`Frame::validate_checksum`] to
-/// validate against external dialect.
+/// to know `CRC_EXTRA` of the exact message this frame encodes. Frames will be validated according
+/// to [`Node::known_dialects`] upon sending and receiving. Invalid incoming frames will be
+/// available as corresponding events. You can always validate frames against arbitrary dialect
+/// using [`Frame::validate_checksum`].
 ///
 /// ## Message Signing
 ///
@@ -196,7 +197,7 @@ impl<K: NodeKind, V: MaybeVersioned, A: NodeApi<V>> Node<K, V, A> {
 
     /// Dialect specification.
     ///
-    /// Default dialect is `minimal`.
+    /// Default dialect is [`DefaultDialect`].
     #[inline]
     pub fn dialect(&self) -> &DialectSpec {
         self.processor.main_dialect()
@@ -207,7 +208,7 @@ impl<K: NodeKind, V: MaybeVersioned, A: NodeApi<V>> Node<K, V, A> {
     /// Node can perform frame validation against known dialects. However, automatic operations,
     /// like heartbeats, will use the main [`Node::dialect`].
     ///
-    /// Default `minimal` dialect is always among the known dialects.
+    /// Main dialect is always among the known dialects.
     pub fn known_dialects(&self) -> impl Iterator<Item = &DialectSpec> {
         self.processor.known_dialects()
     }
@@ -263,13 +264,6 @@ impl<K: NodeKind, V: MaybeVersioned, A: NodeApi<V>> Node<K, V, A> {
     /// protocol version defined for a node.
     pub fn broadcast_frame(&self, frame: &Frame<V>, scope: BroadcastScope) -> Result<()> {
         self.api.route_frame(frame, scope)
-    }
-
-    /// Validates incoming frame against arbitrary dialect.
-    ///
-    /// The dialect has to be specified via [turbofish](https://turbo.fish/about) syntax.
-    pub fn validate_frame<D: Dialect>(&self, frame: &Frame<V>) -> Result<()> {
-        frame.validate_checksum::<D>().map_err(Error::from)
     }
 
     fn close(&mut self) {
