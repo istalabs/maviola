@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use crate::core::error::{RecvResult, RecvTimeoutResult, SendError, TryRecvResult};
 use crate::core::io::{IncomingFrame, OutgoingFrame};
 use crate::core::utils::Closable;
+use crate::error::{RecvResult, RecvTimeoutResult, SendError, SendResult, TryRecvResult};
 
 use crate::prelude::*;
 use crate::sync::prelude::*;

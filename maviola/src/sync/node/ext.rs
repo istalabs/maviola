@@ -7,11 +7,12 @@ use std::time::Duration;
 use crate::core::marker::{Edge, NodeKind};
 use crate::core::node::NodeConf;
 use crate::core::utils::Guarded;
+use crate::error::NodeError;
 use crate::protocol::Peer;
 use crate::sync::marker::ConnConf;
+use crate::sync::node::api::{EventReceiver, FrameSender};
 
 use crate::prelude::*;
-use crate::sync::node::api::{EventReceiver, FrameSender};
 use crate::sync::prelude::*;
 
 impl<K: NodeKind, V: MaybeVersioned> Node<K, V, SyncApi<V>> {

@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
-use crate::core::error::FrameError;
 use crate::core::utils::TryUpdateFrom;
+use crate::error::FrameError;
 use crate::protocol::{CrcExtra, Frame, MavFrame, MaybeVersioned};
 
 /// A protocol for custom frame processing.

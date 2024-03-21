@@ -40,11 +40,11 @@ use std::sync::{mpsc, Arc, RwLock};
 use std::thread;
 use std::time::Duration;
 
-use crate::core::error::{
+use crate::core::utils::{Closable, Closer, RingBuffer, UniqueId};
+use crate::error::{
     RecvError, RecvResult, RecvTimeoutError, RecvTimeoutResult, SendError, SendResult,
     TryRecvError, TryRecvResult,
 };
-use crate::core::utils::{Closable, Closer, RingBuffer, UniqueId};
 
 const POOLING_TIMEOUT: Duration = Duration::from_micros(50);
 

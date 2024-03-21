@@ -74,7 +74,7 @@ pub async fn benchmark_async_unix_sockets(n_clients: u16, n_iter: usize) {
                 base_mode: MavModeFlag::all(),
                 custom_mode: 0,
                 system_status: MavState::Active,
-                mavlink_version: Minimal::version().unwrap(),
+                mavlink_version: DefaultDialect::version().unwrap(),
             };
 
             for _ in 0..n_iter {

@@ -3,6 +3,7 @@ use portpicker::{pick_unused_port, Port};
 use std::time::Duration;
 
 use maviola::dialects::minimal::messages::Heartbeat;
+use maviola::error::FrameError;
 use maviola::protocol::{
     Checksum, CrcExtra, Header, MavFrame, ProcessFrame, ProcessFrameCase, Signature, UpdateFrame,
 };
@@ -130,7 +131,7 @@ fn run(addr: &str) -> Result<()> {
     let (frame, _) = secure_client.recv_frame_timeout(RECV_TIMEOUT)?;
 
     // Validate, that we indeed have a valid message
-    if let Minimal::Heartbeat(heartbeat) = frame.decode::<Minimal>()? {
+    if let DefaultDialect::Heartbeat(heartbeat) = frame.decode::<DefaultDialect>()? {
         assert_eq!(heartbeat.custom_mode, 11);
         assert_eq!(heartbeat.mavlink_version, 17);
     } else {
@@ -140,9 +141,9 @@ fn run(addr: &str) -> Result<()> {
     // Receive frame on unsecure client
     let (frame, _) = unsecure_client.recv_frame_timeout(RECV_TIMEOUT)?;
     // Validate, that we receive a frame with a correct checksum
-    frame.validate_checksum::<Minimal>()?;
+    frame.validate_checksum::<DefaultDialect>()?;
     // But the contents of a frame is a complete junk
-    assert!(frame.decode::<Minimal>().is_err());
+    assert!(frame.decode::<DefaultDialect>().is_err());
 
     Ok(())
 }

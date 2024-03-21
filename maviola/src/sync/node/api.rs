@@ -3,13 +3,13 @@ use std::marker::PhantomData;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-use crate::core::error::{
-    RecvError, RecvResult, RecvTimeoutError, RecvTimeoutResult, SendError, TryRecvError,
-    TryRecvResult,
-};
 use crate::core::io::{BroadcastScope, ConnectionInfo, IncomingFrame, OutgoingFrame};
 use crate::core::node::{NodeApi, NodeApiInternal};
 use crate::core::utils::{Guarded, Sealed, SharedCloser, Switch};
+use crate::error::{
+    RecvError, RecvResult, RecvTimeoutError, RecvTimeoutResult, SendError, SendResult,
+    TryRecvError, TryRecvResult,
+};
 use crate::protocol::{DialectVersion, Endpoint, FrameProcessor, Peer};
 use crate::sync::io::{Connection, ConnectionHandler, IncomingFrameReceiver, OutgoingFrameSender};
 use crate::sync::node::event::EventsIterator;

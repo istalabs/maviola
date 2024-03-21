@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Formatter};
 
-use crate::core::error::FrameError;
+use crate::error::FrameError;
 #[cfg(feature = "unsafe")]
 use crate::protocol::ProcessFrameCase;
 use crate::protocol::{

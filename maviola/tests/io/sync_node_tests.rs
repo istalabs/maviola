@@ -300,7 +300,7 @@ fn node_no_id() {
 
     client_node.try_recv().unwrap();
     if let Event::Frame(frame, _) = client_node.recv().unwrap() {
-        frame.decode::<Minimal>().unwrap();
+        frame.decode::<DefaultDialect>().unwrap();
     } else {
         panic!("invalid event!")
     }
@@ -334,7 +334,7 @@ fn node_no_version() {
         assert!(matches!(frame.version(), MavLinkVersion::V2));
 
         let message = frame.decode().unwrap();
-        if let Minimal::Heartbeat(_) = message {
+        if let DefaultDialect::Heartbeat(_) = message {
             // message is fine
         } else {
             panic!("invalid message!")

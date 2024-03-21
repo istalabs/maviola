@@ -72,7 +72,7 @@
 //!         // Handle incoming MAVLink frame
 //!         Event::Frame(frame, callback) => {
 //!             // Handle heartbeat message
-//!             if let Ok(Minimal::Heartbeat(msg)) = frame.decode::<Minimal>() {
+//!             if let Ok(DefaultDialect::Heartbeat(msg)) = frame.decode::<DefaultDialect>() {
 //!                 // Respond with the same heartbeat message to all clients,
 //!                 // except the one that sent this message
 //!                 callback.broadcast(&server.next_frame(&msg)?)?;
@@ -133,7 +133,7 @@
 //!         // Handle incoming MAVLink frame
 //!         Event::Frame(frame, callback) => {
 //!             // Handle heartbeat message
-//!             if let Ok(Minimal::Heartbeat(msg)) = frame.decode::<Minimal>() {
+//!             if let Ok(DefaultDialect::Heartbeat(msg)) = frame.decode::<DefaultDialect>() {
 //!                 // Respond with the same heartbeat message to all clients,
 //!                 // except the one that sent this message
 //!                 callback.broadcast(&server.next_frame(&msg)?)?;
@@ -215,6 +215,7 @@
 #[cfg(feature = "async")]
 pub mod asnc;
 pub mod core;
+pub mod error;
 pub mod prelude;
 pub mod protocol;
 #[cfg(feature = "sync")]

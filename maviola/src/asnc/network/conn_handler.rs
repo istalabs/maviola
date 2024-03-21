@@ -9,12 +9,12 @@ use crate::asnc::marker::AsyncConnConf;
 use crate::asnc::node::api::{EventReceiver, FrameSender};
 use crate::asnc::node::{AsyncApi, Event};
 use crate::core::consts::NETWORK_POOLING_INTERVAL;
-use crate::core::error::RecvTimeoutError;
 use crate::core::io::{ConnectionInfo, IncomingFrame, Retry};
 use crate::core::marker::Proxy;
 use crate::core::network::types::{NetworkConnInfo, NetworkConnState, RestartNodeEvent};
 use crate::core::node::NodeConf;
 use crate::core::utils::{Closer, UniqueId};
+use crate::error::{NodeError, RecvTimeoutError};
 
 use crate::prelude::*;
 

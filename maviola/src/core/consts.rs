@@ -4,13 +4,13 @@ use std::time::Duration;
 
 mod default_dialect {
     #[cfg(feature = "all")]
-    pub use crate::dialects::all::All as DefaultDialect;
+    pub use crate::dialects::All as DefaultDialect;
     #[cfg(all(not(feature = "all"), feature = "ardupilotmega"))]
-    pub use crate::dialects::ardupilotmega::Ardupilotmega as DefaultDialect;
+    pub use crate::dialects::Ardupilotmega as DefaultDialect;
     #[cfg(all(not(feature = "ardupilotmega"), feature = "common"))]
-    pub use crate::dialects::common::Common as DefaultDialect;
+    pub use crate::dialects::Common as DefaultDialect;
     #[cfg(not(feature = "common"))]
-    pub use crate::dialects::minimal::Minimal as DefaultDialect;
+    pub use crate::dialects::Minimal as DefaultDialect;
 }
 
 /// Default MAVLink dialect.

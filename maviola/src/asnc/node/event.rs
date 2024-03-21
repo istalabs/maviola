@@ -6,8 +6,8 @@ use tokio_util::sync::ReusableBoxFuture;
 
 use crate::asnc::consts::EVENTS_RECV_POOLING_INTERVAL;
 use crate::asnc::node::api::EventReceiver;
-use crate::core::error::{RecvError, TryRecvError};
 use crate::core::utils::Closable;
+use crate::error::{FrameError, RecvError, TryRecvError};
 use crate::protocol::Peer;
 
 use crate::asnc::prelude::*;

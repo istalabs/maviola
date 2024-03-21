@@ -4,12 +4,12 @@ use std::thread;
 use std::thread::JoinHandle;
 
 use crate::core::consts::NETWORK_POOLING_INTERVAL;
-use crate::core::error::RecvTimeoutError;
 use crate::core::io::{ConnectionInfo, IncomingFrame, Retry};
 use crate::core::marker::Proxy;
 use crate::core::network::types::{NetworkConnInfo, NetworkConnState, RestartNodeEvent};
 use crate::core::node::NodeConf;
 use crate::core::utils::{Closer, UniqueId};
+use crate::error::{NodeError, RecvTimeoutError};
 use crate::sync::io::{ChannelFactory, IncomingFrameProducer, OutgoingFrameHandler};
 use crate::sync::marker::ConnConf;
 use crate::sync::node::api::{EventReceiver, FrameSender};

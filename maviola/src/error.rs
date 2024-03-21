@@ -30,7 +30,7 @@ pub use mavio::error::{
 /// For example:
 ///
 /// ```rust
-/// use maviola::core::error::{CoreError, Error, Result};
+/// use maviola::error::{CoreError, Error, Result};
 ///
 /// fn core_fallible() -> core::result::Result<(), CoreError> {
 ///     Ok(())
@@ -45,7 +45,7 @@ pub use mavio::error::{
 /// ---
 ///
 #[doc(inline)]
-pub use crate::core::error::Error as CoreError;
+pub use crate::error::Error as CoreError;
 
 /// Maviola result type.
 pub type Result<T> = core::result::Result<T, Error>;

@@ -3,9 +3,10 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 
 use crate::core::consts::INCOMING_FRAMES_POOLING_INTERVAL;
-use crate::core::error::RecvTimeoutError;
 use crate::core::io::ConnectionInfo;
 use crate::core::utils::Closable;
+use crate::dialects::Minimal;
+use crate::error::RecvTimeoutError;
 use crate::protocol::Peer;
 use crate::sync::io::IncomingFrameReceiver;
 use crate::sync::node::api::{EventSender, FrameSender};

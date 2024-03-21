@@ -10,6 +10,7 @@ use crate::asnc::node::api::{EventReceiver, FrameSender};
 use crate::core::marker::{Edge, NodeKind};
 use crate::core::node::NodeConf;
 use crate::core::utils::Guarded;
+use crate::error::NodeError;
 use crate::protocol::{Behold, Peer};
 
 use crate::asnc::prelude::*;

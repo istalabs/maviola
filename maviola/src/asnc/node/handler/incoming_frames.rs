@@ -7,9 +7,10 @@ use crate::asnc::io::IncomingFrameReceiver;
 use crate::asnc::node::api::{EventSender, FrameSender};
 use crate::asnc::node::{Callback, Event};
 use crate::core::consts::INCOMING_FRAMES_POOLING_INTERVAL;
-use crate::core::error::RecvTimeoutError;
 use crate::core::io::ConnectionInfo;
 use crate::core::utils::Closable;
+use crate::dialects::Minimal;
+use crate::error::RecvTimeoutError;
 use crate::protocol::Peer;
 
 use crate::prelude::*;

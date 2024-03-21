@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Formatter};
 
+use crate::error::FrameError;
 use crate::protocol::{DialectSpec, MessageId, MessageInfo};
 
 use crate::prelude::*;

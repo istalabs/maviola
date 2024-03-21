@@ -6,7 +6,7 @@ use std::sync::atomic::AtomicU64;
 use std::sync::{atomic, Arc};
 use std::time::SystemTime;
 
-use crate::core::error::SignatureError;
+use crate::error::SignatureError;
 use crate::protocol::{
     MavSha256, MavTimestamp, MessageId, SecretKey, Sign, SignedLinkId, Signer, SigningConf,
 };

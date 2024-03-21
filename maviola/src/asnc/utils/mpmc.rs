@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use tokio::sync::broadcast;
 
-use crate::core::error::{RecvError, RecvTimeoutError, SendError, TryRecvError};
+use crate::error::{RecvError, RecvTimeoutError, SendError, TryRecvError};
 
 /// <sup>`⍚` | [`asnc`](crate::asnc)</sup>
 /// MPMC sender.
