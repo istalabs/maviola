@@ -1,7 +1,6 @@
-use mavio::protocol::MessageId;
 use std::fmt::{Debug, Formatter};
 
-use crate::protocol::{DialectSpec, MessageInfo};
+use crate::protocol::{DialectSpec, MessageId, MessageInfo};
 
 use crate::prelude::*;
 
@@ -14,11 +13,12 @@ pub struct KnownDialects {
 }
 
 impl KnownDialects {
-    /// Creates a default [`KnownDialects`] instance with [`Minimal`] as a default main dialect.
+    /// Creates a default [`KnownDialects`] instance with [`DefaultDialect`] as a default main
+    /// dialect.
     pub fn new() -> Self {
         Self {
-            main: Minimal::name(),
-            dialects: vec![Minimal::spec()],
+            main: DefaultDialect::name(),
+            dialects: vec![DefaultDialect::spec()],
             allow_unknown: false,
         }
     }

@@ -2,6 +2,36 @@
 
 use std::time::Duration;
 
+mod default_dialect {
+    #[cfg(feature = "all")]
+    pub use crate::dialects::all::All as DefaultDialect;
+    #[cfg(all(not(feature = "all"), feature = "ardupilotmega"))]
+    pub use crate::dialects::ardupilotmega::Ardupilotmega as DefaultDialect;
+    #[cfg(all(not(feature = "ardupilotmega"), feature = "common"))]
+    pub use crate::dialects::common::Common as DefaultDialect;
+    #[cfg(not(feature = "common"))]
+    pub use crate::dialects::minimal::Minimal as DefaultDialect;
+}
+
+/// Default MAVLink dialect.
+///
+/// This dialect will be used as default by all Maviola entities and re-exported in
+/// [`prelude`](crate::prelude).
+///
+/// The rules for determining the default dialect are the following order of dialect inclusion:
+///
+/// [`all`](https://mavlink.io/en/messages/all.html) >
+/// [`ardupilotmega`](https://mavlink.io/en/messages/common.html) >
+/// [`common`](https://mavlink.io/en/messages/common.html) >
+/// [`minimal`]((https://mavlink.io/en/messages/minimal.html))
+///
+/// That means, that if you enabled `ardupilotmega` dialect but not `all`, then the former is the
+/// "greatest" dialect that include others, and it will be chosen as a default dialect.
+///
+/// ---
+#[doc(inline)]
+pub use default_dialect::DefaultDialect;
+
 /// Default heartbeat timeout.
 pub const DEFAULT_HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(1200);
 /// Default heartbeat interval.
