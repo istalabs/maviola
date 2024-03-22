@@ -31,15 +31,21 @@ use crate::prelude::*;
 ///
 /// ## Sending and Receiving
 ///
-/// The suggested approach for receiving incoming frames is to use [`Node::events`]. This method
+/// Sending operations are represented by [`SendFrame`] / [`SendMessage`] traits. To send messages
+/// you may use either [`SendMessage::send`], or [`SendFrame::send_frame`]. The former accepts
+/// MAVLink messages and decodes them into frames, the latter one is sending MAVLink frames
+/// directly. Only edge nodes implement [`SendMessage`] traits.
+///
+/// Receiving operations are represented by [`ReceiveEvent`](crate::sync::node::ReceiveEvent) /
+/// [`ReceiveFrame`](crate::sync::node::ReceiveFrame) for synchronous api and
+/// [`ReceiveEvent`](crate::asnc::node::ReceiveEvent) / [`ReceiveFrame`](crate::asnc::node::ReceiveFrame)
+/// for asynchronous API.
+///
+/// The suggested approach for receiving incoming frames is subscribing to `events`. This method
 /// returns an iterator (or a stream in the case of asynchronous API) over node events, such as
 /// incoming frames, invalid frames, that hasn't passed signature validation, new peers, and so on.
 ///
-/// You can also receive individual frames via [`Node::recv_frame`] / [`Node::try_recv_frame`].
-///
-/// To send messages you may use either [`Node::send`], or [`Node::send_frame`]. The former accepts
-/// MAVLink messages and decodes them into frames, the latter one is sending MAVLink frames
-/// directly.
+/// You can also subscribe to valid frames using `frames` method.
 ///
 /// ## Frame Validation
 ///

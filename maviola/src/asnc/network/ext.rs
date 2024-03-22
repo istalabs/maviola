@@ -76,6 +76,8 @@ mod tests {
     use crate::core::utils::net::pick_unused_port;
     use crate::dialects::minimal::messages::Heartbeat;
 
+    use crate::asnc::prelude::*;
+
     const RECONNECT_INTERVAL: Duration = SERVER_HANG_UP_TIMEOUT;
     // Should be at least 3-4 times bigger than `RECONNECT_INTERVAL` to make sure that tests will
     // run in parallel

@@ -10,7 +10,7 @@ use crate::asnc::io::{
 };
 use crate::asnc::marker::AsyncConnConf;
 use crate::core::io::{ConnectionConf, ConnectionInfo};
-use crate::core::utils::SharedCloser;
+use crate::core::utils::{Closable, SharedCloser};
 
 use crate::prelude::*;
 
@@ -118,6 +118,10 @@ impl<V: MaybeVersioned> Connection<V> {
     /// Information about this connection.
     pub fn info(&self) -> &ConnectionInfo {
         &self.info
+    }
+
+    pub(crate) fn state(&self) -> Closable {
+        self.state.to_closable()
     }
 
     pub(crate) fn share_state(&self) -> SharedCloser {

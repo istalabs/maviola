@@ -68,6 +68,7 @@ pub trait SendFrame<V: MaybeVersioned>: SendFrameInternal<V> {
     ///
     /// [`send`]: SendMessage::send
     /// [`send_versioned`]: SendVersionlessMessage::send_versioned
+    /// [`Edge`]: crate::core::marker::Edge
     fn send_frame(&self, frame: &Frame<V>) -> Result<()> {
         let mut frame = frame.clone();
         self.processor().process_outgoing(&mut frame)?;
@@ -86,6 +87,7 @@ pub trait SendFrame<V: MaybeVersioned>: SendFrameInternal<V> {
     /// [`send_frame`]: Self::send_frame
     /// [`broadcast`]: SendMessage::broadcast
     /// [`broadcast_versioned`]: SendVersionlessMessage::broadcast_versioned
+    /// [`Edge`]: crate::core::marker::Edge
     fn broadcast_frame(&self, frame: &Frame<V>, scope: BroadcastScope) -> Result<()> {
         let mut frame = frame.clone();
         self.processor().process_outgoing(&mut frame)?;

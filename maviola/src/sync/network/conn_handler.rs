@@ -317,7 +317,7 @@ impl<V: MaybeVersioned> NetworkConnectionHandler<V> {
             id,
             info: info.clone(),
             state: state.clone(),
-            receiver: node.event_receiver().clone(),
+            receiver: node.receiver().clone(),
             producer: self.producer.clone(),
         }
         .spawn();

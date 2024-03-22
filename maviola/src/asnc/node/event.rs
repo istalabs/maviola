@@ -5,8 +5,6 @@ use tokio_stream::Stream;
 use tokio_util::sync::ReusableBoxFuture;
 
 use crate::asnc::consts::EVENTS_RECV_POOLING_INTERVAL;
-use crate::asnc::node::api::EventReceiver;
-use crate::core::utils::Closable;
 use crate::error::{FrameError, RecvError, TryRecvError};
 use crate::protocol::Peer;
 
@@ -28,26 +26,25 @@ pub enum Event<V: MaybeVersioned> {
 }
 
 pub(crate) struct EventStream<V: MaybeVersioned> {
-    inner: ReusableBoxFuture<'static, (RecvResult<V>, EventReceiver<V>, Closable)>,
+    inner: ReusableBoxFuture<'static, (RecvResult<V>, EventReceiver<V>)>,
 }
 
 type RecvResult<V> = core::result::Result<Event<V>, RecvError>;
 
 impl<V: MaybeVersioned> EventStream<V> {
-    pub(crate) fn new(rx: EventReceiver<V>, state: Closable) -> Self {
+    pub(crate) fn new(rx: EventReceiver<V>) -> Self {
         Self {
-            inner: ReusableBoxFuture::new(make_future(rx, state)),
+            inner: ReusableBoxFuture::new(make_future(rx)),
         }
     }
 }
 
 async fn make_future<V: MaybeVersioned>(
     mut rx: EventReceiver<V>,
-    state: Closable,
-) -> (RecvResult<V>, EventReceiver<V>, Closable) {
+) -> (RecvResult<V>, EventReceiver<V>) {
     let handler = tokio::task::spawn(async move {
         let result = loop {
-            if state.is_closed() {
+            if rx.state().is_closed() {
                 break match rx.try_recv() {
                     Ok(event) => Ok(event),
                     Err(_) => Err(RecvError::Disconnected),
@@ -67,7 +64,7 @@ async fn make_future<V: MaybeVersioned>(
             };
         };
 
-        (result, rx, state)
+        (result, rx)
     });
     handler.await.unwrap()
 }
@@ -76,8 +73,8 @@ impl<V: MaybeVersioned> Stream for EventStream<V> {
     type Item = Event<V>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let (result, rx, state) = ready!(self.inner.poll(cx));
-        self.inner.set(make_future(rx, state));
+        let (result, rx) = ready!(self.inner.poll(cx));
+        self.inner.set(make_future(rx));
 
         match result {
             Ok(event) => Poll::Ready(Some(event)),
@@ -102,11 +99,12 @@ mod async_event_tests {
 
     #[tokio::test]
     async fn test_event_stream() {
-        let (tx, rx) = mpmc::channel(2);
-        let event_receiver = EventReceiver::new(rx, Arc::new(FrameProcessor::default()));
         let state = Closer::new();
+        let (tx, rx) = mpmc::channel(2);
+        let event_receiver =
+            EventReceiver::new(rx, state.to_closable(), Arc::new(FrameProcessor::default()));
 
-        let mut stream: EventStream<V2> = EventStream::new(event_receiver, state.to_closable());
+        let mut stream: EventStream<V2> = EventStream::new(event_receiver);
 
         tx.send(Event::NewPeer(Peer::new(1, 1))).unwrap();
         tx.send(Event::NewPeer(Peer::new(1, 1))).unwrap();

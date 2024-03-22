@@ -3,14 +3,15 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
+
+use async_trait::async_trait;
 use tokio_stream::Stream;
 
 use crate::asnc::marker::AsyncConnConf;
-use crate::asnc::node::api::EventReceiver;
 use crate::core::marker::{Edge, NodeKind, Proxy};
 use crate::core::node::{NodeBuilder, NodeConf};
 use crate::core::utils::Guarded;
-use crate::error::NodeError;
+use crate::error::{NodeError, RecvResult, RecvTimeoutResult, TryRecvResult};
 use crate::protocol::{Behold, Peer, Unset};
 
 use crate::asnc::prelude::*;
@@ -79,96 +80,25 @@ impl<K: NodeKind, V: MaybeVersioned> Node<K, V, AsyncApi<V>> {
         self.api.peers().await
     }
 
-    /// <sup>[`async`](crate::asnc)</sup>
-    /// Request the next node [`Event`].
+    /// Returns a reference to an event receiver.
     ///
-    /// Blocks until event received.
+    /// This receiver can be cloned and passed to other threads.
     ///
-    /// If you are interested only in valid incoming frames, use [`Node::recv_frame`] instead.
-    pub async fn recv(&mut self) -> Result<Event<V>> {
-        self.api.recv_event().await
+    /// **⚠** In order to have access to [`EventReceiver`] methods, you have to import
+    /// [`ReceiveEvent`] and [`ReceiveFrame`] traits. You may import [`asnc::prelude`] as well.
+    ///
+    /// [`asnc::prelude`]: crate::asnc::prelude
+    #[inline(always)]
+    pub fn receiver(&mut self) -> &mut EventReceiver<V> {
+        self.api.event_receiver_mut()
     }
 
-    /// <sup>[`async`](crate::asnc)</sup>
-    /// Attempts to receive the next node [`Event`] within a `timeout`.
-    ///
-    /// Blocks until event received or deadline is reached.
-    pub async fn recv_timeout(&mut self, timeout: Duration) -> Result<Event<V>> {
-        self.api.recv_event_timeout(timeout).await
-    }
-
-    /// <sup>[`async`](crate::asnc)</sup>
-    /// Attempts to receive MAVLink [`Event`] without blocking.
-    ///
-    /// If you are interested only in valid incoming frames, use [`Node::try_recv_frame`] instead.
-    pub fn try_recv(&mut self) -> Result<Event<V>> {
-        self.api.try_recv_event()
-    }
-
-    /// <sup>[`async`](crate::asnc)</sup>
-    /// Subscribe to node events.
-    ///
-    /// Returns a stream of node events. Requires [`StreamExt`] from Tokio stream extensions to be
-    /// imported (you may use [`asnc::prelude`](crate::asnc::prelude) that imports it as well).
-    ///
-    /// If you are interested only in valid incoming frames, use [`Node::recv_frame`] or
-    /// [`Node::try_recv_frame`] instead.
-    ///
-    /// ⚠ The result is wrapped with [`Behold`] as a reminder, that the returned stream will have
-    /// access only to events that were emitted close to the moment, when the method was called.
-    /// Repetitive calls in the loop may lead to undesired behavior. This is related to the nature
-    /// of the asynchronous MPMC channels, that able to operate only on a limited number of the past
-    /// events.
-    pub fn events(&self) -> Behold<impl Stream<Item = Event<V>>> {
-        Behold::new(self.api.events())
-    }
-
-    /// <sup>[`async`](crate::asnc)</sup>
-    /// Receives the next frame. Blocks until valid frame received or channel is closed.
-    ///
-    /// If you want to check for the next frame without blocking, use [`Node::try_recv_frame`].
-    ///
-    /// **⚠** This method skips all invalid frames. If you are interested in such frames, use
-    /// [Node::events] or [`Node::recv`] instead to receive [`Event::Invalid`] events that
-    /// contain invalid frame with the corresponding error.
-    pub async fn recv_frame(&mut self) -> Result<(Frame<V>, Callback<V>)> {
-        self.api.recv_frame().await
-    }
-
-    /// <sup>[`async`](crate::asnc)</sup>
-    /// Attempts ot receives the next frame until the timeout is reached. Blocks until valid frame
-    /// received, deadline is reached, or channel is closed.
-    ///
-    /// If you want to block until the next frame is received, use [`Node::recv_frame`].
-    /// If you want to check for the next frame without blocking, use [`Node::try_recv_frame`].
-    ///
-    /// **⚠** This method skips all invalid frames. If you are interested in such frames, use
-    /// [Node::events] or [`Node::recv`] instead to receive [`Event::Invalid`] events that
-    /// contain invalid frame with the corresponding error.
-    pub async fn recv_frame_timeout(
-        &mut self,
-        timeout: Duration,
-    ) -> Result<(Frame<V>, Callback<V>)> {
-        self.api.recv_frame_timeout(timeout).await
-    }
-
-    /// <sup>[`async`](crate::asnc)</sup>
-    /// Attempts to receive the next valid frame.
-    ///
-    /// This method returns immediately if channel is empty. If you want to block until the next
-    /// frame is received, use [`Node::recv_frame`].
-    ///
-    /// **⚠** This method skips all invalid frames. If you are interested in such frames, use
-    /// [Node::events] or [`Node::try_recv`] instead to receive [`Event::Invalid`] events that
-    /// contain invalid frame with the corresponding error.
-    pub fn try_recv_frame(&mut self) -> Result<(Frame<V>, Callback<V>)> {
-        self.api.try_recv_frame()
-    }
-
-    pub(in crate::asnc) fn event_receiver(&self) -> EventReceiver<V> {
+    #[inline(always)]
+    pub(in crate::asnc) fn event_receiver(&self) -> &EventReceiver<V> {
         self.api.event_receiver()
     }
 
+    #[inline(always)]
     pub(in crate::asnc) fn frame_sender(&self) -> &FrameSender<V, Proxy> {
         self.api.frame_sender()
     }
@@ -231,3 +161,29 @@ impl<V: Versioned> Node<Edge<V>, V, AsyncApi<V>> {
         Ok(())
     }
 }
+
+#[async_trait]
+impl<K: NodeKind, V: MaybeVersioned> ReceiveEvent<V> for Node<K, V, AsyncApi<V>> {
+    #[inline(always)]
+    async fn recv(&mut self) -> RecvResult<Event<V>> {
+        self.api.event_receiver_mut().recv().await
+    }
+
+    #[inline(always)]
+    async fn recv_timeout(&mut self, timeout: Duration) -> RecvTimeoutResult<Event<V>> {
+        self.api.event_receiver_mut().recv_timeout(timeout).await
+    }
+
+    #[inline(always)]
+    fn try_recv(&mut self) -> TryRecvResult<Event<V>> {
+        self.api.event_receiver_mut().try_recv()
+    }
+
+    #[inline(always)]
+    fn events(&self) -> Behold<impl Stream<Item = Event<V>>> {
+        Behold::new(self.api.events())
+    }
+}
+
+#[async_trait]
+impl<K: NodeKind, V: MaybeVersioned> ReceiveFrame<V> for Node<K, V, AsyncApi<V>> {}

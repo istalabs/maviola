@@ -1,23 +1,27 @@
+use mavio::protocol::Behold;
 use std::sync::Arc;
 use std::time::Duration;
 
+use async_trait::async_trait;
+use tokio_stream::Stream;
+
+use crate::asnc::node::event::EventStream;
 use crate::core::utils::{Closable, Sealed};
 use crate::error::{
     RecvError, RecvResult, RecvTimeoutError, RecvTimeoutResult, TryRecvError, TryRecvResult,
 };
 use crate::protocol::FrameProcessor;
-use crate::sync::node::event::EventsIterator;
 
+use crate::asnc::prelude::*;
 use crate::prelude::*;
-use crate::sync::prelude::*;
 
-/// <sup>[`sync`](crate::sync)</sup>
-/// Node events receiver for synchronous API.
+/// <sup>[`async`](crate::asnc)</sup>
+/// Node events receiver for asynchronous API.
 ///
 /// **⚠** In order to have access to [`EventReceiver`] methods, you have to import
-/// [`ReceiveEvent`] and [`ReceiveFrame`] traits. You may import [`sync::prelude`] as well.
+/// [`ReceiveEvent`] and [`ReceiveFrame`] traits. You may import [`asnc::prelude`] as well.
 ///
-/// [`sync::prelude`]: crate::sync::prelude
+/// [`asnc::prelude`]: crate::asnc::prelude
 #[derive(Clone)]
 pub struct EventReceiver<V: MaybeVersioned> {
     inner: mpmc::Receiver<Event<V>>,
@@ -38,23 +42,26 @@ impl<V: MaybeVersioned> EventReceiver<V> {
         }
     }
 
-    pub(in crate::sync) fn state(&self) -> &Closable {
+    pub(in crate::asnc) fn state(&self) -> &Closable {
         &self.state
     }
 
-    pub(super) fn recv(&self) -> core::result::Result<Event<V>, RecvError> {
-        Ok(self.process_event(self.inner.recv()?))
+    pub(super) async fn recv(&mut self) -> core::result::Result<Event<V>, RecvError> {
+        let event = self.inner.recv().await?;
+        Ok(self.process_event(event))
     }
 
-    pub(in crate::sync) fn recv_timeout(
-        &self,
+    pub(in crate::asnc) async fn recv_timeout(
+        &mut self,
         timeout: Duration,
     ) -> core::result::Result<Event<V>, RecvTimeoutError> {
-        Ok(self.process_event(self.inner.recv_timeout(timeout)?))
+        let event = self.inner.recv_timeout(timeout).await?;
+        Ok(self.process_event(event))
     }
 
-    pub(super) fn try_recv(&self) -> core::result::Result<Event<V>, TryRecvError> {
-        Ok(self.process_event(self.inner.try_recv()?))
+    pub(super) fn try_recv(&mut self) -> core::result::Result<Event<V>, TryRecvError> {
+        let event = self.inner.try_recv()?;
+        Ok(self.process_event(event))
     }
 
     fn process_event(&self, event: Event<V>) -> Event<V> {
@@ -80,25 +87,27 @@ impl<V: MaybeVersioned> EventReceiver<V> {
 
 impl<V: MaybeVersioned> Sealed for EventReceiver<V> {}
 
+#[async_trait]
 impl<V: MaybeVersioned> ReceiveEvent<V> for EventReceiver<V> {
     #[inline(always)]
-    fn recv(&self) -> RecvResult<Event<V>> {
-        self.recv()
+    async fn recv(&mut self) -> RecvResult<Event<V>> {
+        self.recv().await
     }
 
     #[inline(always)]
-    fn recv_timeout(&self, timeout: Duration) -> RecvTimeoutResult<Event<V>> {
-        self.recv_timeout(timeout)
+    async fn recv_timeout(&mut self, timeout: Duration) -> RecvTimeoutResult<Event<V>> {
+        self.recv_timeout(timeout).await
     }
 
     #[inline(always)]
-    fn try_recv(&self) -> TryRecvResult<Event<V>> {
+    fn try_recv(&mut self) -> TryRecvResult<Event<V>> {
         self.try_recv()
     }
 
-    fn events(&self) -> impl Iterator<Item = Event<V>> {
-        EventsIterator::new(self.clone())
+    fn events(&self) -> Behold<impl Stream<Item = Event<V>>> {
+        Behold::new(EventStream::new(self.clone()))
     }
 }
 
+#[async_trait]
 impl<V: MaybeVersioned> ReceiveFrame<V> for EventReceiver<V> {}

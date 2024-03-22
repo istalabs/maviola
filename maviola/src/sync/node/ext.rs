@@ -75,8 +75,17 @@ impl<K: NodeKind, V: MaybeVersioned> Node<K, V, SyncApi<V>> {
         self.api.peers()
     }
 
+    /// <sup>[`sync`](crate::sync)</sup>
+    /// Returns a reference to an event receiver.
+    ///
+    /// This receiver can be cloned and passed to other threads.
+    ///
+    /// **⚠** In order to have access to [`EventReceiver`] methods, you have to import
+    /// [`ReceiveEvent`] and [`ReceiveFrame`] traits. You may import [`sync::prelude`] as well.
+    ///
+    /// [`sync::prelude`]: crate::sync::prelude
     #[inline(always)]
-    pub(in crate::sync) fn event_receiver(&self) -> &EventReceiver<V> {
+    pub fn receiver(&self) -> &EventReceiver<V> {
         self.api.event_receiver()
     }
 
@@ -85,30 +94,6 @@ impl<K: NodeKind, V: MaybeVersioned> Node<K, V, SyncApi<V>> {
         self.api.frame_sender()
     }
 }
-
-impl<K: NodeKind, V: MaybeVersioned> ReceiveEvent<V> for Node<K, V, SyncApi<V>> {
-    #[inline(always)]
-    fn recv(&self) -> RecvResult<Event<V>> {
-        self.api.event_receiver().recv()
-    }
-
-    #[inline(always)]
-    fn recv_timeout(&self, timeout: Duration) -> RecvTimeoutResult<Event<V>> {
-        self.api.event_receiver().recv_timeout(timeout)
-    }
-
-    #[inline(always)]
-    fn try_recv(&self) -> TryRecvResult<Event<V>> {
-        self.api.event_receiver().try_recv()
-    }
-
-    #[inline(always)]
-    fn events(&self) -> impl Iterator<Item = Event<V>> {
-        self.api.event_receiver().events()
-    }
-}
-
-impl<K: NodeKind, V: MaybeVersioned> ReceiveFrame<V> for Node<K, V, SyncApi<V>> {}
 
 impl<V: MaybeVersioned> Node<Proxy, V, SyncApi<V>> {
     /// <sup>[`sync`](crate::sync)</sup>
@@ -167,3 +152,27 @@ impl<V: Versioned> Node<Edge<V>, V, SyncApi<V>> {
         Ok(())
     }
 }
+
+impl<K: NodeKind, V: MaybeVersioned> ReceiveEvent<V> for Node<K, V, SyncApi<V>> {
+    #[inline(always)]
+    fn recv(&self) -> RecvResult<Event<V>> {
+        self.receiver().recv()
+    }
+
+    #[inline(always)]
+    fn recv_timeout(&self, timeout: Duration) -> RecvTimeoutResult<Event<V>> {
+        self.receiver().recv_timeout(timeout)
+    }
+
+    #[inline(always)]
+    fn try_recv(&self) -> TryRecvResult<Event<V>> {
+        self.receiver().try_recv()
+    }
+
+    #[inline(always)]
+    fn events(&self) -> impl Iterator<Item = Event<V>> {
+        self.receiver().events()
+    }
+}
+
+impl<K: NodeKind, V: MaybeVersioned> ReceiveFrame<V> for Node<K, V, SyncApi<V>> {}

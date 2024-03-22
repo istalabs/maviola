@@ -1,6 +1,5 @@
 use std::thread;
 
-use crate::core::utils::Closable;
 use crate::error::{FrameError, TryRecvError};
 use crate::protocol::Peer;
 use crate::sync::consts::EVENTS_RECV_POOLING_INTERVAL;
@@ -24,12 +23,11 @@ pub enum Event<V: MaybeVersioned> {
 
 pub(crate) struct EventsIterator<V: MaybeVersioned> {
     receiver: EventReceiver<V>,
-    state: Closable,
 }
 
 impl<V: MaybeVersioned> EventsIterator<V> {
-    pub fn new(receiver: EventReceiver<V>, state: Closable) -> Self {
-        Self { receiver, state }
+    pub fn new(receiver: EventReceiver<V>) -> Self {
+        Self { receiver }
     }
 }
 
@@ -37,7 +35,7 @@ impl<V: MaybeVersioned> Iterator for EventsIterator<V> {
     type Item = Event<V>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while !self.state.is_closed() {
+        while !self.receiver.state().is_closed() {
             return match self.receiver.try_recv() {
                 Ok(event) => Some(event),
                 Err(err) => match err {
