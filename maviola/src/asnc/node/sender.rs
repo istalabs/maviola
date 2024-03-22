@@ -10,6 +10,7 @@ use crate::protocol::FrameProcessor;
 
 use crate::prelude::*;
 
+/// <sup>[`async`](crate::asnc)</sup>
 /// Frame sender for asynchronous API.
 ///
 /// **⚠** [`FrameSender`] requires [`SendFrame`], [`SendMessage`], and [`SendVersionlessMessage`]

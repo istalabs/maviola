@@ -4,6 +4,9 @@
 //!
 //! ⚠ Incompatible with [`asnc::prelude`](crate::asnc::prelude)!
 
-pub use crate::sync::node::{Callback, EdgeNode, Event, FrameSender, ProxyNode, SyncApi};
+pub use crate::sync::node::{
+    Callback, EdgeNode, Event, EventReceiver, FrameSender, ProxyNode, ReceiveEvent, ReceiveFrame,
+    SyncApi,
+};
 
 pub(crate) use crate::sync::utils::mpmc;

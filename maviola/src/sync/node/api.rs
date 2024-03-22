@@ -4,19 +4,15 @@ use std::marker::PhantomData;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-use crate::core::io::{BroadcastScope, ConnectionInfo, IncomingFrame, OutgoingFrame};
+use crate::core::io::{BroadcastScope, ConnectionInfo, OutgoingFrame};
 use crate::core::marker::Proxy;
 use crate::core::node::{NodeApi, NodeApiInternal};
 use crate::core::utils::{Guarded, Sealed, SharedCloser, Switch};
-use crate::error::{
-    RecvError, RecvResult, RecvTimeoutError, RecvTimeoutResult, SendError, TryRecvError,
-    TryRecvResult,
-};
+use crate::error::SendError;
 use crate::protocol::{DialectVersion, Endpoint, FrameProcessor, Peer};
-use crate::sync::io::{Connection, ConnectionHandler, IncomingFrameReceiver};
-use crate::sync::node::event::EventsIterator;
+use crate::sync::io::{Connection, ConnectionHandler};
 use crate::sync::node::handler::{HeartbeatEmitter, InactivePeersHandler, IncomingFramesHandler};
-use crate::sync::node::{Callback, Event};
+use crate::sync::node::Event;
 
 use crate::prelude::*;
 use crate::sync::prelude::*;
@@ -26,7 +22,6 @@ use crate::sync::prelude::*;
 pub struct SyncApi<V: MaybeVersioned> {
     connection: Connection<V>,
     sender: FrameSender<V, Proxy>,
-    receiver: FrameReceiver<V>,
     processor: Arc<FrameProcessor>,
     peers: Arc<RwLock<HashMap<MavLinkId, Peer>>>,
     event_sender: EventSender<V>,
@@ -62,17 +57,11 @@ impl<V: MaybeVersioned> SyncApi<V> {
         let (events_tx, events_rx) = mpmc::channel();
 
         let sender = FrameSender::new(connection.sender().clone(), processor.clone());
-        let receiver = FrameReceiver::new(
-            connection.receiver().clone(),
-            sender.clone(),
-            processor.clone(),
-        );
-        let event_receiver = EventReceiver::new(events_rx, processor.clone());
+        let event_receiver = EventReceiver::new(events_rx, connection.state(), processor.clone());
 
         SyncApi {
             connection,
             sender,
-            receiver,
             processor: processor.clone(),
             peers: Arc::new(Default::default()),
             event_sender: EventSender::new(events_tx),
@@ -80,14 +69,17 @@ impl<V: MaybeVersioned> SyncApi<V> {
         }
     }
 
+    #[inline(always)]
     fn processor(&self) -> &FrameProcessor {
         self.processor.as_ref()
     }
 
+    #[inline(always)]
     pub(super) fn share_state(&self) -> SharedCloser {
         self.connection.share_state()
     }
 
+    #[inline(always)]
     pub(super) fn info(&self) -> &ConnectionInfo {
         self.connection.info()
     }
@@ -114,42 +106,14 @@ impl<V: MaybeVersioned> SyncApi<V> {
             .map_err(Error::from)
     }
 
+    #[inline(always)]
     pub(super) fn frame_sender(&self) -> &FrameSender<V, Proxy> {
         &self.sender
     }
 
-    pub(super) fn events(&self) -> impl Iterator<Item = Event<V>> {
-        EventsIterator::new(self.event_receiver.clone(), self.connection.state())
-    }
-
-    pub(super) fn recv_event(&self) -> Result<Event<V>> {
-        self.event_receiver.recv().map_err(Error::from)
-    }
-
-    pub(super) fn recv_event_timeout(&self, timeout: Duration) -> Result<Event<V>> {
-        self.event_receiver
-            .recv_timeout(timeout)
-            .map_err(Error::from)
-    }
-
-    pub(super) fn try_recv_event(&self) -> Result<Event<V>> {
-        self.event_receiver.try_recv().map_err(Error::from)
-    }
-
+    #[inline(always)]
     pub(super) fn event_receiver(&self) -> &EventReceiver<V> {
         &self.event_receiver
-    }
-
-    pub(super) fn recv_frame(&self) -> Result<(Frame<V>, Callback<V>)> {
-        self.receiver.recv().map_err(Error::from)
-    }
-
-    pub(super) fn recv_frame_timeout(&self, timeout: Duration) -> Result<(Frame<V>, Callback<V>)> {
-        self.receiver.recv_timeout(timeout).map_err(Error::from)
-    }
-
-    pub(super) fn try_recv_frame(&self) -> Result<(Frame<V>, Callback<V>)> {
-        self.receiver.try_recv().map_err(Error::from)
     }
 
     pub(super) fn start_default_handlers(&self, heartbeat_timeout: Duration) {
@@ -208,88 +172,9 @@ impl<V: Versioned> SyncApi<V> {
 //                                 PRIVATE                                   //
 ///////////////////////////////////////////////////////////////////////////////
 
-pub(super) struct FrameReceiver<V: MaybeVersioned> {
-    receiver: IncomingFrameReceiver<V>,
-    processor: Arc<FrameProcessor>,
-    sender: FrameSender<V, Proxy>,
-}
-
 #[derive(Clone)]
 pub(super) struct EventSender<V: MaybeVersioned> {
     inner: mpmc::Sender<Event<V>>,
-}
-
-#[derive(Clone)]
-pub(in crate::sync) struct EventReceiver<V: MaybeVersioned> {
-    inner: mpmc::Receiver<Event<V>>,
-    processor: Arc<FrameProcessor>,
-}
-
-impl<V: MaybeVersioned> FrameReceiver<V> {
-    pub(super) fn new(
-        receiver: IncomingFrameReceiver<V>,
-        sender: FrameSender<V, Proxy>,
-        processor: Arc<FrameProcessor>,
-    ) -> Self {
-        Self {
-            receiver,
-            processor,
-            sender,
-        }
-    }
-
-    pub(super) fn recv(&self) -> RecvResult<(Frame<V>, Callback<V>)> {
-        loop {
-            return match self.receiver.recv() {
-                Ok(frame) => {
-                    let (frame, callback) = match self.process_frame(frame) {
-                        Ok(value) => value,
-                        Err(_) => continue,
-                    };
-                    Ok((frame, callback))
-                }
-                Err(err) => Err(err),
-            };
-        }
-    }
-
-    pub(super) fn recv_timeout(
-        &self,
-        timeout: Duration,
-    ) -> RecvTimeoutResult<(Frame<V>, Callback<V>)> {
-        loop {
-            return match self.receiver.recv_timeout(timeout) {
-                Ok(frame) => {
-                    let (frame, callback) = match self.process_frame(frame) {
-                        Ok(value) => value,
-                        Err(_) => continue,
-                    };
-                    Ok((frame, callback))
-                }
-                Err(err) => Err(err),
-            };
-        }
-    }
-
-    pub(super) fn try_recv(&self) -> TryRecvResult<(Frame<V>, Callback<V>)> {
-        match self.receiver.try_recv() {
-            Ok(frame) => {
-                let (frame, callback) = match self.process_frame(frame) {
-                    Ok(value) => value,
-                    Err(_) => return Err(TryRecvError::Empty),
-                };
-                Ok((frame, callback))
-            }
-            Err(err) => Err(err),
-        }
-    }
-
-    fn process_frame(&self, frame: IncomingFrame<V>) -> Result<(Frame<V>, Callback<V>)> {
-        let (mut frame, channel) = frame.into();
-        self.processor.process_incoming(&mut frame)?;
-        let callback = Callback::new(channel, self.sender.clone());
-        Ok((frame, callback))
-    }
 }
 
 impl<V: MaybeVersioned> EventSender<V> {
@@ -300,49 +185,5 @@ impl<V: MaybeVersioned> EventSender<V> {
     #[inline(always)]
     pub(super) fn send(&self, event: Event<V>) -> core::result::Result<(), SendError<Event<V>>> {
         self.inner.send(event)
-    }
-}
-
-impl<V: MaybeVersioned> EventReceiver<V> {
-    pub(super) fn new(receiver: mpmc::Receiver<Event<V>>, processor: Arc<FrameProcessor>) -> Self {
-        Self {
-            inner: receiver,
-            processor,
-        }
-    }
-
-    pub(super) fn recv(&self) -> core::result::Result<Event<V>, RecvError> {
-        Ok(self.process_event(self.inner.recv()?))
-    }
-
-    pub(in crate::sync) fn recv_timeout(
-        &self,
-        timeout: Duration,
-    ) -> core::result::Result<Event<V>, RecvTimeoutError> {
-        Ok(self.process_event(self.inner.recv_timeout(timeout)?))
-    }
-
-    pub(super) fn try_recv(&self) -> core::result::Result<Event<V>, TryRecvError> {
-        Ok(self.process_event(self.inner.try_recv()?))
-    }
-
-    fn process_event(&self, event: Event<V>) -> Event<V> {
-        match event {
-            Event::Frame(mut frame, mut callback) => {
-                callback.set_processor(self.processor.clone());
-
-                if let Err(err) = self.processor.process_incoming(&mut frame) {
-                    return Event::Invalid(frame, err, callback);
-                }
-
-                Event::Frame(frame, callback)
-            }
-            Event::Invalid(frame, err, mut callback) => {
-                callback.set_processor(self.processor.clone());
-                Event::Invalid(frame, err, callback)
-            }
-            Event::NewPeer(peer) => Event::NewPeer(peer),
-            Event::PeerLost(peer) => Event::PeerLost(peer),
-        }
     }
 }

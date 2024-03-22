@@ -4,8 +4,7 @@ use crate::core::utils::Closable;
 use crate::error::{FrameError, TryRecvError};
 use crate::protocol::Peer;
 use crate::sync::consts::EVENTS_RECV_POOLING_INTERVAL;
-use crate::sync::node::api::EventReceiver;
-use crate::sync::node::Callback;
+use crate::sync::node::{Callback, EventReceiver};
 
 use crate::prelude::*;
 

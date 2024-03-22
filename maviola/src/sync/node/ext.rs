@@ -7,10 +7,9 @@ use std::time::Duration;
 use crate::core::marker::{Edge, NodeKind, Proxy};
 use crate::core::node::{NodeBuilder, NodeConf};
 use crate::core::utils::Guarded;
-use crate::error::NodeError;
+use crate::error::{NodeError, RecvResult, RecvTimeoutResult, TryRecvResult};
 use crate::protocol::{Peer, Unset};
 use crate::sync::marker::ConnConf;
-use crate::sync::node::api::EventReceiver;
 
 use crate::prelude::*;
 use crate::sync::prelude::*;
@@ -76,87 +75,40 @@ impl<K: NodeKind, V: MaybeVersioned> Node<K, V, SyncApi<V>> {
         self.api.peers()
     }
 
-    /// <sup>[`sync`](crate::sync)</sup>
-    /// Receives the next node [`Event`].
-    ///
-    /// Blocks until event received.
-    pub fn recv(&self) -> Result<Event<V>> {
-        self.api.recv_event()
-    }
-
-    /// <sup>[`sync`](crate::sync)</sup>
-    /// Attempts to receive the next node [`Event`] within a `timeout`.
-    ///
-    /// Blocks until event received or deadline is reached.
-    pub fn recv_timeout(&self, timeout: Duration) -> Result<Event<V>> {
-        self.api.recv_event_timeout(timeout)
-    }
-
-    /// <sup>[`sync`](crate::sync)</sup>
-    /// Attempts to receive MAVLink [`Event`] without blocking.
-    pub fn try_recv(&self) -> Result<Event<V>> {
-        self.api.try_recv_event()
-    }
-
-    /// <sup>[`sync`](crate::sync)</sup>
-    /// Subscribe to node events.
-    ///
-    /// Blocks while the node is active.
-    ///
-    /// If you are interested only in valid incoming frames, use [`Node::recv_frame`] or
-    /// [`Node::try_recv_frame`] instead.
-    pub fn events(&self) -> impl Iterator<Item = Event<V>> {
-        self.api.events()
-    }
-
-    /// <sup>[`sync`](crate::sync)</sup>
-    /// Receives the next frame. Blocks until valid frame received or channel is closed.
-    ///
-    /// If you want to block until the next frame within a timeout, use [`Node::recv_frame_timeout`].
-    /// If you want to check for the next frame without blocking, use [`Node::try_recv_frame`].
-    ///
-    /// **⚠** This method skips all invalid frames. If you are interested in such frames, use
-    /// [Node::events] or [`Node::recv`] instead to receive [`crate::asnc::node::Event::Invalid`] events that
-    /// contain invalid frame with the corresponding error.
-    pub fn recv_frame(&self) -> Result<(Frame<V>, Callback<V>)> {
-        self.api.recv_frame()
-    }
-
-    /// <sup>[`sync`](crate::sync)</sup>
-    /// Attempts ot receives the next frame until the timeout is reached. Blocks until valid frame
-    /// received, deadline is reached, or channel is closed.
-    ///
-    /// If you want to block until the next frame is received, use [`Node::recv_frame`].
-    /// If you want to check for the next frame without blocking, use [`Node::try_recv_frame`].
-    ///
-    /// **⚠** This method skips all invalid frames. If you are interested in such frames, use
-    /// [Node::events] or [`Node::recv`] instead to receive [`Event::Invalid`] events that
-    /// contain invalid frame with the corresponding error.
-    pub fn recv_frame_timeout(&self, timeout: Duration) -> Result<(Frame<V>, Callback<V>)> {
-        self.api.recv_frame_timeout(timeout)
-    }
-
-    /// <sup>[`sync`](crate::sync)</sup>
-    /// Attempts to receive the next valid frame. Returns immediately if channel is empty.
-    ///
-    /// If you want to block until the next frame within a timeout, use [`Node::recv_frame_timeout`].
-    /// If you want to block until the next frame is received, use [`Node::recv_frame`].
-    ///
-    /// **⚠** This method skips all invalid frames. If you are interested in such frames, use
-    /// [Node::events] or [`Node::try_recv`] instead to receive [`Event::Invalid`] events that
-    /// contain invalid frame with the corresponding error.
-    pub fn try_recv_frame(&self) -> Result<(Frame<V>, Callback<V>)> {
-        self.api.try_recv_frame()
-    }
-
+    #[inline(always)]
     pub(in crate::sync) fn event_receiver(&self) -> &EventReceiver<V> {
         self.api.event_receiver()
     }
 
+    #[inline(always)]
     pub(in crate::sync) fn frame_sender(&self) -> &FrameSender<V, Proxy> {
         self.api.frame_sender()
     }
 }
+
+impl<K: NodeKind, V: MaybeVersioned> ReceiveEvent<V> for Node<K, V, SyncApi<V>> {
+    #[inline(always)]
+    fn recv(&self) -> RecvResult<Event<V>> {
+        self.api.event_receiver().recv()
+    }
+
+    #[inline(always)]
+    fn recv_timeout(&self, timeout: Duration) -> RecvTimeoutResult<Event<V>> {
+        self.api.event_receiver().recv_timeout(timeout)
+    }
+
+    #[inline(always)]
+    fn try_recv(&self) -> TryRecvResult<Event<V>> {
+        self.api.event_receiver().try_recv()
+    }
+
+    #[inline(always)]
+    fn events(&self) -> impl Iterator<Item = Event<V>> {
+        self.api.event_receiver().events()
+    }
+}
+
+impl<K: NodeKind, V: MaybeVersioned> ReceiveFrame<V> for Node<K, V, SyncApi<V>> {}
 
 impl<V: MaybeVersioned> Node<Proxy, V, SyncApi<V>> {
     /// <sup>[`sync`](crate::sync)</sup>

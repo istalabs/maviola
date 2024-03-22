@@ -12,7 +12,6 @@ use crate::core::utils::{Closer, UniqueId};
 use crate::error::{NodeError, RecvTimeoutError};
 use crate::sync::io::{ChannelFactory, IncomingFrameProducer, OutgoingFrameHandler};
 use crate::sync::marker::ConnConf;
-use crate::sync::node::api::EventReceiver;
 
 use crate::prelude::*;
 use crate::sync::prelude::*;

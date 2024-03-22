@@ -87,12 +87,12 @@ mod benchmark_tests {
     #[test]
     #[cfg(feature = "sync")]
     fn run_benchmark_unix_sockets() {
-        super::benchmark_unix_sockets(10, 10);
+        super::benchmark_unix_sockets(10, 1_000);
     }
 
     #[tokio::test]
     #[cfg(feature = "async")]
     async fn run_benchmark_async_unix_sockets() {
-        super::benchmark_async_unix_sockets(10, 10).await;
+        super::benchmark_async_unix_sockets(100, 10).await;
     }
 }

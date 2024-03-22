@@ -9,6 +9,7 @@ use maviola::protocol::{
 };
 
 use maviola::prelude::*;
+use maviola::sync::prelude::*;
 
 const RECV_TIMEOUT: Duration = Duration::from_millis(5);
 const HOST: &str = "127.0.0.1";

@@ -10,13 +10,16 @@ use crate::sync::io::OutgoingFrameSender;
 
 use crate::prelude::*;
 
+/// <sup>[`sync`](crate::sync)</sup>
 /// Frame sender for synchronous API.
 ///
 /// **⚠** [`FrameSender`] requires [`SendFrame`], [`SendMessage`], and [`SendVersionlessMessage`]
 /// traits to be imported in order to work correctly. The latter two traits make sense only for
-/// frame senders exposed by [`Edge`] nodes (like [`EdgeNode`]).
+/// frame senders exposed by [`Edge`] nodes (like [`EdgeNode`]). You can use [`sync::prelude`] to
+/// import these and other essential traits.
 ///
 /// [`EdgeNode`]: crate::sync::node::EdgeNode
+/// [`sync::prelude`]: crate::sync::prelude
 #[derive(Clone, Debug)]
 pub struct FrameSender<V: MaybeVersioned, K: NodeKind> {
     inner: OutgoingFrameSender<V>,
