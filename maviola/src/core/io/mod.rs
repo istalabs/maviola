@@ -38,7 +38,7 @@ pub use transport::{SockClient, SockServer};
 
 pub use connection_conf::ConnectionConf;
 pub use connection_info::{ChannelDetails, ChannelInfo, ConnectionDetails, ConnectionInfo};
-pub use retry::Retry;
+pub use retry::RetryStrategy;
 pub use routing::{BroadcastScope, ChannelId, ConnectionId};
 
 #[cfg(feature = "unstable")]

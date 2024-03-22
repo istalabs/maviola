@@ -41,13 +41,14 @@ impl<V: MaybeVersioned> NodeApiInternal<V> for AsyncApi<V> {
         self.connection.info()
     }
 
-    #[inline(always)]
     unsafe fn route_frame_internal(&self, frame: Frame<V>, scope: BroadcastScope) -> Result<()> {
-        self.route_frame_internal(frame, scope)
+        self.sender
+            .send_raw(OutgoingFrame::scoped(frame, scope))
+            .map_err(Error::from)
     }
 
     #[inline(always)]
-    fn processor(&self) -> &FrameProcessor {
+    fn processor_internal(&self) -> &FrameProcessor {
         self.processor()
     }
 }
@@ -105,12 +106,6 @@ impl<V: MaybeVersioned> AsyncApi<V> {
 
     pub(super) async fn has_peers(&self) -> bool {
         !self.peers.read().await.is_empty()
-    }
-
-    unsafe fn route_frame_internal(&self, frame: Frame<V>, scope: BroadcastScope) -> Result<()> {
-        self.sender
-            .send_raw(OutgoingFrame::scoped(frame, scope))
-            .map_err(Error::from)
     }
 
     pub(super) fn frame_sender(&self) -> &FrameSender<V, Proxy> {

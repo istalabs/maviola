@@ -80,7 +80,7 @@ impl<K: NodeKind, V: MaybeVersioned> Node<K, V, AsyncApi<V>> {
         self.api.peers().await
     }
 
-    /// Returns a reference to an event receiver.
+    /// Returns a mutable reference to an event receiver.
     ///
     /// This receiver can be cloned and passed to other threads.
     ///
@@ -89,13 +89,19 @@ impl<K: NodeKind, V: MaybeVersioned> Node<K, V, AsyncApi<V>> {
     ///
     /// [`asnc::prelude`]: crate::asnc::prelude
     #[inline(always)]
-    pub fn receiver(&mut self) -> &mut EventReceiver<V> {
+    pub fn receiver_mut(&mut self) -> &mut EventReceiver<V> {
         self.api.event_receiver_mut()
     }
 
+    /// Returns a new event receiver cloned form the internal one.
+    ///
+    /// **⚠** In order to have access to [`EventReceiver`] methods, you have to import
+    /// [`ReceiveEvent`] and [`ReceiveFrame`] traits. You may import [`asnc::prelude`] as well.
+    ///
+    /// [`asnc::prelude`]: crate::asnc::prelude
     #[inline(always)]
-    pub(in crate::asnc) fn event_receiver(&self) -> &EventReceiver<V> {
-        self.api.event_receiver()
+    pub fn receiver_cloned(&self) -> EventReceiver<V> {
+        self.api.event_receiver().clone()
     }
 
     #[inline(always)]

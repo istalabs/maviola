@@ -8,12 +8,22 @@ use crate::protocol::{
     MaybeVersioned,
 };
 
+#[cfg(doc)]
+use crate::core::node::Node;
+#[cfg(doc)]
+use crate::protocol::Device;
+
 /// Process MAVLink frames according to protocol, dialect, and additional rules.
 ///
 /// Frame processor is responsible for managing frame signature, incompatibility/compatibility
 /// flags, validating frames against known dialects and CRC, and other checks defined by a set of
 /// rules.
-#[derive(Clone, Default)]
+///
+/// ⓘ Frame processors are used by [`Node`] and [`Device`] internally to produce and process frames.
+/// However, they never expose them. The reason is that frame processing is not generally idempotent.
+/// Which means you may render a frame useless by applying processor twice. Still we've found this
+/// abstraction handy and provide it for those who may want to extend Maviola functionality.
+#[derive(Default)]
 pub struct FrameProcessor {
     compat: Option<CompatProcessor>,
     signer: Option<FrameSigner>,
@@ -25,7 +35,11 @@ pub struct FrameProcessor {
 /// Builder for [`FrameProcessor`].
 #[derive(Clone, Default)]
 pub struct FrameProcessorBuilder {
-    inner: FrameProcessor,
+    compat: Option<CompatProcessor>,
+    signer: Option<FrameSigner>,
+    dialects: KnownDialects,
+    #[cfg(feature = "unsafe")]
+    processors: CustomFrameProcessors,
 }
 
 impl FrameProcessor {
@@ -119,6 +133,9 @@ impl FrameProcessor {
     }
 
     #[cfg(feature = "unsafe")]
+    /// <sup>⛔ | 💢</sup>
+    ///
+    /// Applies custom processors. Works only when `unsafe` feature is enabled.
     fn apply_custom_processors<V: MaybeVersioned>(
         &self,
         frame: &mut Frame<V>,
@@ -149,8 +166,24 @@ impl Debug for FrameProcessor {
 
 impl FrameProcessorBuilder {
     /// Builds a [`FrameProcessor`] from internal configuration.
+    #[cfg(feature = "unsafe")]
     pub fn build(self) -> FrameProcessor {
-        self.inner
+        FrameProcessor {
+            compat: self.compat,
+            signer: self.signer,
+            dialects: self.dialects,
+            processors: self.processors,
+        }
+    }
+
+    /// Builds a [`FrameProcessor`] from internal configuration.
+    #[cfg(not(feature = "unsafe"))]
+    pub fn build(self) -> FrameProcessor {
+        FrameProcessor {
+            compat: self.compat,
+            signer: self.signer,
+            dialects: self.dialects,
+        }
     }
 
     /// Adds a [`FrameSigner`] to a processor.
@@ -159,9 +192,9 @@ impl FrameProcessorBuilder {
     /// [`CompatProcessor::ignore_signature`] to `true` trusting the signer to handle message
     /// signing incompatibility flag.
     pub fn signer(mut self, signer: FrameSigner) -> Self {
-        self.inner.signer = Some(signer);
-        if let Some(compat) = self.inner.compat {
-            self.inner.compat = Some(compat.update().ignore_signature(true).build());
+        self.signer = Some(signer);
+        if let Some(compat) = self.compat {
+            self.compat = Some(compat.update().ignore_signature(true).build());
         }
         self
     }
@@ -171,27 +204,30 @@ impl FrameProcessorBuilder {
     /// When used with [`FrameProcessor::signer`], then [`CompatProcessor::ignore_signature`]
     /// will be set to `true` trusting the signer to handle message signing incompatibility flag.
     pub fn compat(mut self, compat: CompatProcessor) -> Self {
-        let compat = match self.inner.signer {
+        let compat = match self.signer {
             None => compat,
             Some(_) => compat.update().ignore_signature(true).build(),
         };
-        self.inner.compat = Some(compat);
+        self.compat = Some(compat);
         self
     }
 
     /// Adds [`KnownDialects`] to a processor.
     pub fn dialects(mut self, dialects: KnownDialects) -> Self {
-        self.inner.dialects = dialects;
+        self.dialects = dialects;
         self
     }
 
+    /// <sup>💢</sup>
     /// Sets custom processors, that implement [`ProcessFrame`].
     #[cfg(feature = "unsafe")]
     pub fn processors(mut self, processors: CustomFrameProcessors) -> Self {
-        self.inner.processors = processors;
+        self.processors = processors;
         self
     }
 
+    /// <sup>⛔</sup>
+    /// Sets custom processors (does nothing if `unsafe` feature is not enabled).
     #[cfg(not(feature = "unsafe"))]
     pub(crate) fn processors(self, _: CustomFrameProcessors) -> Self {
         self

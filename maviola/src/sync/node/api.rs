@@ -35,13 +35,14 @@ impl<V: MaybeVersioned> NodeApiInternal<V> for SyncApi<V> {
         self.connection.info()
     }
 
-    #[inline(always)]
     unsafe fn route_frame_internal(&self, frame: Frame<V>, scope: BroadcastScope) -> Result<()> {
-        unsafe { self.route_frame_internal(frame, scope) }
+        self.sender
+            .send_raw(OutgoingFrame::scoped(frame, scope))
+            .map_err(Error::from)
     }
 
     #[inline(always)]
-    fn processor(&self) -> &FrameProcessor {
+    fn processor_internal(&self) -> &FrameProcessor {
         self.processor()
     }
 }
@@ -98,12 +99,6 @@ impl<V: MaybeVersioned> SyncApi<V> {
             Ok(peers) => !peers.is_empty(),
             Err(_) => false,
         }
-    }
-
-    unsafe fn route_frame_internal(&self, frame: Frame<V>, scope: BroadcastScope) -> Result<()> {
-        self.sender
-            .send_raw(OutgoingFrame::scoped(frame, scope))
-            .map_err(Error::from)
     }
 
     #[inline(always)]

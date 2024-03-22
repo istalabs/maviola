@@ -382,6 +382,7 @@ dependencies = [
  "env_logger",
  "log",
  "mavio",
+ "mavspec",
  "portpicker",
  "serde",
  "serde_arrays",

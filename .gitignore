@@ -16,11 +16,6 @@
 !/benchmarks/
 !/benchmarks/**
 
-# MAVLink
-!/mavlink
-!/message_definitions
-!/message_definitions/**
-
 # Executables & scripts
 !/bin
 !/bin/**

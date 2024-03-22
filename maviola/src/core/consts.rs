@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-mod default_dialect {
+mod _default_dialect {
     #[cfg(feature = "all")]
     pub use crate::dialects::All as DefaultDialect;
 
@@ -17,6 +17,21 @@ mod default_dialect {
 
     #[cfg(not(feature = "standard"))]
     pub use crate::dialects::Minimal as DefaultDialect;
+
+    #[cfg(feature = "all")]
+    pub use crate::dialects::all as default_dialect;
+
+    #[cfg(all(not(feature = "all"), feature = "ardupilotmega"))]
+    pub use crate::dialects::ardupilotmega as default_dialect;
+
+    #[cfg(all(not(feature = "ardupilotmega"), feature = "common"))]
+    pub use crate::dialects::common as default_dialect;
+
+    #[cfg(all(not(feature = "common"), feature = "standard"))]
+    pub use crate::dialects::standard as default_dialect;
+
+    #[cfg(not(feature = "standard"))]
+    pub use crate::dialects::minimal as default_dialect;
 }
 
 /// Default MAVLink dialect.
@@ -40,7 +55,26 @@ mod default_dialect {
 ///
 /// ---
 #[doc(inline)]
-pub use default_dialect::DefaultDialect;
+pub use _default_dialect::DefaultDialect;
+
+/// Default MAVLink dialect module.
+///
+/// Similar to [`DefaultDialect`] but provides access to a dialect module instead of dialect itself.
+/// Re-exported by [`prelude`](crate::prelude).
+///
+/// See [`DefaultDialect`] to learn about logic behind choosing a default dialect.
+///
+/// # Usage
+///
+/// ```rust,no_run
+/// use maviola::prelude::default_dialect;
+///
+/// let message = default_dialect::messages::Heartbeat::default();
+/// ```
+///
+/// ---
+#[doc(inline)]
+pub use _default_dialect::default_dialect;
 
 /// Default heartbeat timeout.
 pub const DEFAULT_HEARTBEAT_TIMEOUT: Duration = Duration::from_millis(1200);

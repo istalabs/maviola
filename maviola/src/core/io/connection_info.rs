@@ -165,8 +165,8 @@ impl ConnectionInfo {
     }
 
     /// Connection `ID`.
-    pub fn id(&self) -> &ConnectionId {
-        &self.id
+    pub fn id(&self) -> ConnectionId {
+        self.id
     }
 
     /// Connection details.
@@ -220,12 +220,12 @@ impl ChannelInfo {
     }
 
     /// Channel `ID`.
-    pub fn id(&self) -> &ChannelId {
-        &self.id
+    pub fn id(&self) -> ChannelId {
+        self.id
     }
 
     /// Connection `ID` of this channel.
-    pub fn connection_id(&self) -> &ConnectionId {
+    pub fn connection_id(&self) -> ConnectionId {
         self.id.connection_id()
     }
 

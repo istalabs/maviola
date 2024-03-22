@@ -43,6 +43,9 @@ are looking for a solution for embedded devices, then Mavio probably would be a 
 Usage
 -----
 
+> 📖 If you want to learn how to use Maviola, start from reading
+> [Maviola Playbook](https://docs.rs/maviola/latest/maviola/docs). The following section is just a brief introduction.
+
 This library provides both synchronous and asynchronous API. The synchronous API can be enabled by `sync` feature flag.
 The asynchronous API is based on [Tokio](https://tokio.rs/), and can be enabled by `async` feature flag. The differences
 between synchronous and asynchronous APIs are minimal, so you can easily switch between them, if necessary. It is also

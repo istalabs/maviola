@@ -72,7 +72,7 @@ mod tests {
     use std::time::Duration;
 
     use crate::core::consts::SERVER_HANG_UP_TIMEOUT;
-    use crate::core::io::Retry;
+    use crate::core::io::RetryStrategy;
     use crate::core::utils::net::pick_unused_port;
     use crate::dialects::minimal::messages::Heartbeat;
 
@@ -155,7 +155,7 @@ mod tests {
 
         let network = Network::asnc()
             .add_connection(TcpClient::new(addr.as_str()).unwrap())
-            .retry(Retry::Always(RECONNECT_INTERVAL));
+            .retry(RetryStrategy::Always(RECONNECT_INTERVAL));
         let client = Node::asnc::<V2>()
             .id(MavLinkId::new(1, 1))
             .connection(network)

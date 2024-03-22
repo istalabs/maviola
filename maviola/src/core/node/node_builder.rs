@@ -181,7 +181,10 @@ impl<
     ///
     /// Dialect should be specified via [turbofish](https://turbo.fish/about) syntax.
     ///
-    /// Default dialect is [`DefaultDialect`].
+    /// Default dialect is [`DefaultDialect`]. The [`Minimal`] dialect will always remain in the
+    /// list of [`NodeConf::known_dialects`] no matter what you are doing.
+    ///
+    /// [`Minimal`]: crate::dialects::Minimal
     pub fn dialect<D: Dialect>(mut self) -> Self {
         self.dialects = self.dialects.with_dialect(D::spec());
         self
@@ -195,10 +198,39 @@ impl<
     /// Dialect should be specified via [turbofish](https://turbo.fish/about) syntax.
     ///
     /// Main dialect is always among the known dialects. Internally, dialect names are used as
-    /// a dialect `ID`. So, it is technically possible to replace main dialect, but we strongly
-    /// advice against doing that.
+    /// `ID`s in the collection. So, it is technically possible to replace an existing known dialect,
+    /// but in the case of the main dialect this will never happen.
+    ///
+    /// The [`Minimal`] dialect is another dialect which is always known. You can't have a custom
+    /// dialect with the name "minimal" since the canonical minimal dialect is essential for
+    /// validating and encoding / decoding heartbeat messages.
+    ///
+    /// [`Minimal`]: crate::dialects::Minimal
     pub fn add_dialect<D: Dialect>(mut self) -> Self {
         self.dialects = self.dialects.with_known_dialect(D::spec());
+        self
+    }
+
+    /// Removes [`DefaultDialect`] dialect from the list of known dialects.
+    ///
+    /// If default dialect is currently the main one, then the main dialect will be set to
+    /// [`Minimal`].
+    ///
+    /// **⚠** The [`Minimal`] dialect will always remain in the list of the known dialects no matter
+    /// what you are doing.
+    ///
+    /// [`Minimal`]: crate::dialects::Minimal
+    pub fn no_default_dialect(mut self) -> Self {
+        self.dialects = self.dialects.without_default_dialect();
+        self
+    }
+
+    /// Allow frames with [`Frame::message_id`] which do not belong to any known dialect to pass
+    /// validation test.
+    ///
+    /// This value is `false` by default.
+    pub fn allow_unknown_dialects(mut self, value: bool) -> Self {
+        self.dialects = self.dialects.with_allow_unknown(value);
         self
     }
 
@@ -263,9 +295,10 @@ impl<V: MaybeVersioned, CC: HasConnConf, A: NodeApi<V>>
     /// [`NodeConf::component_id`].
     pub fn conf(self) -> NodeConf<Edge<V>, V, CC> {
         NodeConf {
-            kind: Edge {
-                endpoint: Endpoint::new(MavLinkId::new(self.system_id.0, self.component_id.0)),
-            },
+            kind: Edge::new(Endpoint::new(MavLinkId::new(
+                self.system_id.0,
+                self.component_id.0,
+            ))),
             connection_conf: self.conn_conf,
             heartbeat_timeout: self.heartbeat_timeout,
             heartbeat_interval: self.heartbeat_interval,

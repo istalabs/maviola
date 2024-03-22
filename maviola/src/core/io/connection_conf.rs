@@ -10,7 +10,7 @@ pub trait ConnectionConf: Debug + Send {
     /// Returns connection identifier.
     ///
     /// We suggest not to reimplement this method unless you are really know what you are doing.
-    fn id(&self) -> &ConnectionId {
+    fn id(&self) -> ConnectionId {
         self.info().id()
     }
 }

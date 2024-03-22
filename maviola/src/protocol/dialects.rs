@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Formatter};
 
+use crate::dialects::Minimal;
 use crate::error::FrameError;
 use crate::protocol::{DialectSpec, MessageId, MessageInfo};
 
@@ -15,27 +16,77 @@ pub struct KnownDialects {
 
 impl KnownDialects {
     /// Creates a default [`KnownDialects`] instance with [`DefaultDialect`] as a default main
-    /// dialect.
+    /// dialect and [`Minimal`] dialect among known dialects.
     pub fn new() -> Self {
         Self {
             main: DefaultDialect::name(),
-            dialects: vec![DefaultDialect::spec()],
+            dialects: vec![Minimal::spec(), DefaultDialect::spec()],
             allow_unknown: false,
         }
     }
 
     /// Adds dialect specification as a main dialect.
+    ///
+    /// **⚠** The [`Minimal`] dialect will always remain in the list of the known dialects no matter
+    /// what you are doing. You can't add a custom dialect with the name "minimal".
     pub fn with_dialect(mut self, dialect: &'static DialectSpec) -> Self {
-        self = self.with_known_dialect(dialect);
         self.main = dialect.name();
+        self = self.with_known_dialect(dialect);
         self
     }
 
     /// Adds dialect specification as a secondary (known) dialect.
+    ///
+    /// If for some reason you are using a custom dialect with the same name as one of the known
+    /// dialects, then new dialect will override the existing one.
+    ///
+    /// The [`main`] dialect won't be overridden by this method.
+    ///
+    /// **⚠** The [`Minimal`] dialect will always remain in the list of the known dialects no matter
+    /// what you are doing.
+    ///
+    /// [`main`]: Self::main
     pub fn with_known_dialect(mut self, dialect: &'static DialectSpec) -> Self {
         if !self.contains(dialect.name()) {
             self.dialects.push(dialect);
+        } else if dialect.name() != Minimal::name() && dialect.name() != self.main {
+            let mut dialects = Vec::new();
+            for _dialect in self.dialects {
+                if _dialect.name() != dialect.name() {
+                    dialects.push(_dialect);
+                }
+                dialects.push(dialect);
+            }
+            self.dialects = dialects;
         }
+        self
+    }
+
+    /// Removes [`DefaultDialect`] dialect from the list of known dialects.
+    ///
+    /// If default dialect is currently the [`main`] one, then the main dialect will be set to
+    /// [`Minimal`].
+    ///
+    /// **⚠** The [`Minimal`] dialect will always remain in the list of the known dialects no matter
+    /// what you are doing.
+    ///
+    /// [`main`]: Self::main
+    pub fn without_default_dialect(mut self) -> Self {
+        if DefaultDialect::name() == Minimal::name() {
+            return self;
+        }
+
+        self.dialects = self
+            .dialects
+            .iter()
+            .filter(|&&dialect| dialect.name() != DefaultDialect::name())
+            .copied()
+            .collect();
+
+        if DefaultDialect::name() == self.main {
+            self.main = Minimal::name();
+        }
+
         self
     }
 

@@ -12,9 +12,9 @@ pub trait SendFrameInternal<V: MaybeVersioned>: Sealed {
     /// <sup>⛔</sup>
     /// Returns a reference to [`FrameProcessor`], that is responsible for message signing,
     /// compatibility and incompatibility flags, and custom message processing.
-    fn processor(&self) -> &FrameProcessor;
+    fn processor_internal(&self) -> &FrameProcessor;
 
-    /// <sup>⛔</sup>
+    /// <sup>⛔ | 💢</sup>
     /// Routes MAVLink frame without any changes.
     ///
     /// There is nothing particularly unsafe in this method in the sense of unsafe Rust. However,
@@ -41,7 +41,7 @@ pub trait SendFrame<V: MaybeVersioned>: SendFrameInternal<V> {
     /// Default dialect is [`DefaultDialect`].
     #[inline]
     fn dialect(&self) -> &DialectSpec {
-        self.processor().main_dialect()
+        self.processor_internal().main_dialect()
     }
 
     /// Known dialects specifications.
@@ -54,7 +54,7 @@ pub trait SendFrame<V: MaybeVersioned>: SendFrameInternal<V> {
     /// [`dialect`]: Self::dialect
     #[inline(always)]
     fn known_dialects(&self) -> impl Iterator<Item = &DialectSpec> {
-        self.processor().known_dialects()
+        self.processor_internal().known_dialects()
     }
 
     /// Sends MAVLink [`Frame`].
@@ -71,7 +71,7 @@ pub trait SendFrame<V: MaybeVersioned>: SendFrameInternal<V> {
     /// [`Edge`]: crate::core::marker::Edge
     fn send_frame(&self, frame: &Frame<V>) -> Result<()> {
         let mut frame = frame.clone();
-        self.processor().process_outgoing(&mut frame)?;
+        self.processor_internal().process_outgoing(&mut frame)?;
         unsafe { self.route_frame_internal(frame, BroadcastScope::All) }
     }
 
@@ -90,7 +90,7 @@ pub trait SendFrame<V: MaybeVersioned>: SendFrameInternal<V> {
     /// [`Edge`]: crate::core::marker::Edge
     fn broadcast_frame(&self, frame: &Frame<V>, scope: BroadcastScope) -> Result<()> {
         let mut frame = frame.clone();
-        self.processor().process_outgoing(&mut frame)?;
+        self.processor_internal().process_outgoing(&mut frame)?;
         unsafe { self.route_frame_internal(frame, scope) }
     }
 }
@@ -134,7 +134,7 @@ pub trait SendMessage<V: Versioned>: SendFrame<V> + SendMessageInternal<V> {
     /// compatibility and incompatibility flags.
     fn next_frame(&self, message: &impl Message) -> Result<Frame<V>> {
         let mut frame = self.endpoint().next_frame(message)?;
-        self.processor().process_new(&mut frame);
+        self.processor_internal().process_new(&mut frame);
         Ok(frame)
     }
 }
@@ -182,7 +182,7 @@ pub trait SendVersionlessMessage:
         message: &impl Message,
     ) -> Result<Frame<Versionless>> {
         let mut frame = self.endpoint().next_frame::<V>(message)?;
-        self.processor().process_new(&mut frame);
+        self.processor_internal().process_new(&mut frame);
         Ok(frame)
     }
 }

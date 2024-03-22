@@ -11,7 +11,7 @@ pub trait NodeApiInternal<V: MaybeVersioned>: Sealed {
     /// Provides information about connection.
     fn info(&self) -> &ConnectionInfo;
 
-    /// <sup>⛔</sup>
+    /// <sup>⛔ | 💢</sup>
     /// Routes MAVLink frame without any changes.
     ///
     /// There is nothing particularly unsafe in this method in the sense of unsafe Rust. However,
@@ -20,7 +20,7 @@ pub trait NodeApiInternal<V: MaybeVersioned>: Sealed {
 
     /// <sup>⛔</sup>
     /// Message processor that is responsible for message signing and frame compatibility.
-    fn processor(&self) -> &FrameProcessor;
+    fn processor_internal(&self) -> &FrameProcessor;
 }
 
 /// <sup>🔒</sup>
@@ -38,7 +38,7 @@ impl<V: MaybeVersioned> NodeApiInternal<V> for Unset {
         unreachable!()
     }
 
-    fn processor(&self) -> &FrameProcessor {
+    fn processor_internal(&self) -> &FrameProcessor {
         unreachable!()
     }
 }

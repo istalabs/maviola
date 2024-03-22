@@ -48,7 +48,7 @@ impl<V: MaybeVersioned> FrameSender<V, Proxy> {
 }
 
 impl<V: MaybeVersioned, K: NodeKind> FrameSender<V, K> {
-    /// <sup>⛔</sup>
+    /// <sup>⛔ | 💢</sup>
     /// Sends outgoing frame without processing.
     pub(in crate::asnc) unsafe fn send_raw(
         &self,
@@ -74,7 +74,7 @@ impl<V: MaybeVersioned, K: NodeKind> Sealed for FrameSender<V, K> {}
 
 impl<V: MaybeVersioned, K: NodeKind> SendFrameInternal<V> for FrameSender<V, K> {
     #[inline(always)]
-    fn processor(&self) -> &FrameProcessor {
+    fn processor_internal(&self) -> &FrameProcessor {
         self.processor.as_ref()
     }
 

@@ -8,7 +8,7 @@ use crate::prelude::*;
 ///
 /// ⚠ This trait is sealed and not exported to the library users ⚠
 pub trait CallbackApiInternal<V: MaybeVersioned>: Sealed {
-    /// <sup>⛔</sup>
+    /// <sup>⛔ | 💢</sup>
     /// Sends outgoing frame without any changes.
     ///
     /// There is nothing particularly unsafe in this method in the sense of unsafe Rust. However,
@@ -32,13 +32,13 @@ pub trait CallbackApi<V: MaybeVersioned>: CallbackApiInternal<V> {
 
     /// Identifier of a sender's channel.
     #[inline(always)]
-    fn channel_id(&self) -> &ChannelId {
+    fn channel_id(&self) -> ChannelId {
         self.info().id()
     }
 
     /// Identifier of a sender's connection.
     #[inline(always)]
-    fn connection_id(&self) -> &ConnectionId {
+    fn connection_id(&self) -> ConnectionId {
         self.info().connection_id()
     }
 
@@ -54,7 +54,7 @@ pub trait CallbackApi<V: MaybeVersioned>: CallbackApiInternal<V> {
         unsafe {
             self.send_internal(OutgoingFrame::scoped(
                 frame,
-                BroadcastScope::ExactChannel(*self.channel_id()),
+                BroadcastScope::ExactChannel(self.channel_id()),
             ))
         }
     }
@@ -65,7 +65,7 @@ pub trait CallbackApi<V: MaybeVersioned>: CallbackApiInternal<V> {
         unsafe {
             self.send_internal(OutgoingFrame::scoped(
                 frame,
-                BroadcastScope::ExceptChannel(*self.channel_id()),
+                BroadcastScope::ExceptChannel(self.channel_id()),
             ))
         }
     }
@@ -80,7 +80,7 @@ pub trait CallbackApi<V: MaybeVersioned>: CallbackApiInternal<V> {
         unsafe {
             self.send_internal(OutgoingFrame::scoped(
                 frame,
-                BroadcastScope::ExceptChannelWithin(*self.channel_id()),
+                BroadcastScope::ExceptChannelWithin(self.channel_id()),
             ))
         }
     }
@@ -91,7 +91,7 @@ pub trait CallbackApi<V: MaybeVersioned>: CallbackApiInternal<V> {
         unsafe {
             self.send_internal(OutgoingFrame::scoped(
                 frame,
-                BroadcastScope::ExceptConnection(*self.connection_id()),
+                BroadcastScope::ExceptConnection(self.connection_id()),
             ))
         }
     }

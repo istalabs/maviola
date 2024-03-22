@@ -4,7 +4,7 @@ use std::thread;
 use std::thread::JoinHandle;
 
 use crate::core::consts::NETWORK_POOLING_INTERVAL;
-use crate::core::io::{ConnectionInfo, IncomingFrame, Retry};
+use crate::core::io::{ConnectionInfo, IncomingFrame, RetryStrategy};
 use crate::core::marker::Proxy;
 use crate::core::network::types::{NetworkConnInfo, NetworkConnState, RestartNodeEvent};
 use crate::core::node::NodeConf;
@@ -20,7 +20,7 @@ use crate::sync::prelude::*;
 pub(super) struct NetworkConnectionHandler<V: MaybeVersioned> {
     state: Closer,
     info: ConnectionInfo,
-    retry: Retry,
+    retry: RetryStrategy,
     stop_on_node_down: bool,
     node_configs: HashMap<UniqueId, NodeConf<Proxy, V, ConnConf<V>>>,
     nodes: HashMap<UniqueId, Node<Proxy, V, SyncApi<V>>>,
@@ -163,25 +163,25 @@ impl<V: MaybeVersioned> NetworkConnectionHandler<V> {
                 let tx = self.node_events_chan.tx.clone();
 
                 match self.retry {
-                    Retry::Never => {
+                    RetryStrategy::Never => {
                         self.node_events_chan
                             .tx
                             .send(RestartNodeEvent::GiveUp(id))?;
                     }
-                    Retry::Attempts(attempts, interval) => {
+                    RetryStrategy::Attempts(attempts, interval) => {
                         thread::spawn(move || {
                             thread::sleep(interval);
                             tx.send(RestartNodeEvent::Retry(
                                 id,
-                                Retry::Attempts(attempts, interval),
+                                RetryStrategy::Attempts(attempts, interval),
                             ))
                             .unwrap();
                         });
                     }
-                    Retry::Always(interval) => {
+                    RetryStrategy::Always(interval) => {
                         thread::spawn(move || {
                             thread::sleep(interval);
-                            tx.send(RestartNodeEvent::Retry(id, Retry::Always(interval)))
+                            tx.send(RestartNodeEvent::Retry(id, RetryStrategy::Always(interval)))
                                 .unwrap();
                         });
                     }
@@ -196,8 +196,8 @@ impl<V: MaybeVersioned> NetworkConnectionHandler<V> {
         Ok(())
     }
 
-    fn on_node_restart_retry(&self, id: UniqueId, retry: Retry) -> Result<()> {
-        if let Retry::Never = retry {
+    fn on_node_restart_retry(&self, id: UniqueId, retry: RetryStrategy) -> Result<()> {
+        if let RetryStrategy::Never = retry {
             self.node_events_chan
                 .tx
                 .send(RestartNodeEvent::GiveUp(id))?;
@@ -225,7 +225,7 @@ impl<V: MaybeVersioned> NetworkConnectionHandler<V> {
                 let tx = self.node_events_chan.tx.clone();
 
                 match retry {
-                    Retry::Attempts(attempts, _) if attempts <= 1 => {
+                    RetryStrategy::Attempts(attempts, _) if attempts <= 1 => {
                         log::debug!(
                             "[{:?}] no restart attempts left for node {conn_info:?}, giving up",
                             self.info
@@ -234,24 +234,24 @@ impl<V: MaybeVersioned> NetworkConnectionHandler<V> {
                             .tx
                             .send(RestartNodeEvent::GiveUp(id))?;
                     }
-                    Retry::Attempts(attempts, interval) => {
+                    RetryStrategy::Attempts(attempts, interval) => {
                         thread::spawn(move || {
                             thread::sleep(interval);
                             tx.send(RestartNodeEvent::Retry(
                                 id,
-                                Retry::Attempts(attempts - 1, interval),
+                                RetryStrategy::Attempts(attempts - 1, interval),
                             ))
                             .unwrap();
                         });
                     }
-                    Retry::Always(interval) => {
+                    RetryStrategy::Always(interval) => {
                         thread::spawn(move || {
                             thread::sleep(interval);
-                            tx.send(RestartNodeEvent::Retry(id, Retry::Always(interval)))
+                            tx.send(RestartNodeEvent::Retry(id, RetryStrategy::Always(interval)))
                                 .unwrap();
                         });
                     }
-                    Retry::Never => unreachable!(),
+                    RetryStrategy::Never => unreachable!(),
                 }
             }
         }

@@ -66,7 +66,7 @@ impl ConnectionId {
 
     /// Returns `true` if the channel with provided `channel_id` belongs to this connection.
     #[inline(always)]
-    pub fn contains(&self, channel_id: &ChannelId) -> bool {
+    pub fn contains(&self, channel_id: ChannelId) -> bool {
         &channel_id.connection == self
     }
 }
@@ -82,14 +82,14 @@ impl ChannelId {
     }
 
     /// Identifier of a connection withing this channel.
-    pub fn connection_id(&self) -> &ConnectionId {
-        &self.connection
+    pub fn connection_id(&self) -> ConnectionId {
+        self.connection
     }
 
     /// Returns `true`, if this channel belongs to the connection with provided `connection_id`.
     #[inline(always)]
-    pub fn belongs_to(&self, connection_id: &ConnectionId) -> bool {
-        connection_id.contains(self)
+    pub fn belongs_to(&self, connection_id: ConnectionId) -> bool {
+        connection_id.contains(*self)
     }
 }
 
@@ -148,8 +148,8 @@ impl<V: MaybeVersioned> OutgoingFrame<V> {
 
     /// Broadcast scope.
     #[inline]
-    pub fn scope(&self) -> &BroadcastScope {
-        &self.scope
+    pub fn scope(&self) -> BroadcastScope {
+        self.scope
     }
 
     /// Set broadcast scope.
@@ -168,7 +168,7 @@ impl<V: MaybeVersioned> OutgoingFrame<V> {
     ///   `ID`, then frame scope will be changed to [`BroadcastScope::All`] and `true` will be
     ///   returned.
     /// * Returns `true` for all other cases.
-    pub(crate) fn matches_connection_reroute(&mut self, connection_id: &ConnectionId) -> bool {
+    pub(crate) fn matches_connection_reroute(&mut self, connection_id: ConnectionId) -> bool {
         match self.scope() {
             BroadcastScope::ExceptConnection(conn_id) if connection_id == conn_id => false,
             BroadcastScope::ExactConnection(conn_id) if connection_id == conn_id => {
@@ -179,8 +179,8 @@ impl<V: MaybeVersioned> OutgoingFrame<V> {
         }
     }
 
-    pub(crate) fn should_send_to(&self, channel_id: &ChannelId) -> bool {
-        match &self.scope {
+    pub(crate) fn should_send_to(&self, channel_id: ChannelId) -> bool {
+        match self.scope {
             BroadcastScope::All => true,
             BroadcastScope::ExactChannel(sender_id) => sender_id == channel_id,
             BroadcastScope::ExceptChannel(sender_id) => sender_id != channel_id,

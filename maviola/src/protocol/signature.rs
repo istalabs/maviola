@@ -51,6 +51,7 @@ pub struct FrameSigner {
     link_id: SignedLinkId,
     incoming: SignStrategy,
     outgoing: SignStrategy,
+    unknown_links: SignStrategy,
     #[cfg_attr(feature = "serde", serde(skip_serializing))]
     links: HashMap<SignedLinkId, SecretKey>,
     last_timestamp: UniqueMavTimestamp,
@@ -62,28 +63,63 @@ pub struct FrameSigner {
 /// Defines how message signing will be applied.
 ///
 /// By default, the [`SignStrategy::Sign`] strategy will be applied.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SignStrategy {
     /// Apply message signing for all messages. Sign unsigned messages.
     ///
     /// Unsigned messages will be signed. Messages with incorrect signature will be rejected.
     ///
+    /// For messages with unknown links the main [`link_id`] and [`key`] will be used for
+    /// validation.
+    ///
+    /// When set as a strategy for [`unknown_links`], then valid messages with unknown links will
+    /// keep their signature for [`ReSign`] outgoing / incoming strategies.
+    ///
     /// [`Versionless`] frames of `MAVLink 1` protocol will be passed without change.
+    ///
+    /// [`link_id`]: FrameSigner::link_id
+    /// [`key`]: FrameSigner::key
+    /// [`unknown_links`]: FrameSigner::unknown_links
+    /// [`ReSign`]: SignStrategy::ReSign
     #[default]
     Sign,
-    /// Enforce message signing for all messages. Re-sign messages with correct signing.
+    /// Enforce message signing for all messages. Re-sign messages with correct signing using the
+    /// main [`link_id`] and [`key`].
     ///
     /// Unsigned messages will be signed. Messages with incorrect signature will be rejected.
     ///
+    /// For messages with unknown links the main [`link_id`] and [`key`] will be used for
+    /// validation.
+    ///
+    /// When set as a strategy for [`unknown_links`], then valid messages with unknown links will
+    /// be re-signed for both [`Sign`] and [`ReSign`] outgoing / incoming strategies using the main
+    /// [`link_id`] and [`key`].
+    ///
     /// [`Versionless`] frames of `MAVLink 1` protocol will be passed without change.
+    ///
+    /// [`link_id`]: FrameSigner::link_id
+    /// [`key`]: FrameSigner::key
+    /// [`unknown_links`]: FrameSigner::unknown_links
+    /// [`Sign`]: SignStrategy::Sign
+    /// [`ReSign`]: SignStrategy::ReSign
     ReSign,
     /// Apply message signing for all messages. Reject messages without signing or with incorrect
     /// signatures.
     ///
     /// Unsigned messages will be rejected. Messages with incorrect signature will be rejected.
     ///
+    /// Messages with unknown links will be rejected.
+    ///
+    /// When set as a strategy for [`unknown_links`], then messages with unknown links
+    /// (even when valid) will be considered invalid for [`Sign`] and [`ReSign`] incoming / outgoing
+    /// strategies.
+    ///
     /// [`Versionless`] frames of `MAVLink 1` protocol will be rejected.
+    ///
+    /// [`unknown_links`]: FrameSigner::unknown_links
+    /// [`Sign`]: SignStrategy::Sign
+    /// [`ReSign`]: SignStrategy::ReSign
     Strict,
     /// Pass messages as they are.
     Proxy,
@@ -150,13 +186,25 @@ impl FrameSigner {
     }
 
     /// Signing strategy for incoming messages.
+    ///
+    /// The default value is [`SignStrategy::Sign`].
     pub fn incoming(&self) -> SignStrategy {
         self.incoming
     }
 
     /// Signing strategy for outgoing messages.
+    ///
+    /// The default value is [`SignStrategy::Sign`].
     pub fn outgoing(&self) -> SignStrategy {
         self.outgoing
+    }
+
+    /// Signing strategy for messages with unknown [`link_id`](Self::link_id).
+    ///
+    /// The default value is [`SignStrategy::Strict`]. Which means that frames with unknown links
+    /// are considered to be invalid.
+    pub fn unknown_links(&self) -> SignStrategy {
+        self.unknown_links
     }
 
     /// Iterator over supported links.
@@ -262,6 +310,10 @@ impl FrameSigner {
     /// [`Frame::link_id`]. If such link `ID` is not among the available [`FrameSigner::links`],
     /// then frame will be considered invalid.
     ///
+    /// When frame has unknown link `ID`, then the main [`FrameSigner::key`] will be used for
+    /// validation. If [`FrameSigner::unknown_links`] is [`SignStrategy::Strict`], then frames
+    /// with unknown links will be rejected no matter what.
+    ///
     /// Unsigned frames and `MAVLink 1` frames are always invalid.
     pub fn has_valid_signature<V: MaybeVersioned>(&self, frame: &Frame<V>) -> bool {
         let signature = if let Some(signature) = frame.signature() {
@@ -273,10 +325,18 @@ impl FrameSigner {
         if let Some(key) = self.links.get(&signature.link_id) {
             let mut _signer = self.signer();
             let mut signer = Signer::new(&mut _signer);
-            return signer.validate(frame, signature, key);
+            signer.validate(frame, signature, key)
+        } else {
+            match self.unknown_links {
+                SignStrategy::Sign | SignStrategy::ReSign => {
+                    let mut _signer = self.signer();
+                    let mut signer = Signer::new(&mut _signer);
+                    signer.validate(frame, signature, self.key())
+                }
+                SignStrategy::Strict => false,
+                SignStrategy::Proxy | SignStrategy::Strip => true,
+            }
         }
-
-        false
     }
 
     /// Returns a new instance of a signer that implements [`Sign`].
@@ -304,25 +364,53 @@ impl FrameSigner {
         self.last_timestamp.next()
     }
 
-    /// ⚠ **DANGER** ⚠
-    /// Applies [`SignStrategy`] to a frame.
+    /// <sup>⛔</sup>
+    /// ⚠ **DANGER** ⚠ Applies [`SignStrategy`] to a frame.
     ///
-    /// This method should never be exposed to a user as it relies on preliminary frame validation.
+    /// This method should be never exposed to a user as it relies on preliminary frame validation.
     fn sign_for_strategy<V: MaybeVersioned>(&self, frame: &mut Frame<V>, strategy: SignStrategy) {
         match strategy {
             SignStrategy::Sign => {
-                if !frame.is_signed() {
+                if self.should_sign(frame) {
                     self.sign_frame(frame);
                 }
             }
             SignStrategy::ReSign => {
-                self.sign_frame(frame);
+                if self.should_re_sign(frame) {
+                    self.sign_frame(frame);
+                }
             }
             SignStrategy::Strip => {
                 frame.remove_signature();
             }
             SignStrategy::Strict => {}
             SignStrategy::Proxy => {}
+        }
+    }
+
+    /// <sup>⛔</sup>
+    /// Checks, that frame should be signed for [`SignStrategy::Sign`].
+    fn should_sign<V: MaybeVersioned>(&self, frame: &Frame<V>) -> bool {
+        if let Some(signature) = frame.signature() {
+            self.links.get(&signature.link_id).is_none()
+                && (self.unknown_links == SignStrategy::Sign
+                    || self.unknown_links == SignStrategy::ReSign)
+        } else {
+            true
+        }
+    }
+
+    /// <sup>⛔</sup>
+    /// Checks, that frame should be signed for [`SignStrategy::ReSign`].
+    fn should_re_sign<V: MaybeVersioned>(&self, frame: &Frame<V>) -> bool {
+        if let Some(signature) = frame.signature() {
+            if self.links.get(&signature.link_id).is_none() {
+                self.unknown_links == SignStrategy::ReSign
+            } else {
+                true
+            }
+        } else {
+            true
         }
     }
 }
@@ -442,6 +530,7 @@ pub mod builder {
         key: K,
         incoming: Option<SignStrategy>,
         outgoing: Option<SignStrategy>,
+        unknown_links: Option<SignStrategy>,
         links: HashMap<SignedLinkId, SecretKey>,
         exclude: HashSet<MessageId>,
     }
@@ -470,6 +559,7 @@ pub mod builder {
                 key: NoSecretKey,
                 incoming: None,
                 outgoing: None,
+                unknown_links: None,
                 links: Default::default(),
                 exclude: Default::default(),
             }
@@ -484,6 +574,7 @@ pub mod builder {
                 key: self.key,
                 incoming: self.incoming,
                 outgoing: self.outgoing,
+                unknown_links: self.unknown_links,
                 links: self.links,
                 exclude: self.exclude,
             }
@@ -498,6 +589,7 @@ pub mod builder {
                 key: HasSecretKey(key.into()),
                 incoming: self.incoming,
                 outgoing: self.outgoing,
+                unknown_links: self.unknown_links,
                 links: self.links,
                 exclude: self.exclude,
             }
@@ -517,6 +609,20 @@ pub mod builder {
         pub fn outgoing(self, strategy: SignStrategy) -> Self {
             Self {
                 outgoing: Some(strategy),
+                ..self
+            }
+        }
+
+        /// <sup>`⍚` |</sup>
+        /// Set [`FrameSigner::unknown_links`].
+        ///
+        /// Default value is [`SignStrategy::Strict`].
+        ///
+        /// Available only when `unstable` Cargo feature is set.
+        #[cfg(feature = "unstable")]
+        pub fn unknown_links(self, strategy: SignStrategy) -> Self {
+            Self {
+                unknown_links: Some(strategy),
                 ..self
             }
         }
@@ -557,6 +663,7 @@ pub mod builder {
                 link_id: self.link_id.0,
                 incoming: self.incoming.unwrap_or_default(),
                 outgoing: self.outgoing.unwrap_or_default(),
+                unknown_links: self.unknown_links.unwrap_or(SignStrategy::Strict),
                 links: self.links,
                 last_timestamp: Default::default(),
                 exclude: self.exclude,

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-use crate::core::io::{ConnectionConf, ConnectionInfo, Retry};
+use crate::core::io::{ConnectionConf, ConnectionInfo, RetryStrategy};
 use crate::core::marker::{MaybeConnConf, NodeKind, Proxy};
 use crate::core::node::{IntoNodeConf, NodeConf};
 use crate::core::utils::UniqueId;
@@ -22,7 +22,7 @@ use crate::prelude::*;
 ///
 /// ```rust,no_run
 /// use std::time::Duration;
-/// use maviola::core::io::Retry;
+/// use maviola::core::io::RetryStrategy;
 ///
 /// use maviola::prelude::*;
 /// use maviola::sync::prelude::*;
@@ -40,7 +40,7 @@ use crate::prelude::*;
 ///                     /* other node configuration */
 ///             )
 ///             // Attempt to repair disconnected nodes
-///             .retry(Retry::Attempts(10, Duration::from_secs(2)))
+///             .retry(RetryStrategy::Attempts(10, Duration::from_secs(2)))
 ///             // Stop if at least one node is down and all retry attempts have failed
 ///             .stop_on_node_down(true)
 ///     )
@@ -52,7 +52,7 @@ use crate::prelude::*;
 /// ```rust,no_run
 /// # #[tokio::main] async fn main() {
 /// use std::time::Duration;
-/// use maviola::core::io::Retry;
+/// use maviola::core::io::RetryStrategy;
 ///
 /// use maviola::prelude::*;
 /// use maviola::asnc::prelude::*;
@@ -70,7 +70,7 @@ use crate::prelude::*;
 ///                     /* other node configuration */
 ///             )
 ///             // Attempt to repair disconnected nodes
-///             .retry(Retry::Attempts(10, Duration::from_secs(2)))
+///             .retry(RetryStrategy::Attempts(10, Duration::from_secs(2)))
 ///             // Stop if at least one node is down and all retry attempts have failed
 ///             .stop_on_node_down(true)
 ///     )
@@ -81,7 +81,7 @@ use crate::prelude::*;
 pub struct Network<V: MaybeVersioned, C: MaybeConnConf> {
     pub(crate) info: ConnectionInfo,
     pub(crate) nodes: HashMap<UniqueId, NodeConf<Proxy, V, C>>,
-    pub(crate) retry: Retry,
+    pub(crate) retry: RetryStrategy,
     pub(crate) stop_on_node_down: bool,
     pub(crate) _version: PhantomData<V>,
 }
@@ -109,7 +109,7 @@ impl<V: MaybeVersioned, C: MaybeConnConf> Network<V, C> {
     ///
     /// When [`Self::retry`] is set to `true`, then the entire network will be disconnected, when
     /// at least one node is stopped and can't be repaired.
-    pub fn retry(mut self, retry: Retry) -> Self {
+    pub fn retry(mut self, retry: RetryStrategy) -> Self {
         self.retry = retry;
         self
     }

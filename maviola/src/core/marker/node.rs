@@ -3,7 +3,7 @@
 use std::fmt::Debug;
 
 use crate::core::utils::Sealed;
-use crate::protocol::{ComponentId, Endpoint, MaybeVersioned, SystemId, Unset};
+use crate::protocol::{ComponentId, DeviceId, Endpoint, MaybeVersioned, SystemId, Unset};
 
 /// <sup>🔒</sup>
 /// All kinds of nodes are falling under this trait.
@@ -30,10 +30,22 @@ impl NodeKind for Proxy {}
 /// This node can produce messages.
 #[derive(Clone, Debug)]
 pub struct Edge<V: MaybeVersioned> {
+    pub(crate) device_id: DeviceId,
     pub(crate) endpoint: Endpoint<V>,
 }
 impl<V: MaybeVersioned> Sealed for Edge<V> {}
 impl<V: MaybeVersioned> NodeKind for Edge<V> {}
+impl<V: MaybeVersioned> Edge<V> {
+    /// <sup>⛔</sup>
+    /// Creates a new edge configuration from the provided endpoint.
+    pub(crate) fn new(endpoint: Endpoint<V>) -> Self {
+        let device_id = DeviceId::new(endpoint.id());
+        Self {
+            endpoint,
+            device_id,
+        }
+    }
+}
 
 /// <sup>🔒</sup>
 /// Variant of a node configuration which may or may not have a connection config.

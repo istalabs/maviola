@@ -7,7 +7,7 @@ use crate::asnc::consts::{NETWORK_CLOSED_CHAN_CAPACITY, NETWORK_RETRY_EVENTS_CHA
 use crate::asnc::io::{ChannelFactory, IncomingFrameProducer, OutgoingFrameHandler};
 use crate::asnc::marker::AsyncConnConf;
 use crate::core::consts::NETWORK_POOLING_INTERVAL;
-use crate::core::io::{ConnectionInfo, IncomingFrame, Retry};
+use crate::core::io::{ConnectionInfo, IncomingFrame, RetryStrategy};
 use crate::core::marker::Proxy;
 use crate::core::network::types::{NetworkConnInfo, NetworkConnState, RestartNodeEvent};
 use crate::core::node::NodeConf;
@@ -21,7 +21,7 @@ use crate::prelude::*;
 pub(super) struct NetworkConnectionHandler<V: MaybeVersioned> {
     state: Closer,
     info: ConnectionInfo,
-    retry: Retry,
+    retry: RetryStrategy,
     stop_on_node_down: bool,
     node_configs: HashMap<UniqueId, NodeConf<Proxy, V, AsyncConnConf<V>>>,
     nodes: HashMap<UniqueId, Node<Proxy, V, AsyncApi<V>>>,
@@ -166,27 +166,27 @@ impl<V: MaybeVersioned> NetworkConnectionHandler<V> {
                 let tx = self.node_events_chan.tx.clone();
 
                 match self.retry {
-                    Retry::Never => {
+                    RetryStrategy::Never => {
                         self.node_events_chan
                             .tx
                             .send(RestartNodeEvent::GiveUp(id))
                             .await?;
                     }
-                    Retry::Attempts(attempts, interval) => {
+                    RetryStrategy::Attempts(attempts, interval) => {
                         tokio::spawn(async move {
                             tokio::time::sleep(interval).await;
                             tx.send(RestartNodeEvent::Retry(
                                 id,
-                                Retry::Attempts(attempts, interval),
+                                RetryStrategy::Attempts(attempts, interval),
                             ))
                             .await
                             .unwrap();
                         });
                     }
-                    Retry::Always(interval) => {
+                    RetryStrategy::Always(interval) => {
                         tokio::spawn(async move {
                             tokio::time::sleep(interval).await;
-                            tx.send(RestartNodeEvent::Retry(id, Retry::Always(interval)))
+                            tx.send(RestartNodeEvent::Retry(id, RetryStrategy::Always(interval)))
                                 .await
                                 .unwrap();
                         });
@@ -203,8 +203,8 @@ impl<V: MaybeVersioned> NetworkConnectionHandler<V> {
         Ok(())
     }
 
-    async fn on_node_restart_retry(&self, id: UniqueId, retry: Retry) -> Result<()> {
-        if let Retry::Never = retry {
+    async fn on_node_restart_retry(&self, id: UniqueId, retry: RetryStrategy) -> Result<()> {
+        if let RetryStrategy::Never = retry {
             self.node_events_chan
                 .tx
                 .send(RestartNodeEvent::GiveUp(id))
@@ -234,7 +234,7 @@ impl<V: MaybeVersioned> NetworkConnectionHandler<V> {
                 let tx = self.node_events_chan.tx.clone();
 
                 match retry {
-                    Retry::Attempts(attempts, _) if attempts <= 1 => {
+                    RetryStrategy::Attempts(attempts, _) if attempts <= 1 => {
                         log::debug!(
                             "[{:?}] no restart attempts left for node {conn_info:?}, giving up",
                             self.info
@@ -244,26 +244,26 @@ impl<V: MaybeVersioned> NetworkConnectionHandler<V> {
                             .send(RestartNodeEvent::GiveUp(id))
                             .await?;
                     }
-                    Retry::Attempts(attempts, interval) => {
+                    RetryStrategy::Attempts(attempts, interval) => {
                         tokio::spawn(async move {
                             tokio::time::sleep(interval).await;
                             tx.send(RestartNodeEvent::Retry(
                                 id,
-                                Retry::Attempts(attempts - 1, interval),
+                                RetryStrategy::Attempts(attempts - 1, interval),
                             ))
                             .await
                             .unwrap();
                         });
                     }
-                    Retry::Always(interval) => {
+                    RetryStrategy::Always(interval) => {
                         tokio::spawn(async move {
                             tokio::time::sleep(interval).await;
-                            tx.send(RestartNodeEvent::Retry(id, Retry::Always(interval)))
+                            tx.send(RestartNodeEvent::Retry(id, RetryStrategy::Always(interval)))
                                 .await
                                 .unwrap();
                         });
                     }
-                    Retry::Never => unreachable!(),
+                    RetryStrategy::Never => unreachable!(),
                 }
             }
         }
@@ -329,7 +329,7 @@ impl<V: MaybeVersioned> NetworkConnectionHandler<V> {
             id,
             info: info.clone(),
             state: state.clone(),
-            receiver: node.event_receiver().clone(),
+            receiver: node.receiver_cloned(),
             producer: self.producer.clone(),
         }
         .spawn();

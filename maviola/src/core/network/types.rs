@@ -1,4 +1,4 @@
-use crate::core::io::{ConnectionInfo, Retry};
+use crate::core::io::{ConnectionInfo, RetryStrategy};
 use crate::core::marker::Proxy;
 use crate::core::node::NodeApi;
 use crate::core::utils::{Closable, SharedCloser, UniqueId};
@@ -20,7 +20,7 @@ pub(crate) struct NetworkConnInfo {
 
 pub(crate) enum RestartNodeEvent<V: MaybeVersioned, A: NodeApi<V>> {
     New(UniqueId, Node<Proxy, V, A>),
-    Retry(UniqueId, Retry),
+    Retry(UniqueId, RetryStrategy),
     GiveUp(UniqueId),
 }
 

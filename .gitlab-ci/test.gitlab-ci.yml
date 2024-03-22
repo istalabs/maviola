@@ -33,7 +33,8 @@ include:
 .test:build:docs:
   extends: .executor:rust  # from local: "/.gitlab-ci/executors.gitlab-ci.yml"
   script:
-    - cargo doc --no-deps
+    # Build documentation
+    - cargo doc --no-deps --features sync,async,unstable,unsafe,derive,test_utils
 
 # ---------------------------------------------------------
 #    [TEST] Test project for various features
@@ -49,7 +50,7 @@ include:
     # Run linters
     - cargo clippy ${FEATURES}
     # Run tests
-    - cargo test ${FEATURES} --lib --tests --bins
+    - cargo test ${FEATURES} --lib --tests --bins --doc
   parallel:
     matrix:
       - FEATURES:

@@ -303,8 +303,8 @@ impl<K: NodeKind, V: Versioned, A: NodeApi<V>> Node<K, V, A> {
 }
 
 impl<K: NodeKind, V: MaybeVersioned, A: NodeApi<V>> SendFrameInternal<V> for Node<K, V, A> {
-    fn processor(&self) -> &FrameProcessor {
-        self.api.processor()
+    fn processor_internal(&self) -> &FrameProcessor {
+        self.api.processor_internal()
     }
 
     unsafe fn route_frame_internal(&self, frame: Frame<V>, scope: BroadcastScope) -> Result<()> {

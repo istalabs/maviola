@@ -26,6 +26,7 @@ path = "src/lib.rs"
 [dependencies]
 log = "0.4.20"
 mavio = { version = "0.2.3", features = ["extras", "minimal", "sha2", "std"] }
+mavspec = { version = "0.3.2", features = ["std", "rust"], optional = true }
 portpicker = "0.1.1"
 serde = { version = "1.0.193", default-features = false, features = ["derive"], optional = true }
 serde_arrays = { version = "0.1.0", default-features = false, optional = true }
@@ -48,6 +49,18 @@ tokio = { version = "1.36.0", default-features = false, features = ["sync", "rt"
 [features]
 ## Default features.
 default = []
+## All stable features (no unsafe features).
+## This should be used instead of --all-features for any production environment
+full = [
+    "derive",
+    "sync",
+    "async",
+    "all",
+    "serde",
+]
+
+## Includes derive maros from MAVSpec
+derive = ["mavspec"]
 ## Enables synchromous API.
 sync = []
 ## Enables asynchromous API via Tokio.
@@ -72,9 +85,9 @@ unsafe = [
     "mavio/unsafe"
 ]
 
-###########################################################
+#----------------------------------------------------------
 # Dialects
-###########################################################
+#----------------------------------------------------------
 ## Include `ardupilotmega` dialect
 ardupilotmega = ["common", "mavio/ardupilotmega"]
 ## Include `ASLUAV` dialect
@@ -121,6 +134,20 @@ all = [
     "ualberta",
     "uavionix",
     "mavio/all"
+]
+
+#----------------------------------------------------------
+# Test utils (!!! do not use at production !!!)
+#----------------------------------------------------------
+## Add testing utils that allow to run complex tests.
+## Primarily used for documentation but can be utilized by
+## other libraries as well.
+test_utils = [
+    "derive",
+    "sync",
+    "async",
+    "unstable",
+    "unsafe",
 ]
 
 ###########################################################
@@ -191,4 +218,9 @@ required-features = ["async"]
 ###########################################################
 [package.metadata.docs.rs]
 # Features to include into `docs.rs` documentation
-features = ["serde", "all", "unstable", "sync", "async", "unsafe"]
+features = [
+    "full",
+    "unstable",
+    "unsafe",
+    "test_utils"
+]

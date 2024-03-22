@@ -132,11 +132,9 @@ pub trait ReceiveFrame<V: MaybeVersioned>: ReceiveEvent<V> {
     /// [`try_recv`]: ReceiveEvent::try_recv
     fn try_recv_frame(&self) -> TryRecvResult<(Frame<V>, Callback<V>)> {
         match self.try_recv() {
-            Ok(Event::Frame(frame, callback)) => {
-                return Ok((frame, callback));
-            }
+            Ok(Event::Frame(frame, callback)) => Ok((frame, callback)),
             Ok(_) => Err(TryRecvError::Empty),
-            Err(err) => return Err(err),
+            Err(err) => Err(err),
         }
     }
 

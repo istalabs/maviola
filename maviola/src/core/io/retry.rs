@@ -5,7 +5,7 @@ use std::time::Duration;
 /// When an entity goes down and can be repaired, then it may be rebuilt/restored according to this
 /// strategy.
 #[derive(Copy, Clone, Debug, Default)]
-pub enum Retry {
+pub enum RetryStrategy {
     /// Never restore (default value).
     #[default]
     Never,
