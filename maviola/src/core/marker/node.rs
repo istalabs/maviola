@@ -6,9 +6,9 @@ use crate::core::utils::Sealed;
 use crate::protocol::{ComponentId, Endpoint, MaybeVersioned, SystemId, Unset};
 
 /// <sup>🔒</sup>
-/// All kinds of nodes are falling ander this trait.
+/// All kinds of nodes are falling under this trait.
 ///
-/// ⚠ This trait is sealed ⚠
+/// 🔒 This trait is sealed 🔒
 ///
 /// Variants:
 ///
@@ -38,7 +38,7 @@ impl<V: MaybeVersioned> NodeKind for Edge<V> {}
 /// <sup>🔒</sup>
 /// Variant of a node configuration which may or may not have a connection config.
 ///
-/// ⚠ This trait is sealed ⚠
+/// 🔒 This trait is sealed 🔒
 pub trait MaybeConnConf: Debug + Send + Sealed {}
 
 impl MaybeConnConf for Unset {}
@@ -46,7 +46,7 @@ impl MaybeConnConf for Unset {}
 /// <sup>🔒</sup>
 /// Variant of a node configuration which has a connection config.
 ///
-/// ⚠ This trait is sealed ⚠
+/// 🔒 This trait is sealed 🔒
 pub trait HasConnConf: MaybeConnConf {
     /// Returns `true` if it makes sense to restart the node after connection failure.
     ///
@@ -59,7 +59,7 @@ pub trait HasConnConf: MaybeConnConf {
 /// <sup>🔒</sup>
 /// Marker trait for an entity with or without MAVLink system `ID`.
 ///
-/// ⚠ This trait is sealed ⚠
+/// 🔒 This trait is sealed 🔒
 pub trait MaybeSystemId: Clone + Copy + Debug + Sync + Send + Sealed {}
 
 impl MaybeSystemId for Unset {}
@@ -73,7 +73,7 @@ impl MaybeSystemId for HasSystemId {}
 /// <sup>🔒</sup>
 /// Marker trait for an entity with or without MAVLink component `ID`.
 ///
-/// ⚠ This trait is sealed ⚠
+/// 🔒 This trait is sealed 🔒
 pub trait MaybeComponentId: Clone + Debug + Sync + Send + Sealed {}
 
 impl MaybeComponentId for Unset {}

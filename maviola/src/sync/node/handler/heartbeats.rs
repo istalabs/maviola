@@ -3,17 +3,18 @@ use std::thread;
 use std::time::Duration;
 
 use crate::core::io::ConnectionInfo;
+use crate::core::marker::Proxy;
 use crate::core::utils::{make_heartbeat_message, Guarded, SharedCloser, Switch};
 use crate::protocol::DialectVersion;
-use crate::sync::node::api::FrameSender;
 
 use crate::prelude::*;
+use crate::sync::prelude::*;
 
 pub(in crate::sync::node) struct HeartbeatEmitter<V: Versioned> {
     pub(in crate::sync::node) info: ConnectionInfo,
     pub(in crate::sync::node) endpoint: Endpoint<V>,
     pub(in crate::sync::node) interval: Duration,
-    pub(in crate::sync::node) sender: FrameSender<V>,
+    pub(in crate::sync::node) sender: FrameSender<V, Proxy>,
     pub(in crate::sync::node) dialect_version: Option<DialectVersion>,
     pub(in crate::sync::node) _version: PhantomData<V>,
 }
@@ -29,7 +30,7 @@ impl<V: Versioned> HeartbeatEmitter<V> {
                 let frame = self.endpoint.next_frame(&heartbeat_message).unwrap();
 
                 log::trace!("[{info:?}] broadcasting heartbeat");
-                if let Err(err) = self.sender.send(&frame) {
+                if let Err(err) = self.sender.send_frame(&frame) {
                     log::trace!("[{info:?}] heartbeat can't be broadcast: {err:?}");
                     is_active.set(false);
                     break;

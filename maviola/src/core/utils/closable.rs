@@ -38,7 +38,7 @@ use crate::core::utils::Sealed;
 /// <sup>🔒</sup>
 /// A trait for anything that may be closed.
 ///
-/// ⚠ This trait is sealed ⚠
+/// 🔒 This trait is sealed 🔒
 ///
 /// This trait is implemented by [`Closer`], [`SharedCloser`], [`Closable`], and [`Closed`].
 pub trait WillClose: Sealed {

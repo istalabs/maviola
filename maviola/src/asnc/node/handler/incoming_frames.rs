@@ -4,15 +4,16 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::asnc::io::IncomingFrameReceiver;
-use crate::asnc::node::api::{EventSender, FrameSender};
-use crate::asnc::node::{Callback, Event};
+use crate::asnc::node::api::EventSender;
 use crate::core::consts::INCOMING_FRAMES_POOLING_INTERVAL;
 use crate::core::io::ConnectionInfo;
+use crate::core::marker::Proxy;
 use crate::core::utils::Closable;
 use crate::dialects::Minimal;
 use crate::error::RecvTimeoutError;
 use crate::protocol::Peer;
 
+use crate::asnc::prelude::*;
 use crate::prelude::*;
 
 pub(in crate::asnc::node) struct IncomingFramesHandler<V: MaybeVersioned> {
@@ -20,7 +21,7 @@ pub(in crate::asnc::node) struct IncomingFramesHandler<V: MaybeVersioned> {
     pub(in crate::asnc::node) peers: Arc<RwLock<HashMap<MavLinkId, Peer>>>,
     pub(in crate::asnc::node) receiver: IncomingFrameReceiver<V>,
     pub(in crate::asnc::node) event_sender: EventSender<V>,
-    pub(in crate::asnc::node) sender: FrameSender<V>,
+    pub(in crate::asnc::node) sender: FrameSender<V, Proxy>,
 }
 
 impl<V: MaybeVersioned> IncomingFramesHandler<V> {

@@ -56,6 +56,13 @@ impl FrameProcessor {
         self.dialects.known()
     }
 
+    /// Prepares a new outgoing frame.
+    pub fn process_new<V: MaybeVersioned>(&self, frame: &mut Frame<V>) {
+        if let Some(signer) = &self.signer {
+            signer.process_new(frame);
+        }
+    }
+
     /// Takes incoming frame and processes it according to defined signing and compatibility
     /// settings.
     pub fn process_incoming<V: MaybeVersioned>(

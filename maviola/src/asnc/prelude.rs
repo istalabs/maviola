@@ -5,7 +5,7 @@
 //!
 //! ⚠ Incompatible with [`sync::prelude`](crate::sync::prelude)!
 
-pub use crate::asnc::node::{AsyncApi, Callback, EdgeNode, Event, ProxyNode};
+pub use crate::asnc::node::{AsyncApi, Callback, EdgeNode, Event, FrameSender, ProxyNode};
 
 pub use tokio_stream::StreamExt;
 

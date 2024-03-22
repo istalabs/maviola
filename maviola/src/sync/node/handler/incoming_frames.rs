@@ -4,22 +4,24 @@ use std::thread;
 
 use crate::core::consts::INCOMING_FRAMES_POOLING_INTERVAL;
 use crate::core::io::ConnectionInfo;
+use crate::core::marker::Proxy;
 use crate::core::utils::Closable;
 use crate::dialects::Minimal;
 use crate::error::RecvTimeoutError;
 use crate::protocol::Peer;
 use crate::sync::io::IncomingFrameReceiver;
-use crate::sync::node::api::{EventSender, FrameSender};
+use crate::sync::node::api::EventSender;
 use crate::sync::node::{Callback, Event};
 
 use crate::prelude::*;
+use crate::sync::prelude::*;
 
 pub(in crate::sync::node) struct IncomingFramesHandler<V: MaybeVersioned> {
     pub(in crate::sync::node) info: ConnectionInfo,
     pub(in crate::sync::node) peers: Arc<RwLock<HashMap<MavLinkId, Peer>>>,
     pub(in crate::sync::node) receiver: IncomingFrameReceiver<V>,
     pub(in crate::sync::node) event_sender: EventSender<V>,
-    pub(in crate::sync::node) sender: FrameSender<V>,
+    pub(in crate::sync::node) sender: FrameSender<V, Proxy>,
 }
 
 impl<V: MaybeVersioned> IncomingFramesHandler<V> {

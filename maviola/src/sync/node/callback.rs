@@ -2,10 +2,11 @@ use std::sync::Arc;
 
 use crate::core::io::ChannelInfo;
 use crate::core::io::OutgoingFrame;
+use crate::core::marker::Proxy;
 use crate::core::node::CallbackApiInternal;
 use crate::core::utils::Sealed;
 use crate::protocol::FrameProcessor;
-use crate::sync::node::api::FrameSender;
+use crate::sync::node::FrameSender;
 
 use crate::prelude::*;
 
@@ -28,11 +29,11 @@ use crate::prelude::*;
 #[derive(Clone, Debug)]
 pub struct Callback<V: MaybeVersioned> {
     channel_info: ChannelInfo,
-    sender: FrameSender<V>,
+    sender: FrameSender<V, Proxy>,
 }
 
 impl<V: MaybeVersioned> Callback<V> {
-    pub(super) fn new(channel_info: ChannelInfo, sender: FrameSender<V>) -> Self {
+    pub(super) fn new(channel_info: ChannelInfo, sender: FrameSender<V, Proxy>) -> Self {
         Self {
             channel_info,
             sender,
@@ -47,7 +48,7 @@ impl<V: MaybeVersioned> Callback<V> {
 impl<V: MaybeVersioned> Sealed for Callback<V> {}
 
 impl<V: MaybeVersioned> CallbackApiInternal<V> for Callback<V> {
-    fn send_internal(&self, frame: OutgoingFrame<V>) -> Result<()> {
+    unsafe fn send_internal(&self, frame: OutgoingFrame<V>) -> Result<()> {
         self.sender.send_raw(frame).map_err(Error::from).map(|_| ())
     }
 

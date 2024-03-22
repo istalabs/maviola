@@ -4,18 +4,21 @@ use crate::protocol::{FrameProcessor, Unset};
 
 use crate::prelude::*;
 
-/// <sup>🔒</sup>
+/// <sup>⛔</sup>
 /// Internal node API.
 pub trait NodeApiInternal<V: MaybeVersioned>: Sealed {
+    /// <sup>⛔</sup>
     /// Provides information about connection.
     fn info(&self) -> &ConnectionInfo;
 
-    /// Send a MAVLink frame.
-    fn send_frame(&self, frame: &Frame<V>) -> Result<()>;
+    /// <sup>⛔</sup>
+    /// Routes MAVLink frame without any changes.
+    ///
+    /// There is nothing particularly unsafe in this method in the sense of unsafe Rust. However,
+    /// we want to mark this method as something, that should never be used without caution.
+    unsafe fn route_frame_internal(&self, frame: Frame<V>, scope: BroadcastScope) -> Result<()>;
 
-    /// Route MAVLink frame.
-    fn route_frame(&self, frame: &Frame<V>, scope: BroadcastScope) -> Result<()>;
-
+    /// <sup>⛔</sup>
     /// Message processor that is responsible for message signing and frame compatibility.
     fn processor(&self) -> &FrameProcessor;
 }
@@ -23,7 +26,7 @@ pub trait NodeApiInternal<V: MaybeVersioned>: Sealed {
 /// <sup>🔒</sup>
 /// This trait is implemented by node API providers: synchronous and asynchronous.
 ///
-/// ⚠ This trait is sealed ⚠
+/// 🔒 This trait is sealed 🔒
 pub trait NodeApi<V: MaybeVersioned>: NodeApiInternal<V> {}
 
 impl<V: MaybeVersioned> NodeApiInternal<V> for Unset {
@@ -31,11 +34,7 @@ impl<V: MaybeVersioned> NodeApiInternal<V> for Unset {
         ConnectionInfo::unknown()
     }
 
-    fn send_frame(&self, _: &Frame<V>) -> Result<()> {
-        unreachable!()
-    }
-
-    fn route_frame(&self, _: &Frame<V>, _: BroadcastScope) -> Result<()> {
+    unsafe fn route_frame_internal(&self, _: Frame<V>, _: BroadcastScope) -> Result<()> {
         unreachable!()
     }
 

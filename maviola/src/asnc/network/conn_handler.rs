@@ -6,8 +6,7 @@ use tokio::task::JoinHandle;
 use crate::asnc::consts::{NETWORK_CLOSED_CHAN_CAPACITY, NETWORK_RETRY_EVENTS_CHAN_CAPACITY};
 use crate::asnc::io::{ChannelFactory, IncomingFrameProducer, OutgoingFrameHandler};
 use crate::asnc::marker::AsyncConnConf;
-use crate::asnc::node::api::{EventReceiver, FrameSender};
-use crate::asnc::node::{AsyncApi, Event};
+use crate::asnc::node::api::EventReceiver;
 use crate::core::consts::NETWORK_POOLING_INTERVAL;
 use crate::core::io::{ConnectionInfo, IncomingFrame, Retry};
 use crate::core::marker::Proxy;
@@ -16,6 +15,7 @@ use crate::core::node::NodeConf;
 use crate::core::utils::{Closer, UniqueId};
 use crate::error::{NodeError, RecvTimeoutError};
 
+use crate::asnc::prelude::*;
 use crate::prelude::*;
 
 /// Manages the entire [`Network`] connection.
@@ -47,7 +47,7 @@ struct OutgoingFramesHandler<V: MaybeVersioned> {
     info: NetworkConnInfo,
     state: NetworkConnState,
     send_handler: OutgoingFrameHandler<V>,
-    sender: FrameSender<V>,
+    sender: FrameSender<V, Proxy>,
 }
 
 /// Manages the state of a particular [`Node`] withing a [`Network`].
@@ -434,7 +434,7 @@ impl<V: MaybeVersioned> OutgoingFramesHandler<V> {
                 continue;
             }
 
-            self.sender.send_raw(frame)?;
+            unsafe { self.sender.send_raw(frame)? };
         }
 
         Ok(())

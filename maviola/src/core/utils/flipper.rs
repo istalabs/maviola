@@ -8,7 +8,7 @@ use crate::core::utils::{Closable, Closer, Sealed, SharedCloser};
 /// <sup>🔒</sup>
 /// A trait that represents a shared atomic guarded boolean value that can be finalized.
 ///
-/// ⚠ This trait is sealed ⚠
+/// 🔒 This trait is sealed 🔒
 pub trait Flipper: Sealed {}
 
 /// A simple flag that can be either in "on" or "off" state.

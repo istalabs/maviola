@@ -3,7 +3,7 @@
 //! This module contains basic imports for Maviola.
 
 pub use crate::core::consts::DefaultDialect;
-pub use crate::core::node::{CallbackApi, Node};
+pub use crate::core::node::{CallbackApi, Node, SendFrame, SendMessage, SendVersionlessMessage};
 pub use crate::error::{Error, Result};
 pub use crate::protocol::{
     CompatProcessor, CompatStrategy, Dialect, Endpoint, Frame, FrameSigner, MavLinkId,

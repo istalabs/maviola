@@ -7,10 +7,12 @@ mod conf_ext;
 mod event;
 mod ext;
 mod handler;
+mod sender;
 
 pub use api::SyncApi;
 pub use callback::Callback;
 pub use event::Event;
+pub use sender::FrameSender;
 
 use crate::core::marker::{Edge, Proxy};
 use crate::core::node::Node;

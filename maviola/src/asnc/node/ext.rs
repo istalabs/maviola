@@ -1,18 +1,17 @@
 //! # 🔒 Asynchronous I/O extensions for node
 
-use mavio::protocol::Unset;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_stream::Stream;
 
 use crate::asnc::marker::AsyncConnConf;
-use crate::asnc::node::api::{EventReceiver, FrameSender};
+use crate::asnc::node::api::EventReceiver;
 use crate::core::marker::{Edge, NodeKind, Proxy};
 use crate::core::node::{NodeBuilder, NodeConf};
 use crate::core::utils::Guarded;
 use crate::error::NodeError;
-use crate::protocol::{Behold, Peer};
+use crate::protocol::{Behold, Peer, Unset};
 
 use crate::asnc::prelude::*;
 use crate::prelude::*;
@@ -170,8 +169,33 @@ impl<K: NodeKind, V: MaybeVersioned> Node<K, V, AsyncApi<V>> {
         self.api.event_receiver()
     }
 
-    pub(in crate::asnc) fn frame_sender(&self) -> &FrameSender<V> {
+    pub(in crate::asnc) fn frame_sender(&self) -> &FrameSender<V, Proxy> {
         self.api.frame_sender()
+    }
+}
+
+impl<V: MaybeVersioned> Node<Proxy, V, AsyncApi<V>> {
+    /// <sup>[`async`](crate::asnc)</sup>
+    /// Returns a new instance of a frame sender.
+    ///
+    /// Senders can be cloned and passed to other threads.
+    ///
+    /// Senders returned by [`Proxy`] nodes (i.e. [`ProxyNode`]) can't create frames from MAVLink
+    /// messages. This is only possible for [`Edge`] nodes ([`EdgeNode`]) with specified system and
+    /// component `ID`s.
+    pub fn sender(&self) -> FrameSender<V, Proxy> {
+        self.api.frame_sender().clone()
+    }
+}
+
+impl<V: MaybeVersioned> Node<Edge<V>, V, AsyncApi<V>> {
+    /// <sup>[`async`](crate::asnc)</sup>
+    /// Returns a new instance of a frame sender that will use the same endpoint settings as the
+    /// parent node.
+    ///
+    /// Senders can be cloned and passed to other threads.
+    pub fn sender(&self) -> FrameSender<V, Edge<V>> {
+        self.api.frame_sender().clone().into_edge(self.kind.clone())
     }
 }
 

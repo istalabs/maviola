@@ -5,14 +5,15 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use crate::core::io::{BroadcastScope, ConnectionInfo, IncomingFrame, OutgoingFrame};
+use crate::core::marker::Proxy;
 use crate::core::node::{NodeApi, NodeApiInternal};
 use crate::core::utils::{Guarded, Sealed, SharedCloser, Switch};
 use crate::error::{
-    RecvError, RecvResult, RecvTimeoutError, RecvTimeoutResult, SendError, SendResult,
-    TryRecvError, TryRecvResult,
+    RecvError, RecvResult, RecvTimeoutError, RecvTimeoutResult, SendError, TryRecvError,
+    TryRecvResult,
 };
 use crate::protocol::{DialectVersion, Endpoint, FrameProcessor, Peer};
-use crate::sync::io::{Connection, ConnectionHandler, IncomingFrameReceiver, OutgoingFrameSender};
+use crate::sync::io::{Connection, ConnectionHandler, IncomingFrameReceiver};
 use crate::sync::node::event::EventsIterator;
 use crate::sync::node::handler::{HeartbeatEmitter, InactivePeersHandler, IncomingFramesHandler};
 use crate::sync::node::{Callback, Event};
@@ -24,7 +25,7 @@ use crate::sync::prelude::*;
 /// Synchronous API for MAVLink [`Node`].
 pub struct SyncApi<V: MaybeVersioned> {
     connection: Connection<V>,
-    sender: FrameSender<V>,
+    sender: FrameSender<V, Proxy>,
     receiver: FrameReceiver<V>,
     processor: Arc<FrameProcessor>,
     peers: Arc<RwLock<HashMap<MavLinkId, Peer>>>,
@@ -40,13 +41,8 @@ impl<V: MaybeVersioned> NodeApiInternal<V> for SyncApi<V> {
     }
 
     #[inline(always)]
-    fn send_frame(&self, frame: &Frame<V>) -> Result<()> {
-        self.send_frame(frame)
-    }
-
-    #[inline(always)]
-    fn route_frame(&self, frame: &Frame<V>, scope: BroadcastScope) -> Result<()> {
-        self.route_frame(frame, scope)
+    unsafe fn route_frame_internal(&self, frame: Frame<V>, scope: BroadcastScope) -> Result<()> {
+        unsafe { self.route_frame_internal(frame, scope) }
     }
 
     #[inline(always)]
@@ -112,15 +108,13 @@ impl<V: MaybeVersioned> SyncApi<V> {
         }
     }
 
-    pub(super) fn send_frame(&self, frame: &Frame<V>) -> Result<()> {
-        self.sender.send(frame)
+    unsafe fn route_frame_internal(&self, frame: Frame<V>, scope: BroadcastScope) -> Result<()> {
+        self.sender
+            .send_raw(OutgoingFrame::scoped(frame, scope))
+            .map_err(Error::from)
     }
 
-    pub(super) fn route_frame(&self, frame: &Frame<V>, scope: BroadcastScope) -> Result<()> {
-        self.sender.send_scoped(frame, scope)
-    }
-
-    pub(super) fn frame_sender(&self) -> &FrameSender<V> {
+    pub(super) fn frame_sender(&self) -> &FrameSender<V, Proxy> {
         &self.sender
     }
 
@@ -214,16 +208,10 @@ impl<V: Versioned> SyncApi<V> {
 //                                 PRIVATE                                   //
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Debug)]
-pub(in crate::sync) struct FrameSender<V: MaybeVersioned> {
-    inner: OutgoingFrameSender<V>,
-    processor: Arc<FrameProcessor>,
-}
-
 pub(super) struct FrameReceiver<V: MaybeVersioned> {
     receiver: IncomingFrameReceiver<V>,
     processor: Arc<FrameProcessor>,
-    sender: FrameSender<V>,
+    sender: FrameSender<V, Proxy>,
 }
 
 #[derive(Clone)]
@@ -237,48 +225,10 @@ pub(in crate::sync) struct EventReceiver<V: MaybeVersioned> {
     processor: Arc<FrameProcessor>,
 }
 
-impl<V: MaybeVersioned> FrameSender<V> {
-    pub(super) fn new(sender: OutgoingFrameSender<V>, processor: Arc<FrameProcessor>) -> Self {
-        Self {
-            inner: sender,
-            processor,
-        }
-    }
-
-    pub(super) fn send(&self, frame: &Frame<V>) -> Result<()> {
-        let mut frame = frame.clone();
-        self.processor.process_outgoing(&mut frame)?;
-        self.inner.send(frame).map_err(Error::from)
-    }
-
-    fn send_scoped(&self, frame: &Frame<V>, scope: BroadcastScope) -> Result<()> {
-        let mut frame = frame.clone();
-        self.processor.process_outgoing(&mut frame)?;
-        self.inner
-            .send_raw(OutgoingFrame::scoped(frame, scope))
-            .map_err(Error::from)
-    }
-
-    pub(in crate::sync) fn send_raw(
-        &self,
-        frame: OutgoingFrame<V>,
-    ) -> SendResult<OutgoingFrame<V>> {
-        self.inner.send_raw(frame)
-    }
-
-    pub(in crate::sync) fn processor(&self) -> &FrameProcessor {
-        self.processor.as_ref()
-    }
-
-    pub(in crate::sync) fn set_processor(&mut self, processor: Arc<FrameProcessor>) {
-        self.processor = processor;
-    }
-}
-
 impl<V: MaybeVersioned> FrameReceiver<V> {
     pub(super) fn new(
         receiver: IncomingFrameReceiver<V>,
-        sender: FrameSender<V>,
+        sender: FrameSender<V, Proxy>,
         processor: Arc<FrameProcessor>,
     ) -> Self {
         Self {

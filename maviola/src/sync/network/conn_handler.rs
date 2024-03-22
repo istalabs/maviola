@@ -12,10 +12,10 @@ use crate::core::utils::{Closer, UniqueId};
 use crate::error::{NodeError, RecvTimeoutError};
 use crate::sync::io::{ChannelFactory, IncomingFrameProducer, OutgoingFrameHandler};
 use crate::sync::marker::ConnConf;
-use crate::sync::node::api::{EventReceiver, FrameSender};
-use crate::sync::node::{Event, SyncApi};
+use crate::sync::node::api::EventReceiver;
 
 use crate::prelude::*;
+use crate::sync::prelude::*;
 
 /// Manages the entire [`Network`] connection.
 pub(super) struct NetworkConnectionHandler<V: MaybeVersioned> {
@@ -46,7 +46,7 @@ struct OutgoingFramesHandler<V: MaybeVersioned> {
     info: NetworkConnInfo,
     state: NetworkConnState,
     send_handler: OutgoingFrameHandler<V>,
-    sender: FrameSender<V>,
+    sender: FrameSender<V, Proxy>,
 }
 
 /// Manages the state of a particular [`Node`] withing a [`Network`].
