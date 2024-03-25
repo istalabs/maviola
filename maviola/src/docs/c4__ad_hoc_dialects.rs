@@ -1,7 +1,7 @@
 /*!
 # 📖 3.4. Ad-hoc Dialects
 
-<em>[← Custom Processing](crate::docs::c3__custom_processing)</em>
+<em>[← Custom Processing](crate::docs::c3__custom_processing) | [Testing →](crate::docs::e1__testing)</em>
 
 While in [Custom Dialects](crate::docs::c1__custom_dialects) we've explained how to generate custom
 dialects from XML definitions, this chapter shows how one can create ad-hoc dialects using pure
@@ -134,7 +134,7 @@ As you can see, we use [`maviola::test_utils`] module. This module contains util
 To use it, you need to enable `test_utils` Cargo feature. Not the best choice for production but
 can be useful for writing your own documentation.
 
-<em>[← Custom Processing](crate::docs::c3__custom_processing)</em>
+<em>[← Custom Processing](crate::docs::c3__custom_processing) | [Testing →](crate::docs::e1__testing)</em>
 
 [`maviola::test_utils`]: crate::test_utils
  */

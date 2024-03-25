@@ -50,13 +50,14 @@ include:
     # Run linters
     - cargo clippy ${FEATURES}
     # Run tests
-    - cargo test ${FEATURES}
+    - cargo test ${FEATURES} --lib --tests --bins
+    # Run doc tests
+    - cargo test ${FEATURES} --features test_utils --doc
   parallel:
     matrix:
       - TEST_PARAMS:
-          - "--no-default-features --lib --tests --bins"
-          - "--features sync,async,unstable,unsafe --lib --tests --bins"
-          - "--features sync,async,unstable,unsafe,test_utils --doc"
+          - "--no-default-features"
+          - "--features sync,async,unstable,unsafe"
 
 # ---------------------------------------------------------
 #      [TEST] Dry run for publishing to Crates.io

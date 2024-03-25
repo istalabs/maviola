@@ -34,6 +34,8 @@ If you are interested in the reasoning behind this library, we have a correspond
     1. [Custom Transport](crate::docs::c2__custom_transport)
     1. [Custom Processing](crate::docs::c3__custom_processing)
     1. [Ad-hoc Dialects](crate::docs::c4__ad_hoc_dialects)
+1. Developer Notes
+    1. [Testing](crate::docs::e1__testing)
 
 <em>[Quickstart →](crate::docs::a1__quickstart)</em>
 */
@@ -50,3 +52,4 @@ pub mod c1__custom_dialects;
 pub mod c2__custom_transport;
 pub mod c3__custom_processing;
 pub mod c4__ad_hoc_dialects;
+pub mod e1__testing;
