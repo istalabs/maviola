@@ -28,8 +28,9 @@ MAVLink defines so-called [`microservices`](https://mavlink.io/en/services/) tha
 a particular message under certain conditions or how they should initiate a particular action.
 </details>
 
-Maviola provides abstractions like communication nodes and takes care of **stateful** features of the MAVLink protocol,
-such as sequencing, message time-stamping, automatic heartbeats, message signing, and so on. The key features are:
+Maviola provides abstractions such as communication nodes, networks, or devices and implements
+_stateful_ features of MAVLink protocol: sequencing, message signing, automatic heartbeats, and so
+on. The key features are:
 
 * Synchronous and asynchronous API. The latter is based on [Tokio](https://tokio.rs/).
 * Both `MAVLink 1` and `MAVLink 2` protocol versions are supported, it is also possible to have protocol-agnostic

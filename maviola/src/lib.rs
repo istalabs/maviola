@@ -8,8 +8,9 @@ A high-level [MAVLink](https://mavlink.io/en/) communication library written in 
 [![`docs.rs`](https://img.shields.io/docsrs/maviola.svg?label=docs.rs)](https://docs.rs/maviola/latest/maviola/)
 [![`issues`](https://img.shields.io/gitlab/issues/open/mavka/libs/maviola.svg)](https://gitlab.com/mavka/libs/maviola/-/issues/)
 
-Maviola provides abstractions such as communication nodes and implements **stateful** features
-of MAVLink protocol: sequencing, message signing, automatic heartbeats, and so on.
+Maviola provides abstractions such as communication nodes, networks, or devices and implements
+_stateful_ features of MAVLink protocol: sequencing, message signing, automatic heartbeats, and so
+on.
 
 This library is a part of [Mavka](https://mavka.gitlab.io/home/) toolchain. It is based on
 [Mavio](https://gitlab.com/mavka/libs/mavio), a low-level MAVLink library, and compatible with

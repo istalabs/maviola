@@ -1,6 +1,8 @@
 /*!
 # 📖 2.2. Message Signing
 
+<em>[← Dialect Constraints](crate::docs::b1__dialect_constraints) | [Compatibility →](crate::docs::b3__compat_checks)</em>
+
 Second version of MAVLink protocol adds a capability to
 [authenticate](https://mavlink.io/en/guide/message_signing.html) sender by adding a
 cryptographic [`signature`] to a frame. When frames are signed, they have a special
