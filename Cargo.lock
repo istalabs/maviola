@@ -375,7 +375,7 @@ dependencies = [
 
 [[package]]
 name = "maviola"
-version = "0.1.0-alpha3"
+version = "0.1.0-rc1"
 dependencies = [
  "async-stream",
  "async-trait",

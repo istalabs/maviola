@@ -1,7 +1,7 @@
 /*!
-# 📖 $.1. Testing
+# 📖 4.1. Testing
 
-<em>[← Ad-hoc Dialects →](crate::docs::c4__ad_hoc_dialects)</em>
+<em>[← Implementation Notes](crate::docs::e2__implementation)</em>
 
 Since we have two types of API and several feature flags, the proper testing could be cumbersome.
 Here is the list of commands required to ensure, that your pull request will pass the
@@ -29,5 +29,5 @@ Building a documentation:
 cargo doc --no-deps --features sync,async,unstable,unsafe,derive,test_utils
 ```
 
-<em>[← Ad-hoc Dialects →](crate::docs::c4__ad_hoc_dialects)</em>
+<em>[← Implementation Notes](crate::docs::e2__implementation)</em>
  */
