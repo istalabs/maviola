@@ -166,6 +166,20 @@ Examples
 
 Basic examples can be found [here](maviola/examples).
 
+API Stability
+-------------
+
+Although this library has suspiciously small version number, the most parts of the API are considered stable. All
+parts of the API that are still under consideration are hidden under the `unstable` Cargo feature flag.
+
+There are few exceptions, namely the `Device` entity. We are considering to enrich its API in the near future and
+can't guarantee that this operation won't require breaking the existing API.
+
+Basically, the existing project reached the state, where our intuition and our engineering experience tells us that
+further changes will be mostly related to adding new functionality, not amending the existing one. The current plan is
+to create a proper [roadmap](https://gitlab.com/mavka/libs/maviola/-/milestones), so other people won't have to rely on
+our vaguely expressed gut feeling.
+
 License
 -------
 
