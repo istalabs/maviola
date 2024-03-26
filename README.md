@@ -4,29 +4,29 @@ Maviola
 A high-level [MAVLink](https://mavlink.io/en/) communication library written in Rust.
 
 [🇺🇦](https://mavka.gitlab.io/home/a_note_on_the_war_in_ukraine/)
-[![`repository`](https://img.shields.io/gitlab/pipeline-status/mavka/libs/maviola.svg?branch=main&label=repository)](https://gitlab.com/mavka/libs/maviola)
+[![`repository`](https://img.shields.io/gitlab/pipeline-status/mavka/libs/maviola.svg?logo=gitlab&branch=main&label=repository)](https://gitlab.com/mavka/libs/maviola)
+[![`mirror`](https://img.shields.io/badge/-gray?logo=github)](https://github.com/istalabs/maviola)
 [![`crates.io`](https://img.shields.io/crates/v/maviola.svg)](https://crates.io/crates/maviola)
 [![`docs.rs`](https://img.shields.io/docsrs/maviola.svg?label=docs.rs)](https://docs.rs/maviola/latest/maviola/)
 [![`issues`](https://img.shields.io/gitlab/issues/open/mavka/libs/maviola.svg)](https://gitlab.com/mavka/libs/maviola/-/issues/)
 
 <details>
-<summary>
-More on MAVLink
-</summary>
+<summary><em>Repositories</em></summary>
 
-MAVLink is a lightweight open protocol for communicating between drones, onboard components and ground control stations.
-It is used by such autopilots like [PX4](https://px4.io) or [ArduPilot](https://ardupilot.org/#). MAVLink has simple and
-compact serialization model. The basic abstraction is `message` which can be sent through a link (UDP, TCP, UNIX
-socket, UART, whatever) and deserialized into a struct with fields of primitive types or arrays of primitive types.
-Such fields can be additionally restricted by `enum` variants, annotated with metadata like units of measurements,
-default or invalid values.
+> Currently, we use [GitLab](https://gitlab.com/mavka/libs/maviola) as the main project repository and
+[GitHub](https://github.com/istalabs/maviola) as official mirror.
+>
+> We accept [issues](https://gitlab.com/mavka/libs/maviola/-/issues) and
+[pull-requests](https://gitlab.com/mavka/libs/maviola/-/merge_requests) only at GitLab but will do our best
+> to keep GitHub [discussions](https://github.com/istalabs/maviola/discussions) as alive as possible.
+>
+> The [mirror](https://github.com/istalabs/maviola) will always contain latest release tags and is kept up to date
+> automatically.
 
-There are several MAVLink dialects. Official dialect definitions are
-[XML files](https://mavlink.io/en/guide/xml_schema.html) that can be found in the MAVlink
-[repository](https://github.com/mavlink/mavlink/tree/master/message_definitions/v1.0). Based on `message` abstractions,
-MAVLink defines so-called [`microservices`](https://mavlink.io/en/services/) that specify how clients should respond on
-a particular message under certain conditions or how they should initiate a particular action.
 </details>
+
+Intro
+-----
 
 Maviola provides abstractions such as communication nodes, networks, or devices and implements
 _stateful_ features of MAVLink protocol: sequencing, message signing, automatic heartbeats, and so
@@ -40,6 +40,21 @@ on. The key features are:
 
 This library is based on [Mavio](https://gitlab.com/mavka/libs/mavio), a low-level library with `no-std` support. If you
 are looking for a solution for embedded devices, then Mavio probably would be a better option.
+
+Install
+-------
+
+If you want to use synchronous API, you can install Maviola with:
+
+```shell
+cargo add maviola --features sync
+```
+
+And for asynchronous API:
+
+```shell
+cargo add maviola --features async
+```
 
 Usage
 -----
@@ -174,12 +189,15 @@ Although this library has suspiciously small version number, the most parts of t
 parts of the API that are still under consideration are hidden under the `unstable` Cargo feature flag.
 
 There are few exceptions, namely the `Device` entity. We are considering to enrich its API in the near future and
-can't guarantee that this operation won't require breaking the existing API.
+can't guarantee that this operation won't require breaking the existing API. There is a corresponding
+[issue](https://gitlab.com/mavka/libs/maviola/-/issues/1) in the tracker.
 
 Basically, the project reached the state, when our intuition and our engineering experience tells us that
 further development will be mostly related to adding new functionality, not amending the existing one. The current plan
 is to create a proper [roadmap](https://gitlab.com/mavka/libs/maviola/-/milestones), so other people won't have to rely
 on our vaguely expressed gut feeling.
+
+You can track [v1](https://gitlab.com/mavka/libs/maviola/-/milestones/1) milestone dedicated to API stabilisation.
 
 License
 -------

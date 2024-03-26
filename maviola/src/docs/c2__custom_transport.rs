@@ -7,6 +7,9 @@ Custom transports are still require `unstable` Cargo feature to be enabled. Refe
 [`asnc::io`] module documentation to learn how to build custom connections using
 [`sync::ConnectionBuilder`] or [`asnc::ConnectionBuilder`] respectively.
 
+There is an [issue](https://gitlab.com/mavka/libs/maviola/-/issues/2) dedicated to stabilization of
+this part of the API you can track.
+
 <em>[← Custom Dialects](crate::docs::c1__custom_dialects) | [Custom Processing →](crate::docs::c3__custom_processing)</em>
 
 [`sync::io`]: crate::sync::io

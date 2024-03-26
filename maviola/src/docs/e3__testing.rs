@@ -1,5 +1,5 @@
 /*!
-# 📖 4.1. Testing
+# 📖 4.3. Testing
 
 <em>[← Implementation Notes](crate::docs::e2__implementation)</em>
 
@@ -7,7 +7,7 @@ Since we have two types of API and several feature flags, the proper testing cou
 Here is the list of commands required to ensure, that your pull request will pass the
 [CI](https://gitlab.com/mavka/libs/maviola/-/pipelines) checks related to testing.
 
-Common tests (the last one and is not essential for fast checks):
+Common tests (the last one builds all dialects and is not essential for fast checks):
 
 ```shell
 cargo test --no-default-features --lib --tests --bins

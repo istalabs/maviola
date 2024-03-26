@@ -27,7 +27,7 @@ before reading this.
 To use synchronous API we have to install Maviola with `async` feature flag.
 
 ```shell
-cargo install maviola --features async
+cargo add maviola --features async
 ```
 
 ## Basics
@@ -252,7 +252,8 @@ as described in [Active Nodes & Heartbeats](#active-nodes--heartbeats). In the c
 have to send heartbeats manually.
 
 ⓘ In current Maviola version it is not possible to send frames directly from the device. However,
-in later versions we may introduce such capability.
+in later versions we may introduce such capability. There is an
+[issue](https://gitlab.com/mavka/libs/maviola/-/issues/1) you can track related to this feature.
 
 ## Handling Peers
 

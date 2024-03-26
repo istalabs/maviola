@@ -357,9 +357,9 @@ dependencies = [
 
 [[package]]
 name = "mavio"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bea75ab58ff7811684af6d68ad5d11f07986735b51b414bea3676b87d6e51f0"
+checksum = "ece562e0943eb2920e7f027f2235d09f64e7bf91b0abd32e73917b1c9a913472"
 dependencies = [
  "bitflags",
  "crc-any",
@@ -375,7 +375,7 @@ dependencies = [
 
 [[package]]
 name = "maviola"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-stream",
  "async-trait",

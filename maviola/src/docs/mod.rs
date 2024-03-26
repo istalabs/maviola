@@ -4,7 +4,7 @@
 # 📖 Maviola Playbook
 
 Maviola is a high-level [MAVLink](https://mavlink.io/en/) communication library written in Rust.
-It provides abstractions such as communication nodes and implements **stateful** features of MAVLink
+It provides abstractions such as communication nodes and implements _stateful_ features of MAVLink
 protocol: sequencing, message signing, automatic heartbeats, and so on.
 
 This library is a part of [Mavka](https://mavka.gitlab.io/home/) toolchain. It is based on

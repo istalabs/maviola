@@ -129,7 +129,8 @@ This will use the main [`key`] to validate frames from unknown links and re-sign
 [`link_id`].
 
 **`⍚`** Unfortunately, this part of API is not stable enough and therefore available only, when
-`unstable` Cargo feature is enabled.
+`unstable` Cargo feature is enabled. There is a dedicated
+[issue](https://gitlab.com/mavka/libs/maviola/-/issues/3) you can track.
 
 <em>[← Dialect Constraints](crate::docs::b1__dialect_constraints) | [Compatibility →](crate::docs::b3__compat_checks)</em>
 

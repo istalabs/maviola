@@ -3,7 +3,7 @@
 A high-level [MAVLink](https://mavlink.io/en/) communication library written in Rust.
 
 <span style="font-size:24px">[🇺🇦](https://mavka.gitlab.io/home/a_note_on_the_war_in_ukraine/)</span>
-[![`repository`](https://img.shields.io/gitlab/pipeline-status/mavka/libs/maviola.svg?branch=main&label=repository)](https://gitlab.com/mavka/libs/maviola)
+[![`repository`](https://img.shields.io/gitlab/pipeline-status/mavka/libs/maviola.svg?logo=gitlab&branch=main&label=repository)](https://gitlab.com/mavka/libs/maviola)
 [![`crates.io`](https://img.shields.io/crates/v/maviola.svg)](https://crates.io/crates/maviola)
 [![`docs.rs`](https://img.shields.io/docsrs/maviola.svg?label=docs.rs)](https://docs.rs/maviola/latest/maviola/)
 [![`issues`](https://img.shields.io/gitlab/issues/open/mavka/libs/maviola.svg)](https://gitlab.com/mavka/libs/maviola/-/issues/)
