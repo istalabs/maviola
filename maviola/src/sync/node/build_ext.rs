@@ -1,11 +1,14 @@
 //! # 🔒 Build extensions for synchronous MAVLink node
 
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 use crate::core::marker::{
-    HasComponentId, HasSystemId, MaybeComponentId, MaybeConnConf, MaybeSystemId, NodeKind, Unset,
+    Edge, HasComponentId, HasSystemId, MaybeComponentId, MaybeConnConf, MaybeSystemId, NodeKind,
+    Unset,
 };
 use crate::core::node::{Node, NodeBuilder, NodeConf};
+use crate::core::utils::Guarded;
 use crate::sync::io::ConnectionBuilder;
 use crate::sync::marker::ConnConf;
 use crate::sync::node::{EdgeNode, ProxyNode, SyncApi};
@@ -121,5 +124,81 @@ impl<V: MaybeVersioned> NodeBuilder<HasSystemId, HasComponentId, V, ConnConf<V>,
     /// Creates an [`EdgeNode`] with synchronous API.
     pub fn build(self) -> Result<EdgeNode<V>> {
         Node::try_from_conf(self.conf())
+    }
+}
+
+impl<V: MaybeVersioned> NodeBuilder<HasSystemId, HasComponentId, V, Unset, SyncApi<V>> {
+    /// <sup>[`sync`](crate::sync)</sup>
+    /// Creates a synchronous [`EdgeNode`] from an existing [`ProxyNode`] reusing its connection.
+    ///
+    /// The new "dependant" edge nodes can be created only from a [`ProxyNode`] which means that
+    /// it is impossible to create nodes of nodes and so on. The common use case is when one need
+    /// several nodes per connection representing different MAVLink components.
+    ///
+    /// The new edge node will inherit known dialects and frame processing settings from a "parent"
+    /// node. If [`signer`] and [`compat`] are not set explicitly, then they will be inherited as
+    /// well. All [custom processors](crate::docs::c3__custom_processing) from the "parent" node
+    /// will be added to the new one.
+    ///
+    /// **⚠** The [`heartbeat_timeout`] setting of a "parent" [`ProxyNode`] node will be ignored!
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use maviola::prelude::*;
+    /// use maviola::sync::prelude::*;
+    ///
+    /// let proxy_node = Node::sync::<V2>()
+    ///     .connection(TcpServer::new("127.0.0.1:5600").unwrap())
+    ///     .build().unwrap();
+    ///
+    /// // As you can see, Rust may infer a proper
+    /// // MAVLink version for us
+    /// let mut edge_node = Node::sync()
+    ///     .id(MavLinkId::new(1, 17))
+    ///     /* other node settings that do not include connection */
+    ///     .build_from(&proxy_node);
+    ///
+    /// // Activate the edge node to send heartbeats
+    /// edge_node.activate().unwrap();
+    /// ```
+    ///
+    /// Yet, it is not possible to build a dependent node when connection is already set:
+    ///
+    /// ```rust,compile_fail
+    /// # use maviola::prelude::*;
+    /// # use maviola::sync::prelude::*;
+    /// #
+    /// let proxy_node = Node::sync::<V2>()
+    ///     .connection(TcpServer::new("127.0.0.1:5600").unwrap())
+    ///     .build().unwrap();
+    ///
+    /// let mut edge_node = Node::sync()
+    ///     .id(MavLinkId::new(1, 17))
+    ///     .connection(TcpClient::new("127.0.0.1:5600").unwrap())
+    ///     /* compilation error */
+    ///     .build_from(&proxy_node);
+    /// ```
+    ///
+    /// [`signer`]: Self::signer
+    /// [`compat`]: Self::compat
+    /// [`heartbeat_timeout`]: Self::heartbeat_timeout
+    pub fn build_from(self, node: &ProxyNode<V>) -> EdgeNode<V> {
+        let processor = Arc::new(self.reuse_processor(node.processor.as_ref()));
+        let connection = node.api.connection().reuse();
+
+        Node {
+            kind: Edge::new(Endpoint::new(MavLinkId::new(
+                self.system_id.0,
+                self.component_id.0,
+            ))),
+            api: SyncApi::new(connection, processor.clone()),
+            state: Default::default(),
+            is_active: Guarded::from(node.api.share_state()),
+            heartbeat_timeout: self.heartbeat_timeout,
+            heartbeat_interval: self.heartbeat_interval,
+            processor: processor.clone(),
+            _version: node._version,
+        }
     }
 }

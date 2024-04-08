@@ -120,20 +120,42 @@ impl<V: MaybeVersioned> Connection<V> {
         &self.info
     }
 
-    pub(crate) fn state(&self) -> Closable {
+    pub(in crate::asnc) fn state(&self) -> Closable {
         self.state.to_closable()
     }
 
-    pub(crate) fn share_state(&self) -> SharedCloser {
+    pub(in crate::asnc) fn share_state(&self) -> SharedCloser {
         self.state.clone()
     }
 
-    pub(crate) fn sender(&self) -> OutgoingFrameSender<V> {
+    pub(in crate::asnc) fn sender(&self) -> OutgoingFrameSender<V> {
         self.sender.clone()
     }
 
-    pub(crate) fn receiver(&self) -> IncomingFrameReceiver<V> {
+    pub(in crate::asnc) fn receiver(&self) -> IncomingFrameReceiver<V> {
         self.receiver.clone()
+    }
+
+    pub(in crate::asnc) fn reuse(&self) -> Connection<V> {
+        let mut state = SharedCloser::new();
+
+        let conn = Self {
+            info: self.info.clone(),
+            sender: self.sender.clone(),
+            receiver: self.receiver.clone(),
+            state: state.clone(),
+        };
+
+        let parent_state = self.state.to_closable();
+
+        tokio::task::spawn(async move {
+            while !parent_state.is_closed() && !state.is_closed() {
+                tokio::time::sleep(CONN_STOP_POOLING_INTERVAL).await;
+            }
+            state.close();
+        });
+
+        conn
     }
 
     fn close(&mut self) {

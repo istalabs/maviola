@@ -65,6 +65,21 @@ Basic synchronous example: [`message_signing.rs`](message_signing.rs)
 cargo run --package maviola --example message_signing
 ```
 
+Multiple devices per connection
+-------------------------------
+
+Basic synchronous example: [`multiple_devices.rs`](multiple_devices.rs)
+
+```shell
+cargo run --package maviola --example multiple_devices
+```
+
+Basic asynchronous example: [`async_multiple_devices.rs`](async_multiple_devices.rs)
+
+```shell
+cargo run --package maviola --example async_multiple_devices
+```
+
 Custom Processing
 -----------------
 

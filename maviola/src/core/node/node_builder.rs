@@ -244,6 +244,28 @@ impl<
         self.processors.add(name, processor);
         self
     }
+
+    /// <sup>⛔</sup>
+    /// Helper method that create a new processor from configuration extended with the provided one.
+    pub(crate) fn reuse_processor(&self, other: &FrameProcessor) -> FrameProcessor {
+        let mut builder = FrameProcessor::builder();
+
+        if let Some(signer) = self.signer.clone() {
+            builder = builder.signer(signer);
+        }
+        if let Some(compat) = self.compat {
+            builder = builder.compat(compat);
+        }
+
+        let mut processor = builder
+            .dialects(self.dialects.clone())
+            .processors(self.processors.clone())
+            .build();
+
+        processor.extend_with(other);
+
+        processor
+    }
 }
 
 impl<V: Versioned, CC: MaybeConnConf, A: NodeApi<V>>

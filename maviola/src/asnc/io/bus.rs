@@ -3,7 +3,9 @@ use std::time::Duration;
 use crate::asnc::consts::CONN_BROADCAST_CHAN_CAPACITY;
 use crate::core::io::{IncomingFrame, OutgoingFrame};
 use crate::core::utils::Closable;
-use crate::error::{RecvResult, RecvTimeoutResult, SendError, SendResult, TryRecvResult};
+#[cfg(feature = "unstable")]
+use crate::error::TryRecvResult;
+use crate::error::{RecvResult, RecvTimeoutResult, SendError, SendResult};
 
 use crate::asnc::prelude::*;
 use crate::prelude::*;
@@ -130,6 +132,7 @@ impl<V: MaybeVersioned> IncomingFrameReceiver<V> {
 
     /// Receives incoming frame blocking until either frame is received or channel is closed.
     #[inline(always)]
+    #[cfg(feature = "unstable")]
     pub async fn recv(&mut self) -> RecvResult<IncomingFrame<V>> {
         self.receiver.recv().await
     }
@@ -142,6 +145,7 @@ impl<V: MaybeVersioned> IncomingFrameReceiver<V> {
 
     /// Attempts to receive incoming frame without blocking.
     #[inline(always)]
+    #[cfg(feature = "unstable")]
     pub fn try_recv(&mut self) -> TryRecvResult<IncomingFrame<V>> {
         self.receiver.try_recv()
     }

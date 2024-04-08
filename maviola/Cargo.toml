@@ -184,6 +184,11 @@ test = true
 required-features = ["sync"]
 
 [[example]]
+name = "multiple_devices"
+test = true
+required-features = ["sync"]
+
+[[example]]
 name = "scrambler"
 test = true
 required-features = ["sync", "unsafe"]
@@ -210,6 +215,11 @@ required-features = ["sync"]
 
 [[example]]
 name = "async_network"
+test = true
+required-features = ["async"]
+
+[[example]]
+name = "async_multiple_devices"
 test = true
 required-features = ["async"]
 

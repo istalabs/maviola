@@ -1,14 +1,17 @@
 //! # 🔒 Build extensions for asynchronous MAVLink node
 
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 use crate::asnc::io::ConnectionBuilder;
 use crate::asnc::marker::AsyncConnConf;
 use crate::asnc::node::{AsyncApi, EdgeNode, ProxyNode};
 use crate::core::marker::{
-    HasComponentId, HasSystemId, MaybeComponentId, MaybeConnConf, MaybeSystemId, NodeKind, Unset,
+    Edge, HasComponentId, HasSystemId, MaybeComponentId, MaybeConnConf, MaybeSystemId, NodeKind,
+    Unset,
 };
 use crate::core::node::{Node, NodeBuilder, NodeConf};
+use crate::core::utils::Guarded;
 
 use crate::prelude::*;
 
@@ -121,5 +124,85 @@ impl<V: MaybeVersioned> NodeBuilder<HasSystemId, HasComponentId, V, AsyncConnCon
     /// Creates an [`EdgeNode`] with synchronous API.
     pub async fn build(self) -> Result<EdgeNode<V>> {
         Node::try_from_async_conf(self.conf()).await
+    }
+}
+
+impl<V: MaybeVersioned> NodeBuilder<HasSystemId, HasComponentId, V, Unset, AsyncApi<V>> {
+    /// <sup>[`async`](crate::asnc)</sup>
+    /// Creates an asynchronous [`EdgeNode`] from an existing [`ProxyNode`] reusing its connection.
+    ///
+    /// The new "dependant" edge nodes can be created only from a [`ProxyNode`] which means that
+    /// it is impossible to create nodes of nodes and so on. The common use case is when one need
+    /// several nodes per connection representing different MAVLink components.
+    ///
+    /// The new edge node will inherit known dialects and frame processing settings from a "parent"
+    /// node. If [`signer`] and [`compat`] are not set explicitly, then they will be inherited as
+    /// well. All [custom processors](crate::docs::c3__custom_processing) from the "parent" node
+    /// will be added to the new one.
+    ///
+    /// **⚠** The [`heartbeat_timeout`] setting of a "parent" [`ProxyNode`] node will be ignored!
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # #[tokio::main] async fn main() {
+    /// use maviola::prelude::*;
+    /// use maviola::asnc::prelude::*;
+    ///
+    /// let proxy_node = Node::asnc::<V2>()
+    ///     .connection(TcpServer::new("127.0.0.1:5600").unwrap())
+    ///     .build().await.unwrap();
+    ///
+    /// // As you can see, Rust may infer a proper
+    /// // MAVLink version for us
+    /// let mut edge_node = Node::asnc()
+    ///     .id(MavLinkId::new(1, 17))
+    ///     /* other node settings that do not include connection */
+    ///     .build_from(&proxy_node);
+    ///
+    /// // Activate the edge node to send heartbeats
+    /// edge_node.activate().await.unwrap();
+    /// # }
+    /// ```
+    ///
+    /// Yet, it is not possible to build a dependent node when connection is already set:
+    ///
+    /// ```rust,compile_fail
+    /// # #[tokio::main] async fn main() {
+    /// # use maviola::prelude::*;
+    /// # use maviola::asnc::prelude::*;
+    /// #
+    /// let proxy_node = Node::asnc::<V2>()
+    ///     .connection(TcpServer::new("127.0.0.1:5600").unwrap())
+    ///     .build().await.unwrap();
+    ///
+    /// let mut edge_node = Node::sync()
+    ///     .id(MavLinkId::new(1, 17))
+    ///     .connection(TcpClient::new("127.0.0.1:5600").unwrap())
+    ///     /* compilation error */
+    ///     .build_from(&proxy_node);
+    /// # }
+    /// ```
+    ///
+    /// [`signer`]: Self::signer
+    /// [`compat`]: Self::compat
+    /// [`heartbeat_timeout`]: Self::heartbeat_timeout
+    pub fn build_from(self, node: &ProxyNode<V>) -> EdgeNode<V> {
+        let processor = Arc::new(self.reuse_processor(node.processor.as_ref()));
+        let connection = node.api.connection().reuse();
+
+        Node {
+            kind: Edge::new(Endpoint::new(MavLinkId::new(
+                self.system_id.0,
+                self.component_id.0,
+            ))),
+            api: AsyncApi::new(connection, processor.clone()),
+            state: Default::default(),
+            is_active: Guarded::from(node.api.share_state()),
+            heartbeat_timeout: self.heartbeat_timeout,
+            heartbeat_interval: self.heartbeat_interval,
+            processor: processor.clone(),
+            _version: node._version,
+        }
     }
 }

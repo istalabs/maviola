@@ -134,7 +134,6 @@ impl FrameProcessor {
 
     #[cfg(feature = "unsafe")]
     /// <sup>⛔ | 💢</sup>
-    ///
     /// Applies custom processors. Works only when `unsafe` feature is enabled.
     fn apply_custom_processors<V: MaybeVersioned>(
         &self,
@@ -155,6 +154,27 @@ impl FrameProcessor {
         }
 
         self.processors.process(frame, case, crc_extra)
+    }
+
+    /// <sup>⛔</sup>
+    /// Extends the current frame processor with the settings from the provided one.
+    pub(crate) fn extend_with(&mut self, other: &FrameProcessor) {
+        #[cfg(feature = "unsafe")]
+        self.processors.extend(&other.processors);
+
+        self.dialects.append_known_dialects(&other.dialects);
+
+        if self.signer.is_none() {
+            if let Some(signer) = other.signer() {
+                self.signer = Some(signer.clone());
+            }
+        }
+
+        if self.compat.is_none() {
+            if let Some(compat) = other.compat() {
+                self.compat = Some(compat.clone());
+            }
+        }
     }
 }
 
@@ -231,5 +251,80 @@ impl FrameProcessorBuilder {
     #[cfg(not(feature = "unsafe"))]
     pub(crate) fn processors(self, _: CustomFrameProcessors) -> Self {
         self
+    }
+}
+
+#[cfg(test)]
+mod processor_tests {
+    use super::*;
+    use crate::protocol::{IncompatFlags, SecretKey};
+
+    #[test]
+    fn extend_processor_new_signer() {
+        let other = FrameProcessor::builder()
+            .signer(FrameSigner::new(1, "abc"))
+            .build();
+        let mut this = FrameProcessor::builder().build();
+
+        this.extend_with(&other);
+
+        assert!(this.signer().is_some());
+    }
+
+    #[test]
+    fn extend_processor_keep_signer() {
+        let other = FrameProcessor::builder()
+            .signer(FrameSigner::new(1, "abc"))
+            .build();
+        let mut this = FrameProcessor::builder()
+            .signer(FrameSigner::new(1, "abcd"))
+            .build();
+
+        this.extend_with(&other);
+
+        assert!(this.signer().is_some());
+        assert_eq!(
+            this.signer().unwrap().key().value(),
+            SecretKey::from("abcd").value()
+        );
+    }
+
+    #[test]
+    fn extend_processor_new_compat() {
+        let other = FrameProcessor::builder()
+            .compat(CompatProcessor::builder().build())
+            .build();
+        let mut this = FrameProcessor::builder().build();
+
+        this.extend_with(&other);
+
+        assert!(this.compat().is_some());
+    }
+
+    #[test]
+    fn extend_processor_keep_compat() {
+        let other = FrameProcessor::builder()
+            .compat(
+                CompatProcessor::builder()
+                    .incompat_flags(IncompatFlags::MAVLINK_IFLAG_SIGNED)
+                    .build(),
+            )
+            .build();
+        let mut this = FrameProcessor::builder()
+            .compat(
+                CompatProcessor::builder()
+                    .incompat_flags(IncompatFlags::BIT_2)
+                    .build(),
+            )
+            .build();
+
+        this.extend_with(&other);
+
+        assert!(this.compat().is_some());
+        assert!(this.compat().unwrap().incompat_flags().is_some());
+        assert_eq!(
+            this.compat().unwrap().incompat_flags().unwrap(),
+            IncompatFlags::BIT_2
+        );
     }
 }

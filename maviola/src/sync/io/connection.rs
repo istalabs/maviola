@@ -134,6 +134,28 @@ impl<V: MaybeVersioned> Connection<V> {
         &self.receiver
     }
 
+    pub(in crate::sync) fn reuse(&self) -> Self {
+        let mut state = SharedCloser::new();
+
+        let conn = Self {
+            info: self.info.clone(),
+            sender: self.sender.clone(),
+            receiver: self.receiver.clone(),
+            state: state.clone(),
+        };
+
+        let parent_state = self.state.to_closable();
+
+        thread::spawn(move || {
+            while !parent_state.is_closed() && !state.is_closed() {
+                thread::sleep(CONN_STOP_POOLING_INTERVAL);
+            }
+            state.close();
+        });
+
+        conn
+    }
+
     fn close(&mut self) {
         if self.state.is_closed() {
             return;

@@ -196,6 +196,14 @@ impl KnownDialects {
     pub(in crate::protocol) fn as_slice(&self) -> &[&DialectSpec] {
         self.dialects.as_slice()
     }
+
+    pub(super) fn append_known_dialects(&mut self, other: &Self) {
+        for dialect in &other.dialects {
+            if !self.contains(dialect.name()) {
+                self.dialects.push(dialect)
+            }
+        }
+    }
 }
 
 impl Default for KnownDialects {

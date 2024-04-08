@@ -120,6 +120,10 @@ impl<V: MaybeVersioned> SyncApi<V> {
         handler.handle(&self.connection)
     }
 
+    pub(super) fn connection(&self) -> &Connection<V> {
+        &self.connection
+    }
+
     fn handle_incoming_frames(&self) {
         let handler = IncomingFramesHandler {
             info: self.info().clone(),

@@ -174,13 +174,14 @@ impl ConnectionInfo {
         &self.details
     }
 
-    /// Creates [`ChannelInfo`] for a channel withing this connection
+    /// Creates [`ChannelInfo`] for a channel withing this connection.
     #[cfg(feature = "unstable")]
     #[inline(always)]
     pub fn make_channel_info(&self, details: ChannelDetails) -> ChannelInfo {
         self.make_channel_info_inner(details)
     }
 
+    /// Creates [`ChannelInfo`] for a channel withing this connection.
     #[cfg(not(feature = "unstable"))]
     #[inline(always)]
     pub fn make_channel_info(&self, details: ChannelDetails) -> ChannelInfo {

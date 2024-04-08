@@ -17,6 +17,7 @@ before reading this.
 1. [Sending](#sending)
     1. [Sending Frames](#sending-frames)
     1. [Proxy Nodes & Devices](#proxy-nodes--devices)
+    1. [Dependent Nodes](#dependent-nodes)
 1. [Handling Peers](#handling-peers)
 1. [Active Nodes & Heartbeats](#active-nodes--heartbeats)
 1. [Multithreading](#multithreading)
@@ -221,11 +222,33 @@ node.send_frame(&frame).unwrap();
 **⚠** It is important to remember, that if you communicate on behalf of a device, MAVLink
 specification requires you to send heartbeats. In Maviola only edge nodes can do that automatically
 as described in [Active Nodes & Heartbeats](#active-nodes--heartbeats). In the case of devices you
-have to send heartbeats manually.
+have to send heartbeats manually or use [dependent nodes](#dependent-nodes).
 
-ⓘ In current Maviola version it is not possible to send frames directly from the device. However,
-in later versions we may introduce such capability. There is an
-[issue](https://gitlab.com/mavka/libs/maviola/-/issues/1) you can track related to this feature.
+### Dependent Nodes
+
+While [`Device`] abstraction is useful ang gives a fine-grained control over frame processing, in
+most cases it would be advantageous to reuse a connection of an existing node for the new one. Such
+nodes are called "dependent" nodes and can be built using node builder:
+
+```rust,no_run
+# use maviola::prelude::*;
+# use maviola::sync::prelude::*;
+#
+let proxy_node = Node::sync::<V2>()
+    .connection(TcpServer::new("127.0.0.1:5600").unwrap())
+    /* we can add frame processing settings here */
+    .build().unwrap();
+
+let mut edge_node = Node::sync()
+    .id(MavLinkId::new(1, 17))
+    /* other node settings that do not include connection */
+    .build_from(&proxy_node);
+```
+
+Such nodes can be created only from a [`ProxyNode`] and are always [`EdgeNode`]s. They will use
+[`FrameProcessor::compat`] and [`FrameProcessor::signer`] from a "parent" node if these parameters
+hasn't been set explicitly for the "dependent" node. They will also add all known dialects from the
+parent edge node and all [custom processors](crate::docs::c3__custom_processing).
 
 ## Handling Peers
 
