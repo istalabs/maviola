@@ -437,6 +437,7 @@ after their creation. This is related to the limitations of the underlying MPMC 
  */
 
 #[cfg(doc)]
+#[cfg(feature = "async")]
 use crate::asnc::prelude::*;
 #[cfg(doc)]
 use crate::core::marker::*;

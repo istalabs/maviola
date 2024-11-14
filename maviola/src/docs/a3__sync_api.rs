@@ -418,4 +418,5 @@ use crate::prelude::*;
 #[cfg(doc)]
 use crate::protocol::*;
 #[cfg(doc)]
+#[cfg(feature = "sync")]
 use crate::sync::prelude::*;
