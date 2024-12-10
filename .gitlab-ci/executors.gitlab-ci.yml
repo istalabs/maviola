@@ -11,5 +11,7 @@ include:
     - !reference [ .dirs, before_script ]  # from: local: "/.gitlab-ci/utils.gitlab-ci.yml"
     # Install system build dependencies
     - apt-get update && apt-get install -y curl git jq bash
+    # Install additional dependencies
+    - apt-get install -y libudev-dev
     # Generate common variables
     - !reference [ .variables:generated, before_script ]  # from: local: "/.gitlab-ci/utils.gitlab-ci.yml"
