@@ -11,6 +11,7 @@
 //! * UDP: [`UdpServer`] / [`UdpClient`]
 //! * File: [`FileWriter`] / [`FileReader`]
 //! * Unix socket: [`SockServer`] / [`SockClient`] (only on Unix-like systems such as Linux or OS X)
+//! * Serial port: [`SerialPort`]
 //!
 //! ## API modes
 //!
@@ -32,6 +33,7 @@ mod retry;
 mod routing;
 mod transport;
 
+pub use transport::SerialPort;
 pub use transport::{FileReader, FileWriter, TcpClient, TcpServer, UdpClient, UdpServer};
 #[cfg(unix)]
 pub use transport::{SockClient, SockServer};

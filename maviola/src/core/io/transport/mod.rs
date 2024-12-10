@@ -1,6 +1,7 @@
 //! # 🔒 Transport interfaces
 
 mod file;
+mod serial;
 #[cfg(unix)]
 mod sock;
 mod tcp;
@@ -17,3 +18,5 @@ pub use udp::server::UdpServer;
 pub use sock::client::SockClient;
 #[cfg(unix)]
 pub use sock::server::SockServer;
+
+pub use serial::serial::SerialPort;

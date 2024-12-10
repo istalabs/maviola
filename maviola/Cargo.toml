@@ -35,6 +35,7 @@ portpicker = "0.1.1"
 serde = { version = "1.0.197", default-features = false, features = ["derive"], optional = true }
 serde_arrays = { version = "0.1.0", default-features = false, optional = true }
 thiserror = "1.0.58"
+serialport = { version = "4.6.1", optional = true }
 
 # Async dependencies
 async-stream = { version = "0.3.5", optional = true }
@@ -42,6 +43,7 @@ async-trait = { version = "0.1.79", optional = true }
 tokio = { version = "1.36.0", default-features = false, features = ["sync", "rt", "net", "fs", "io-util", "time"], optional = true }
 tokio-stream = { version = "0.1.15", features = ["sync"], optional = true }
 tokio-util = { version = "0.7.10", optional = true }
+tokio-serial = { version = "5.4.4", optional = true }
 
 [dev-dependencies]
 env_logger = "0.11.3"
@@ -65,8 +67,10 @@ full = [
 
 ## Includes derive maros from MAVSpec
 derive = ["mavspec"]
-## Enables synchromous API.
-sync = []
+## Enables synchronous API.
+sync = [
+    "dep:serialport",
+]
 ## Enables asynchromous API via Tokio.
 async = [
     "dep:async-stream",
@@ -74,6 +78,7 @@ async = [
     "dep:tokio",
     "dep:tokio-stream",
     "dep:tokio-util",
+    "dep:tokio-serial",
     "mavio/async"
 ]
 ## Enables serde support.
@@ -178,6 +183,11 @@ test = true
 required-features = ["sync"]
 
 [[example]]
+name = "serial_fc"
+test = false
+required-features = ["sync", "ardupilotmega"]
+
+[[example]]
 name = "message_signing"
 test = true
 required-features = ["sync"]
@@ -218,6 +228,11 @@ test = true
 required-features = ["sync"]
 
 [[example]]
+name = "async_serial_fc"
+test = false
+required-features = ["async", "ardupilotmega"]
+
+[[example]]
 name = "async_network"
 test = true
 required-features = ["async"]
@@ -226,6 +241,12 @@ required-features = ["async"]
 name = "async_multiple_devices"
 test = true
 required-features = ["async"]
+
+###########################################################
+# Linter
+###########################################################
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(rustdoc)'] }
 
 ###########################################################
 # Metadata

@@ -59,6 +59,13 @@ pub enum ConnectionDetails {
         /// Server address.
         path: PathBuf,
     },
+    /// Serial port.
+    SerialPort {
+        /// Port path.
+        path: String,
+        /// Baud rate.
+        baud_rate: u32,
+    },
     /// Network with multiple connections.
     Network,
     /// Custom connection.
@@ -135,6 +142,13 @@ pub enum ChannelDetails {
     SockClient {
         /// Socket path.
         path: PathBuf,
+    },
+    /// Serial port.
+    SerialPort {
+        /// Path to port.
+        path: String,
+        /// Baud rate.
+        baud_rate: u32,
     },
     /// Custom channel.
     #[cfg(feature = "unstable")]
@@ -253,6 +267,7 @@ static mut UNKNOWN_CONNECTION: Option<ConnectionInfo> = None;
 static INIT_UNKNOWN_CONNECTION: Once = Once::new();
 
 impl ConnectionInfo {
+    #[allow(static_mut_refs)]
     pub(in crate::core) fn unknown() -> &'static ConnectionInfo {
         INIT_UNKNOWN_CONNECTION.call_once(|| unsafe {
             UNKNOWN_CONNECTION = Some(ConnectionInfo::new(ConnectionDetails::Unknown));

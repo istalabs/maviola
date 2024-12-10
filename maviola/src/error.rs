@@ -15,12 +15,6 @@ use std::sync::{mpsc, Arc, PoisonError};
 use crate::protocol::MessageId;
 
 /// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
-#[doc(inline)]
-pub use mavio::error::{
-    ChecksumError, FrameError, IncompatFlagsError, SignatureError, SpecError, VersionError,
-};
-
-/// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
 /// Low-level error re-exported from Mavio. Maviola wraps all variants of [`CoreError`] with its own
 /// [`Error`] and provides proper conversions with [`From`] trait.
 ///
@@ -46,6 +40,11 @@ pub use mavio::error::{
 ///
 #[doc(inline)]
 pub use crate::error::Error as CoreError;
+/// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
+#[doc(inline)]
+pub use mavio::error::{
+    ChecksumError, FrameError, IncompatFlagsError, SignatureError, SpecError, VersionError,
+};
 
 /// Maviola result type.
 pub type Result<T> = core::result::Result<T, Error>;
@@ -84,6 +83,16 @@ pub enum Error {
     /// Synchronisation errors.
     #[error("multi-threading error: {0:?}")]
     Sync(#[from] SyncError),
+
+    /// Serial port error.
+    #[error("serial port error: {0:?}")]
+    #[cfg(feature = "sync")]
+    Serial(Arc<serialport::Error>),
+
+    /// Serial port error.
+    #[error("serial port error: {0:?}")]
+    #[cfg(all(feature = "async", not(feature = "sync")))]
+    Serial(Arc<tokio_serial::Error>),
 
     /// Other errors.
     #[error("error: {0}")]
@@ -422,5 +431,34 @@ impl<T> From<tokio::sync::mpsc::error::SendError<T>> for SendError<T> {
 impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Error {
     fn from(value: tokio::sync::mpsc::error::SendError<T>) -> Self {
         SendError::from(value).into()
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+//                                Serial Port                                //
+///////////////////////////////////////////////////////////////////////////////
+
+#[cfg(feature = "sync")]
+#[cfg(any(windows, unix))]
+impl From<serialport::Error> for Error {
+    fn from(value: serialport::Error) -> Self {
+        match value.kind {
+            serialport::ErrorKind::Io(kind) => {
+                Self::Io(Arc::new(std::io::Error::new(kind, value.description)))
+            }
+            _ => Self::Serial(Arc::new(value)),
+        }
+    }
+}
+
+#[cfg(all(feature = "async", not(feature = "sync")))]
+impl From<tokio_serial::Error> for Error {
+    fn from(value: tokio_serial::Error) -> Self {
+        match value.kind {
+            tokio_serial::ErrorKind::Io(kind) => {
+                Self::Io(Arc::new(std::io::Error::new(kind, value.description)))
+            }
+            _ => Self::Serial(Arc::new(value)),
+        }
     }
 }
