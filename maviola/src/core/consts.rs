@@ -15,7 +15,7 @@ mod _default_dialect {
     #[cfg(all(not(feature = "common"), feature = "standard"))]
     pub use crate::dialects::Standard as DefaultDialect;
 
-    #[cfg(not(feature = "standard"))]
+    #[cfg(all(not(feature = "standard"), not(feature = "common")))]
     pub use crate::dialects::Minimal as DefaultDialect;
 
     #[cfg(feature = "all")]
@@ -30,7 +30,7 @@ mod _default_dialect {
     #[cfg(all(not(feature = "common"), feature = "standard"))]
     pub use crate::dialects::standard as default_dialect;
 
-    #[cfg(not(feature = "standard"))]
+    #[cfg(all(not(feature = "standard"), not(feature = "common")))]
     pub use crate::dialects::minimal as default_dialect;
 }
 
@@ -91,3 +91,6 @@ pub(crate) const INCOMING_FRAMES_POOLING_INTERVAL: Duration = Duration::from_mic
 
 /// Specifies a pooling interval for network nodes.
 pub(crate) const NETWORK_POOLING_INTERVAL: Duration = Duration::from_micros(50);
+
+/// Connection timeout for serial port.
+pub(crate) const SERIAL_CONN_TIMEOUT: Duration = Duration::from_millis(100);
