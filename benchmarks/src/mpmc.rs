@@ -8,6 +8,7 @@ use maviola::sync::utils::mpmc;
 const PAYLOAD_SIZE: usize = 255;
 
 #[derive(Copy, Clone)]
+#[allow(dead_code)]
 struct Payload([u8; PAYLOAD_SIZE]);
 
 impl Payload {

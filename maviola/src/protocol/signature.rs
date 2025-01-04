@@ -46,6 +46,7 @@ use builder::{NoLinkId, NoSecretKey};
 ///     .build();
 /// ```
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FrameSigner {
     link_id: SignedLinkId,
@@ -64,6 +65,7 @@ pub struct FrameSigner {
 ///
 /// By default, the [`SignStrategy::Sign`] strategy will be applied.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SignStrategy {
     /// Apply message signing for all messages. Sign unsigned messages.
@@ -143,6 +145,7 @@ pub trait IntoFrameSigner {
 ///
 /// Used internally by [`FrameSigner`].
 #[derive(Clone)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct UniqueMavTimestamp(Arc<AtomicU64>);
 
 impl FrameSigner {
