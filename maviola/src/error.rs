@@ -217,8 +217,8 @@ pub struct SerialError {
     #[cfg(any(windows, unix))]
     inner: Arc<serialport::Error>,
     #[cfg(all(feature = "async", not(feature = "sync")))]
-    inner: Arc<serialport::Error>,
-    #[cfg(not(all(feature = "async", feature = "sync")))]
+    inner: Arc<tokio_serial::Error>,
+    #[cfg(not(any(feature = "async", feature = "sync")))]
     inner: (),
     #[cfg(feature = "sync")]
     #[cfg(not(any(windows, unix)))]
@@ -633,11 +633,11 @@ impl<'de> serde::Deserialize<'de> for SerialError {
 
         #[cfg(all(feature = "async", not(feature = "sync")))]
         return Ok(SerialError::from(tokio_serial::Error::new(
-            serialport::ErrorKind::Unknown,
+            tokio_serial::ErrorKind::Unknown,
             "Foreign error",
         )));
 
-        #[cfg(not(all(feature = "async", feature = "sync")))]
+        #[cfg(not(any(feature = "async", feature = "sync")))]
         return Ok(SerialError { inner: () });
 
         #[cfg(feature = "sync")]
