@@ -248,6 +248,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ctor"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32a2785755761f3ddc1492979ce1e48d2c00d09311c39e4466429188f3dd6501"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -511,9 +521,9 @@ dependencies = [
 
 [[package]]
 name = "mavio"
-version = "0.3.1"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55ae91c0ef10257a54d7c3ad9d7307b86d49f5172c42f5cdc3db3edefbd87e92"
+checksum = "6f4e304c5bccc3b52ebd49a814ecaca3c59e04daba10e656446b0372c456a77d"
 dependencies = [
  "bitflags 2.6.0",
  "crc-any",
@@ -522,6 +532,7 @@ dependencies = [
  "serde_arrays",
  "sha2",
  "specta",
+ "specta-util",
  "tbytes",
  "thiserror 2.0.9",
  "tokio",
@@ -529,7 +540,7 @@ dependencies = [
 
 [[package]]
 name = "maviola"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -563,9 +574,9 @@ dependencies = [
 
 [[package]]
 name = "mavspec"
-version = "0.4.1"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "554dd296078a17e9eb1e69778fdc79a053a01b69814951a35d5daaeaf629acaf"
+checksum = "e0799040d56aeef168e5d40564b8015301f2e0903c57f22d165be4f7c879bd5e"
 dependencies = [
  "mavspec_rust_derive",
  "mavspec_rust_gen",
@@ -574,9 +585,9 @@ dependencies = [
 
 [[package]]
 name = "mavspec_rust_derive"
-version = "0.4.1"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "123ac538a492c95968d53b397288e0e2e6d571b20aa349ce899b6114320bfb32"
+checksum = "783bf336d4a28d55a94c67bc6a91ea25c0d97db9f8a0209c902d90bdb657137b"
 dependencies = [
  "crc-any",
  "heck",
@@ -588,9 +599,9 @@ dependencies = [
 
 [[package]]
 name = "mavspec_rust_gen"
-version = "0.4.1"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fd9bc8f944a765fdb43bfae630a24680b9afc73b48374e1f2de15428059d42f"
+checksum = "01f2fb8a2e5244c02de671e81bf0a4fdf8cfa5237dccb20473ae30f83a563a1b"
 dependencies = [
  "base64",
  "cargo-manifest",
@@ -608,13 +619,14 @@ dependencies = [
 
 [[package]]
 name = "mavspec_rust_spec"
-version = "0.4.1"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2c537054d732063f70d5b6890bd6a0cc8876ba718704e7b3fff601c09c3d8ce"
+checksum = "c49ff7d78760fdf2f14ce6066471722f64f3e2d7009f0ccca0fd39c6c02e5a02"
 dependencies = [
  "bitflags 2.6.0",
  "serde",
  "specta",
+ "specta-util",
  "tbytes",
 ]
 
@@ -962,10 +974,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "syn"
-version = "2.0.94"
+name = "specta-util"
+version = "0.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "987bc0be1cdea8b10216bd06e2ca407d40b9543468fafd3ddfb02f36e77f71f3"
+checksum = "e8113d65b58a6de3184b01d6df9e50b6d4bbe7f724251f576d84f23228824456"
+dependencies = [
+ "ctor",
+ "serde",
+ "specta",
+ "specta-macros",
+]
+
+[[package]]
+name = "syn"
+version = "2.0.95"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46f71c0377baf4ef1cc3e3402ded576dccc315800fbc62dfc7fe04b009773b4a"
 dependencies = [
  "proc-macro2",
  "quote",
