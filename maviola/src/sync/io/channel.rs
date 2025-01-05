@@ -152,7 +152,7 @@ impl<V: MaybeVersioned, R: Read + Send + 'static, W: Write + Send + 'static> Cha
                 if let Err(err) = frame_writer.send(out_frame.frame()) {
                     let err = Error::from(err);
                     if let Error::Io(err) = err {
-                        if let std::io::ErrorKind::TimedOut = err.kind() {
+                        if let std::io::ErrorKind::TimedOut = err.as_ref().kind() {
                             continue;
                         }
                         return Err(Error::Io(err));
@@ -181,7 +181,7 @@ impl<V: MaybeVersioned, R: Read + Send + 'static, W: Write + Send + 'static> Cha
                 Err(err) => {
                     let err = Error::from(err);
                     if let Error::Io(err) = err {
-                        if let std::io::ErrorKind::TimedOut = err.kind() {
+                        if let std::io::ErrorKind::TimedOut = err.as_ref().kind() {
                             continue;
                         }
                         return Err(Error::Io(err));

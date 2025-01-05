@@ -33,8 +33,9 @@ mavio = { version = "0.3.4", features = ["extras", "minimal", "sha2", "std"] }
 mavspec = { version = "0.4.5", features = ["std", "rust"], optional = true }
 portpicker = "0.1.1"
 serde = { version = "1.0.197", default-features = false, features = ["derive"], optional = true }
-specta = { version = "2.0.0-rc.20", features = ["derive"], optional = true }
 serde_arrays = { version = "0.1.0", default-features = false, optional = true }
+specta = { version = "2.0.0-rc.20", features = ["derive"], optional = true }
+specta-util = { version = "0.0.7", features = ["export"], optional = true }
 thiserror = "2.0.9"
 serialport = { version = "4.6.1", optional = true }
 
@@ -92,10 +93,13 @@ serde = [
 ## Enables specta support.
 specta = [
     "dep:specta",
+    "dep:specta-util",
     "mavio/specta",
 ]
 ## Enables unstable API features.
-unstable = []
+unstable = [
+    "mavio/unstable"
+]
 ## Unsafe features.
 unsafe = [
     "mavio/unsafe"

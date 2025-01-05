@@ -96,7 +96,6 @@ pub trait SendFrame<V: MaybeVersioned>: SendFrameInternal<V> {
 }
 
 /// <sup>🔒</sup>
-///
 /// Message sending API.
 pub trait SendMessage<V: Versioned>: SendFrame<V> + SendMessageInternal<V> {
     /// Sends MAVLink message.
@@ -140,7 +139,6 @@ pub trait SendMessage<V: Versioned>: SendFrame<V> + SendMessageInternal<V> {
 }
 
 /// <sup>🔒</sup>
-///
 /// API for sending messages within version-agnostic channels.
 pub trait SendVersionlessMessage:
     SendFrame<Versionless> + SendMessageInternal<Versionless>

@@ -156,7 +156,7 @@ impl<
                 if let Err(err) = frame_writer.send(out_frame.frame()).await {
                     let err = Error::from(err);
                     if let Error::Io(err) = err {
-                        if let std::io::ErrorKind::TimedOut = err.kind() {
+                        if let std::io::ErrorKind::TimedOut = err.as_ref().kind() {
                             continue;
                         }
                         return Err(Error::Io(err));
@@ -185,7 +185,7 @@ impl<
                 Err(err) => {
                     let err = Error::from(err);
                     if let Error::Io(err) = err {
-                        if let std::io::ErrorKind::TimedOut = err.kind() {
+                        if let std::io::ErrorKind::TimedOut = err.as_ref().kind() {
                             continue;
                         }
                         return Err(Error::Io(err));

@@ -16,6 +16,7 @@ use crate::prelude::*;
 pub use builder::FrameSignerBuilder;
 use builder::{NoLinkId, NoSecretKey};
 
+/// <sup>[`serde`](https://serde.rs) | [`specta`](https://crates.io/crates/specta)</sup>
 /// MAVLink [message signing](https://mavlink.io/en/guide/message_signing.html) manager.
 ///
 /// [`FrameSigner`] allows to verify and sign outgoing and incoming frames. There are several
@@ -59,6 +60,7 @@ pub struct FrameSigner {
     exclude: HashSet<MessageId>,
 }
 
+/// <sup>[`serde`](https://serde.rs) | [`specta`](https://crates.io/crates/specta)</sup>
 /// Message signing strategy.
 ///
 /// Defines how message signing will be applied.
@@ -137,6 +139,7 @@ pub trait IntoFrameSigner {
     fn into_message_signer(self) -> FrameSigner;
 }
 
+/// <sup>[`serde`](https://serde.rs) | [`specta`](https://crates.io/crates/specta)</sup>
 /// MAVLink timestamp wrapper that preserve uniqueness of timestamp sequence.
 ///
 /// ⚠ It is not strictly guaranteed that the next timestamp will be unique, if multiple clones

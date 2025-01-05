@@ -5,14 +5,20 @@ use std::sync::Once;
 
 use crate::core::io::{ChannelId, ConnectionId};
 
+/// <sup>[`serde`](https://serde.rs) | [`specta`](https://crates.io/crates/specta)</sup>
 /// Information about a connection.
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone)]
 pub struct ConnectionInfo {
     id: ConnectionId,
     details: ConnectionDetails,
 }
 
+/// <sup>[`serde`](https://serde.rs) | [`specta`](https://crates.io/crates/specta)</sup>
 /// Information about a connection.
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub enum ConnectionDetails {
     /// TCP server.

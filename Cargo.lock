@@ -553,6 +553,7 @@ dependencies = [
  "serde_arrays",
  "serialport",
  "specta",
+ "specta-util",
  "thiserror 2.0.9",
  "tokio",
  "tokio-serial",

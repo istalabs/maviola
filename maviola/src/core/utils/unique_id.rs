@@ -3,11 +3,14 @@ use std::fmt::{Debug, Formatter};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+/// <sup>[`serde`](https://serde.rs) | [`specta`](https://crates.io/crates/specta)</sup>
 /// Unique identifier.
 ///
 /// Identifier which is guaranteed to be unique during the program run. It is intentionally kept
 /// opaque. This identifier can't be serialized or deserialized and dedicated for comparison of
 /// runtime entities like nodes or connections.
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 pub struct UniqueId {
     timestamp: u64,

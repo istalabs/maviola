@@ -5,12 +5,15 @@ use std::sync::Arc;
 use crate::core::utils::UniqueId;
 use crate::protocol::{Frame, MaybeVersioned};
 
+/// <sup>[`serde`](https://serde.rs) | [`specta`](https://crates.io/crates/specta)</sup>
 /// Connection `ID`.
 ///
 /// Identifies a particular connection.
 ///
 /// This is an opaque identifier. It can be compared for equality with other connection `ID` and
 /// used as a key in hashmaps or hashsets.
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub struct ConnectionId(UniqueId);
 

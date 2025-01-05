@@ -49,11 +49,9 @@ pub use routing::{IncomingFrame, OutgoingFrame};
 pub(crate) use routing::{IncomingFrame, OutgoingFrame};
 
 #[cfg(feature = "sync")]
-/// <sup>[`mavio`](https://crates.io/crates/mavio) | `sync`</sup>
 #[doc(inline)]
 pub use core::{Receiver, Sender};
 
 #[cfg(feature = "async")]
-/// <sup>[`mavio`](https://crates.io/crates/mavio) | `asnc`</sup>
 #[doc(inline)]
 pub use core::{AsyncReceiver, AsyncSender};
