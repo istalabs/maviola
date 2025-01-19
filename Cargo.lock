@@ -249,16 +249,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ctor"
-version = "0.2.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32a2785755761f3ddc1492979ce1e48d2c00d09311c39e4466429188f3dd6501"
-dependencies = [
- "quote",
- "syn",
-]
-
-[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -522,9 +512,9 @@ dependencies = [
 
 [[package]]
 name = "mavio"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f4e304c5bccc3b52ebd49a814ecaca3c59e04daba10e656446b0372c456a77d"
+checksum = "9d46f777a9450e837b09a3be8d09d9e038f95104686e3b0e6764433fce95fc5a"
 dependencies = [
  "bitflags 2.8.0",
  "crc-any",
@@ -576,9 +566,9 @@ dependencies = [
 
 [[package]]
 name = "mavspec"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0799040d56aeef168e5d40564b8015301f2e0903c57f22d165be4f7c879bd5e"
+checksum = "682b57f808411b3a508aa471d3d498c7687df0fcc67476807894bc416a9064d8"
 dependencies = [
  "mavspec_rust_derive",
  "mavspec_rust_gen",
@@ -587,9 +577,9 @@ dependencies = [
 
 [[package]]
 name = "mavspec_rust_derive"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "783bf336d4a28d55a94c67bc6a91ea25c0d97db9f8a0209c902d90bdb657137b"
+checksum = "18853be7e87ff4c13da32232608f9cab0e1689ff44661836370f20f5d3b5512f"
 dependencies = [
  "crc-any",
  "heck",
@@ -601,9 +591,9 @@ dependencies = [
 
 [[package]]
 name = "mavspec_rust_gen"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01f2fb8a2e5244c02de671e81bf0a4fdf8cfa5237dccb20473ae30f83a563a1b"
+checksum = "bad8eea16b12f7d2e2ff49a0a6756f5655ac3eea7d6bcbed55cb92783a216797"
 dependencies = [
  "base64",
  "cargo-manifest",
@@ -621,9 +611,9 @@ dependencies = [
 
 [[package]]
 name = "mavspec_rust_spec"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c49ff7d78760fdf2f14ce6066471722f64f3e2d7009f0ccca0fd39c6c02e5a02"
+checksum = "2dd2e2b22f99e343b4882016952737e8fc0f5d6457417ad8078589e3f934b744"
 dependencies = [
  "bitflags 2.8.0",
  "serde",
@@ -891,9 +881,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.135"
+version = "1.0.136"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b0d7ba2887406110130a978386c4e1befb98c674b4fba677954e4db976630d9"
+checksum = "336a0c23cf42a38d9eaa7cd22c7040d04e1228a19a933890805ffd00a16437d2"
 dependencies = [
  "itoa",
  "memchr",
@@ -961,9 +951,9 @@ dependencies = [
 
 [[package]]
 name = "specta"
-version = "2.0.0-rc.20"
+version = "2.0.0-rc.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ccbb212565d2dc177bc15ecb7b039d66c4490da892436a4eee5b394d620c9bc"
+checksum = "ab7f01e9310a820edd31c80fde3cae445295adde21a3f9416517d7d65015b971"
 dependencies = [
  "specta-macros",
  "thiserror 1.0.69",
@@ -971,9 +961,9 @@ dependencies = [
 
 [[package]]
 name = "specta-macros"
-version = "2.0.0-rc.17"
+version = "2.0.0-rc.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68999d29816965eb9e5201f60aec02a76512139811661a7e8e653abc810b8f72"
+checksum = "c0074b9e30ed84c6924eb63ad8d2fe71cdc82628525d84b1fcb1f2fd40676517"
 dependencies = [
  "Inflector",
  "proc-macro2",
@@ -983,14 +973,12 @@ dependencies = [
 
 [[package]]
 name = "specta-util"
-version = "0.0.7"
+version = "0.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8113d65b58a6de3184b01d6df9e50b6d4bbe7f724251f576d84f23228824456"
+checksum = "125d245883e3f46d9bdec8a226030d80760aa57da1ffd21ea5591a890256c2f0"
 dependencies = [
- "ctor",
  "serde",
  "specta",
- "specta-macros",
 ]
 
 [[package]]

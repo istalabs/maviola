@@ -44,7 +44,7 @@ pub use mavio::utils::MavSha256;
 ///
 /// # Derive macros from [MAVSpec](https://crates.io/crates/mavspec)
 ///
-/// These macros allow to derive [`Dialect`], [`Message`] and MAVLink enums.
+/// These macros allow to derive [`Dialect`], [`Message`], and MAVLink enums.
 ///
 /// [`Dialect`]: crate::protocol::Dialect
 /// [`Message`]: crate::protocol::Message
