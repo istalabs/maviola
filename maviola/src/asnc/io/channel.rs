@@ -1,5 +1,8 @@
 use tokio::io::{AsyncRead, AsyncWrite};
 
+use mavio::error::IoErrorKind;
+use mavio::io::{TokioReader, TokioWriter};
+
 use crate::asnc::consts::{
     CHANNEL_STOP_JOIN_ATTEMPTS, CHANNEL_STOP_JOIN_POOLING_INTERVAL, CHANNEL_STOP_POOLING_INTERVAL,
 };
@@ -105,7 +108,7 @@ impl<
         let write_handler = {
             let info = info.clone();
             let send_handler = self.send_handler;
-            let frame_writer = AsyncSender::new(self.writer);
+            let frame_writer = AsyncSender::new(TokioWriter::new(self.writer));
 
             tokio::spawn(async move { Self::write_handler(info, send_handler, frame_writer).await })
         };
@@ -115,7 +118,7 @@ impl<
             let state = state.clone();
             let info = info.clone();
             let producer = self.producer;
-            let frame_reader = AsyncReceiver::new(self.reader);
+            let frame_reader = AsyncReceiver::new(TokioReader::new(self.reader));
 
             tokio::spawn(async move {
                 Self::read_handler(state, conn_state, info, producer, frame_reader).await
@@ -136,7 +139,7 @@ impl<
     async fn write_handler(
         info: ChannelInfo,
         mut send_handler: OutgoingFrameHandler<V>,
-        mut frame_writer: AsyncSender<W, V>,
+        mut frame_writer: AsyncSender<std::io::Error, TokioWriter<W>, V>,
     ) -> Result<()> {
         loop {
             let out_frame = match send_handler.recv().await {
@@ -156,8 +159,10 @@ impl<
                 if let Err(err) = frame_writer.send(out_frame.frame()).await {
                     let err = Error::from(err);
                     if let Error::Io(err) = err {
-                        if let std::io::ErrorKind::TimedOut = err.as_ref().kind() {
-                            continue;
+                        if let IoErrorKind::Std(err_kind) = err.kind() {
+                            if let std::io::ErrorKind::TimedOut = err_kind {
+                                continue;
+                            }
                         }
                         return Err(Error::Io(err));
                     }
@@ -173,7 +178,7 @@ impl<
         conn_state: Closable,
         info: ChannelInfo,
         producer: IncomingFrameProducer<V>,
-        mut frame_reader: AsyncReceiver<R, V>,
+        mut frame_reader: AsyncReceiver<std::io::Error, TokioReader<R>, V>,
     ) -> Result<()> {
         loop {
             if conn_state.is_closed() || state.is_closed() {
@@ -185,8 +190,10 @@ impl<
                 Err(err) => {
                     let err = Error::from(err);
                     if let Error::Io(err) = err {
-                        if let std::io::ErrorKind::TimedOut = err.as_ref().kind() {
-                            continue;
+                        if let IoErrorKind::Std(err_kind) = err.kind() {
+                            if let std::io::ErrorKind::TimedOut = err_kind {
+                                continue;
+                            }
                         }
                         return Err(Error::Io(err));
                     }

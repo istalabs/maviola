@@ -1,7 +1,7 @@
 [package]
 name = "maviola"
 description = "High-level MAVLink communication library with support for essential micro-services."
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 authors = ["Mykhailo Ziatin <ziatin@mathwithoutend.org>"]
 repository = "https://gitlab.com/mavka/libs/maviola"
@@ -29,8 +29,8 @@ path = "src/lib.rs"
 ###########################################################
 [dependencies]
 log = "0.4.21"
-mavio = { version = "0.3.5", features = ["extras", "minimal", "sha2", "std"] }
-mavspec = { version = "0.4.6", features = ["std", "rust"], optional = true }
+mavio = { version = "0.4.1", features = ["extras", "minimal", "sha2", "std"] }
+mavspec = { version = "0.4.8", features = ["std", "rust"], optional = true }
 portpicker = "0.1.1"
 serde = { version = "1.0.197", default-features = false, features = ["derive"], optional = true }
 serde_arrays = { version = "0.1.0", default-features = false, optional = true }
@@ -82,7 +82,7 @@ async = [
     "dep:tokio-stream",
     "dep:tokio-util",
     "dep:tokio-serial",
-    "mavio/async"
+    "mavio/tokio"
 ]
 ## Enables serde support.
 serde = [

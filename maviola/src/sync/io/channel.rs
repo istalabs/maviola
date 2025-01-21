@@ -1,6 +1,9 @@
 use std::io::{Read, Write};
 use std::thread;
 
+use mavio::error::IoErrorKind;
+use mavio::io::{StdIoReader, StdIoWriter};
+
 use crate::core::io::{ChannelInfo, ConnectionInfo, IncomingFrame};
 use crate::core::io::{Receiver, Sender};
 use crate::core::utils::{Closable, SharedCloser};
@@ -101,7 +104,7 @@ impl<V: MaybeVersioned, R: Read + Send + 'static, W: Write + Send + 'static> Cha
         let write_handler = {
             let info = info.clone();
             let send_handler = self.send_handler;
-            let frame_writer = Sender::new(self.writer);
+            let frame_writer = Sender::new(StdIoWriter::new(self.writer));
 
             thread::spawn(move || Self::write_handler(info, send_handler, frame_writer))
         };
@@ -111,7 +114,7 @@ impl<V: MaybeVersioned, R: Read + Send + 'static, W: Write + Send + 'static> Cha
             let state = state.clone();
             let info = info.clone();
             let producer = self.producer;
-            let frame_reader = Receiver::new(self.reader);
+            let frame_reader = Receiver::new(StdIoReader::new(self.reader));
 
             thread::spawn(move || {
                 Self::read_handler(state, conn_state, info, producer, frame_reader)
@@ -132,7 +135,7 @@ impl<V: MaybeVersioned, R: Read + Send + 'static, W: Write + Send + 'static> Cha
     fn write_handler(
         info: ChannelInfo,
         send_handler: OutgoingFrameHandler<V>,
-        mut frame_writer: Sender<W, V>,
+        mut frame_writer: Sender<std::io::Error, StdIoWriter<W>, V>,
     ) -> Result<()> {
         loop {
             let out_frame = match send_handler.recv() {
@@ -152,8 +155,10 @@ impl<V: MaybeVersioned, R: Read + Send + 'static, W: Write + Send + 'static> Cha
                 if let Err(err) = frame_writer.send(out_frame.frame()) {
                     let err = Error::from(err);
                     if let Error::Io(err) = err {
-                        if let std::io::ErrorKind::TimedOut = err.as_ref().kind() {
-                            continue;
+                        if let IoErrorKind::Std(err_kind) = err.kind() {
+                            if let std::io::ErrorKind::TimedOut = err_kind {
+                                continue;
+                            }
                         }
                         return Err(Error::Io(err));
                     }
@@ -169,7 +174,7 @@ impl<V: MaybeVersioned, R: Read + Send + 'static, W: Write + Send + 'static> Cha
         conn_state: Closable,
         info: ChannelInfo,
         producer: IncomingFrameProducer<V>,
-        mut frame_reader: Receiver<R, V>,
+        mut frame_reader: Receiver<std::io::Error, StdIoReader<R>, V>,
     ) -> Result<()> {
         loop {
             if conn_state.is_closed() || state.is_closed() {
@@ -181,8 +186,10 @@ impl<V: MaybeVersioned, R: Read + Send + 'static, W: Write + Send + 'static> Cha
                 Err(err) => {
                     let err = Error::from(err);
                     if let Error::Io(err) = err {
-                        if let std::io::ErrorKind::TimedOut = err.as_ref().kind() {
-                            continue;
+                        if let IoErrorKind::Std(err_kind) = err.kind() {
+                            if let std::io::ErrorKind::TimedOut = err_kind {
+                                continue;
+                            }
                         }
                         return Err(Error::Io(err));
                     }

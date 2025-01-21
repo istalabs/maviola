@@ -423,9 +423,9 @@ checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
 name = "indexmap"
-version = "2.7.0"
+version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62f822373a4fe84d4bb149bf54e584a7f4abec90e072ed49cda0edea5b95471f"
+checksum = "8c9c992b02b5b4c94ea26e32fe5bccb7aa7d9f390ab5c1221ff895bc7ea8b652"
 dependencies = [
  "equivalent",
  "hashbrown",
@@ -512,9 +512,9 @@ dependencies = [
 
 [[package]]
 name = "mavio"
-version = "0.3.5"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d46f777a9450e837b09a3be8d09d9e038f95104686e3b0e6764433fce95fc5a"
+checksum = "7114ef6a984276018b30fa052b740ecb43057aca03546582b7e3b42717edb1d4"
 dependencies = [
  "bitflags 2.8.0",
  "crc-any",
@@ -531,7 +531,7 @@ dependencies = [
 
 [[package]]
 name = "maviola"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -566,9 +566,9 @@ dependencies = [
 
 [[package]]
 name = "mavspec"
-version = "0.4.6"
+version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "682b57f808411b3a508aa471d3d498c7687df0fcc67476807894bc416a9064d8"
+checksum = "c83a08f725a46ae9b6ed74e5e96472fa306e1e0ca6297eda29910b1ee9bb50d4"
 dependencies = [
  "mavspec_rust_derive",
  "mavspec_rust_gen",
@@ -577,9 +577,9 @@ dependencies = [
 
 [[package]]
 name = "mavspec_rust_derive"
-version = "0.4.6"
+version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18853be7e87ff4c13da32232608f9cab0e1689ff44661836370f20f5d3b5512f"
+checksum = "83d0b0d29a22a7bba73f9245d6473bcbee73ced89927faaf14384691ed68fe1e"
 dependencies = [
  "crc-any",
  "heck",
@@ -591,9 +591,9 @@ dependencies = [
 
 [[package]]
 name = "mavspec_rust_gen"
-version = "0.4.6"
+version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bad8eea16b12f7d2e2ff49a0a6756f5655ac3eea7d6bcbed55cb92783a216797"
+checksum = "84a0bb6ef8c9ca07d2aff70d330fb0c083748db41495e23af69c3290627c9b25"
 dependencies = [
  "base64",
  "cargo-manifest",
@@ -611,12 +611,13 @@ dependencies = [
 
 [[package]]
 name = "mavspec_rust_spec"
-version = "0.4.6"
+version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2dd2e2b22f99e343b4882016952737e8fc0f5d6457417ad8078589e3f934b744"
+checksum = "926109f60746507dfc5953b053b89d4bea5f79b4d55770206a00a79d9f6275e7"
 dependencies = [
  "bitflags 2.8.0",
  "serde",
+ "serde_arrays",
  "specta",
  "specta-util",
  "tbytes",
@@ -881,9 +882,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.136"
+version = "1.0.137"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "336a0c23cf42a38d9eaa7cd22c7040d04e1228a19a933890805ffd00a16437d2"
+checksum = "930cfb6e6abf99298aaad7d29abbef7a9999a9a8806a40088f55f0dcec03146b"
 dependencies = [
  "itoa",
  "memchr",
