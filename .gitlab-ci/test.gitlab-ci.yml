@@ -34,7 +34,7 @@ include:
   extends: .executor:rust  # from local: "/.gitlab-ci/executors.gitlab-ci.yml"
   script:
     # Build documentation
-    - cargo doc --no-deps --features sync,async,unstable,unsafe,derive,test_utils
+    - cargo doc --no-deps --all-features
 
 # ---------------------------------------------------------
 #    [TEST] Test project for various features
