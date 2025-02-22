@@ -77,6 +77,7 @@ use crate::prelude::*;
 /// Create a synchronous TCP server node:
 ///
 /// ```rust,no_run
+/// # #[cfg(feature = "sync")] {
 /// use maviola::prelude::*;
 /// use maviola::sync::prelude::*;
 ///
@@ -93,11 +94,14 @@ use crate::prelude::*;
 ///
 /// // Activate node to start sending heartbeats
 /// node.activate().unwrap();
+/// # }
 /// ```
 ///
 /// Create an asynchronous TCP server node:
 ///
 /// ```rust,no_run
+/// # #[cfg(not(feature = "async"))] fn main() {}
+/// # #[cfg(feature = "async")]
 /// # #[tokio::main(flavor = "current_thread")] async fn main() {
 /// use maviola::prelude::*;
 /// use maviola::asnc::prelude::*;
@@ -122,6 +126,7 @@ use crate::prelude::*;
 /// signed incoming messages:
 ///
 /// ```rust,no_run
+/// # #[cfg(feature = "sync")] {
 /// use maviola::protocol::dialects::minimal::messages::Heartbeat;
 /// use maviola::prelude::*;
 /// use maviola::sync::prelude::*;
@@ -148,11 +153,14 @@ use crate::prelude::*;
 /// // Incoming frames are always correctly signed
 /// let (frame, _) = node.recv_frame().unwrap();
 /// assert!(frame.is_signed());
+/// # }
 /// ```
 ///
 /// Create an asynchronous node with a network containing two TCP servers:
 ///
 /// ```rust,no_run
+/// # #[cfg(not(feature = "async"))] fn main() {}
+/// # #[cfg(feature = "async")]
 /// # #[tokio::main] async fn main() {
 /// use maviola::prelude::*;
 /// use maviola::asnc::prelude::*;

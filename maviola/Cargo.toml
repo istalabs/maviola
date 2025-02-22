@@ -38,7 +38,7 @@ thiserror = "2.0.9"
 serialport = { version = "4.6.1", optional = true }
 
 # Mavka
-mavio = { version = "0.5.3", features = ["extras", "dlct-minimal", "sha2", "std"] }
+mavio = { version = "0.5.4", features = ["extras", "dlct-minimal", "sha2", "std"] }
 
 # Async dependencies
 async-stream = { version = "0.3.5", optional = true }
@@ -49,7 +49,7 @@ tokio-util = { version = "0.7.10", optional = true }
 tokio-serial = { version = "5.4.4", optional = true }
 
 # Documentation
-document-features = { version = "0.2.10", optional = true }
+document-features = "0.2.10"
 
 [dev-dependencies]
 env_logger = "0.11.3"
@@ -76,7 +76,6 @@ full = [
     "specta",
     "dlct-all",
     "msrv-all",
-    "msrv-utils-all",
     "definitions",
 ]
 
@@ -406,7 +405,7 @@ required-features = ["async"]
 [[example]]
 name = "async_file_rw"
 test = true
-required-features = ["sync"]
+required-features = ["async"]
 
 [[example]]
 name = "async_serial_fc"

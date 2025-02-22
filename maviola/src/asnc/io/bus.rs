@@ -11,6 +11,7 @@ use crate::asnc::prelude::*;
 use crate::prelude::*;
 
 #[cfg(doc)]
+#[cfg(feature = "unstable")]
 use crate::asnc::io::{Channel, Connection};
 
 /// <sup>[`async`](crate::asnc)</sup>

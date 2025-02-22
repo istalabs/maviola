@@ -13,6 +13,7 @@ use crate::prelude::*;
 /// Create a synchronous node that writes to a file:
 ///
 /// ```rust,no_run
+/// # #[cfg(feature = "sync")] {
 /// use maviola::prelude::*;
 ///
 /// let path = "/tmp/maviola.bin";
@@ -26,6 +27,7 @@ use crate::prelude::*;
 ///             FileWriter::new(path)    // Configure file reader connection
 ///                 .unwrap()
 ///         ).build().unwrap();
+/// # }
 /// ```
 ///
 /// # Usage
@@ -33,6 +35,8 @@ use crate::prelude::*;
 /// Create an asynchronous node that writes to a file:
 ///
 /// ```rust,no_run
+/// # #[cfg(not(feature = "async"))] fn main() {}
+/// # #[cfg(feature = "async")]
 /// # #[tokio::main] async fn main() {
 /// use maviola::prelude::*;
 ///

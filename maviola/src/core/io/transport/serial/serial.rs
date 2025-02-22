@@ -12,6 +12,7 @@ use crate::prelude::*;
 /// Create a synchronous node that connects to a port:
 ///
 /// ```rust,no_run
+/// # #[cfg(feature = "sync")] {
 /// use maviola::prelude::*;
 ///
 /// let path = "/dev/tty.usbmodem101";
@@ -26,11 +27,14 @@ use crate::prelude::*;
 ///             SerialPort::new(path, baud_rate)    // Configure serial port connection
 ///                 .unwrap()
 ///         ).build().unwrap();
+/// # }
 /// ```
 ///
 /// Create an asynchronous node that reads from a file:
 ///
 /// ```rust,no_run
+/// # #[cfg(not(feature = "async"))] fn main() {}
+/// # #[cfg(feature = "async")]
 /// # #[tokio::main] async fn main() {
 /// use maviola::prelude::*;
 ///

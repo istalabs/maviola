@@ -183,6 +183,7 @@ mod tests {
     use std::time::Duration;
 
     #[test]
+    #[cfg(feature = "unstable")]
     fn standalone_connections() {
         let addr = format!("127.0.0.1:{}", pick_unused_port().unwrap());
 

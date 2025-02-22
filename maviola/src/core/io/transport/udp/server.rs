@@ -19,6 +19,7 @@ use crate::prelude::*;
 /// Create a synchronous UDP server node:
 ///
 /// ```rust,no_run
+/// # #[cfg(feature = "sync")] {
 /// use maviola::prelude::*;
 ///
 /// let addr = "127.0.0.1:14500";
@@ -32,11 +33,14 @@ use crate::prelude::*;
 ///             UdpServer::new(addr)    // Configure UDP server connection
 ///                 .unwrap()
 ///         ).build().unwrap();
+/// # }
 /// ```
 ///
 /// Create an asynchronous UDP server node:
 ///
 /// ```rust,no_run
+/// # #[cfg(not(feature = "async"))] fn main() {}
+/// # #[cfg(feature = "async")]
 /// # #[tokio::main] async fn main() {
 /// use maviola::prelude::*;
 ///

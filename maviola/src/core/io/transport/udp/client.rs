@@ -20,6 +20,7 @@ use crate::prelude::*;
 /// Create a synchronous UDP client node:
 ///
 /// ```rust,no_run
+/// # #[cfg(feature = "sync")] {
 /// use maviola::prelude::*;
 ///
 /// let addr = "127.0.0.1:14500";
@@ -36,11 +37,14 @@ use crate::prelude::*;
 ///                 .with_host(host)        // set bind host (random port will be used for bind addr)
 ///                 .unwrap()
 ///         ).build().unwrap();
+/// # }
 /// ```
 ///
 /// Create an asynchronous UDP client node:
 ///
 /// ```rust,no_run
+/// # #[cfg(not(feature = "async"))] fn main() {}
+/// # #[cfg(feature = "async")]
 /// # #[tokio::main] async fn main() {
 /// use maviola::prelude::*;
 ///

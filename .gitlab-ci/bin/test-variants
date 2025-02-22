@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#
+# Go over all significant build variants
+#
+
+set -o errexit -o nounset -o pipefail
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+PROJECT_DIR=$(realpath "${SCRIPT_DIR}/../../")
+
+HL='\033[0;35m'
+NC='\033[0m'
+
+function print() {
+  echo -e "$HL$1$NC"
+}
+
+declare -a commands=(
+  "cargo test --package maviola --no-default-features"
+  "cargo test --package maviola --no-default-features --features sync"
+  "cargo test --package maviola --no-default-features --features async"
+  "cargo test --package maviola --no-default-features --features full"
+  "cargo test --package maviola --all-features"
+)
+
+pushd "${PROJECT_DIR}"
+  for command in "${commands[@]}"
+  do
+     print "$command"
+     $command
+  done
+popd

@@ -10,6 +10,7 @@ use crate::prelude::*;
 use crate::sync::prelude::*;
 
 #[cfg(doc)]
+#[cfg(feature = "unstable")]
 use crate::sync::io::{Channel, Connection};
 
 /// <sup>[`sync`](crate::sync)</sup>

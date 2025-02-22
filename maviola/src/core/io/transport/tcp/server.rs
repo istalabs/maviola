@@ -18,6 +18,7 @@ use crate::prelude::*;
 /// Create a synchronous TCP server node:
 ///
 /// ```rust,no_run
+/// # #[cfg(feature = "sync")] {
 /// use maviola::prelude::*;
 ///
 /// let addr = "127.0.0.1:5600";
@@ -31,11 +32,14 @@ use crate::prelude::*;
 ///             TcpServer::new(addr)    // Configure TCP server connection
 ///                 .unwrap()
 ///         ).build().unwrap();
+/// # }
 /// ```
 ///
 /// Create an asynchronous TCP server node:
 ///
 /// ```rust,no_run
+/// # #[cfg(not(feature = "async"))] fn main() {}
+/// # #[cfg(feature = "async")]
 /// # #[tokio::main] async fn main() {
 /// use maviola::prelude::*;
 ///

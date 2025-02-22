@@ -56,8 +56,10 @@ include:
   parallel:
     matrix:
       - TEST_PARAMS:
-          - "--no-default-features"
-          - "--features sync,async,unstable,unsafe"
+          - "--no-default-features --features sync"
+          - "--no-default-features --features async"
+          - "--features full"
+          - "--features full,msrv-utils-all,,unstable,unsafe"
 
 # ---------------------------------------------------------
 #      [TEST] Dry run for publishing to Crates.io

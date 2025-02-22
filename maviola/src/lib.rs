@@ -31,10 +31,12 @@ flag.
 Here is a simple example of a synchronous TCP server:
 
 ```rust,no_run
+# #[cfg(not(feature = "sync"))] fn main() {}
+# #[cfg(feature = "sync")]
+# fn main() -> maviola::error::Result<()> {
 use maviola::prelude::*;
 use maviola::sync::prelude::*;
 
-# fn main() -> Result<()> {
 // Create a synchronous MAVLink node
 // with MAVLink protocol version set to `V2`
 let server = Node::sync::<V2>()
@@ -135,6 +137,8 @@ The metadata is available at [`protocol::definitions`].
     html_logo_url = "https://gitlab.com/mavka/libs/maviola/-/raw/main/avatar.png?ref_type=heads",
     html_favicon_url = "https://gitlab.com/mavka/libs/maviola/-/raw/main/avatar.png?ref_type=heads"
 )]
+#![cfg_attr(not(all(feature = "sync", feature = "async")), allow(unused_imports))]
+#![cfg_attr(not(all(feature = "sync", feature = "async")), allow(dead_code))]
 
 #[cfg(feature = "async")]
 pub mod asnc;
@@ -149,6 +153,7 @@ pub mod sync;
 // pub use protocol::{default_dialect, derive, dialects, DefaultDialect};
 
 #[cfg(any(doc, doctest, rustdoc))]
+#[cfg(all(feature = "sync", feature = "async"))]
 pub mod docs;
 
 #[cfg(feature = "test_utils")]

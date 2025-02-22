@@ -42,7 +42,7 @@ use crate::protocol::MessageId;
 pub use crate::error::Error as CoreError;
 /// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
 #[doc(inline)]
-#[cfg(feature = "msrv-utils-mission")]
+#[cfg(all(feature = "msrv-utils-mission", feature = "unstable"))]
 pub use mavio::error::MissionError;
 /// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
 #[doc(inline)]
@@ -121,7 +121,7 @@ pub enum Error {
     Serial(#[from] SerialError),
 
     /// Mission-related errors.
-    #[cfg(feature = "msrv-utils-mission")]
+    #[cfg(all(feature = "msrv-utils-mission", feature = "unstable"))]
     #[error("mission error: {0:?}")]
     Mission(#[from] MissionError),
 
@@ -302,7 +302,7 @@ impl From<mavio::error::Error> for Error {
             mavio::error::Error::Io(err) => Self::Io(err),
             mavio::error::Error::Frame(err) => Self::Frame(err),
             mavio::error::Error::Spec(err) => Self::Spec(err),
-            #[cfg(feature = "msrv-utils-mission")]
+            #[cfg(all(feature = "msrv-utils-mission", feature = "unstable"))]
             mavio::error::Error::Mission(err) => Self::Mission(err),
         }
     }

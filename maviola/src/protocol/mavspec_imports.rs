@@ -49,7 +49,6 @@ pub use mavspec::rust::dialects;
 /// Re-exported from [`mavspec::rust::default_dialect`].
 ///
 /// ---
-#[cfg(feature = "dlct-minimal")]
 #[doc(inline)]
 pub use mavspec::rust::default_dialect;
 
@@ -72,7 +71,6 @@ pub use mavspec::rust::default_dialect;
 /// Re-exported from [`mavspec::rust::DefaultDialect`].
 ///
 /// ---
-#[cfg(feature = "dlct-minimal")]
 #[doc(inline)]
 pub use mavspec::rust::DefaultDialect;
 

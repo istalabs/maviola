@@ -21,6 +21,7 @@ use crate::prelude::*;
 /// Create a synchronous node with a network containing two TCP servers:
 ///
 /// ```rust,no_run
+/// # #[cfg(feature = "sync")] {
 /// use std::time::Duration;
 /// use maviola::core::io::RetryStrategy;
 ///
@@ -45,11 +46,14 @@ use crate::prelude::*;
 ///             .stop_on_node_down(true)
 ///     )
 ///     .build().unwrap();
+/// # }
 /// ```
 ///
 /// Create an asynchronous node with a network containing a TCP server and a TCP client:
 ///
 /// ```rust,no_run
+/// # #[cfg(not(feature = "async"))] fn main() {}
+/// # #[cfg(feature = "async")]
 /// # #[tokio::main] async fn main() {
 /// use std::time::Duration;
 /// use maviola::core::io::RetryStrategy;

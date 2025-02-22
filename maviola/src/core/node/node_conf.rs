@@ -48,6 +48,8 @@ impl NodeConf<Proxy, Versionless, Unset> {
     /// Create a synchronous node configuration.
     ///
     /// ```rust
+    /// # #[cfg(feature = "sync")]
+    /// # {
     /// use maviola::core::node::NodeConf;
     /// use maviola::core::io::TcpClient;
     ///
@@ -60,11 +62,13 @@ impl NodeConf<Proxy, Versionless, Unset> {
     ///
     /// assert_eq!(node.system_id(), 10);
     /// assert_eq!(node.component_id(), 42);
+    /// # }
     /// ```
     ///
     /// Create a configuration for unidentified node.
     ///
     /// ```rust
+    /// # #[cfg(feature = "sync")] {
     /// use maviola::core::node::NodeConf;
     /// use maviola::core::io::TcpClient;
     ///
@@ -72,6 +76,7 @@ impl NodeConf<Proxy, Versionless, Unset> {
     ///     .sync()
     ///     .connection(TcpClient::new("localhost:5600").unwrap())
     ///     .conf();
+    /// # }
     /// ```
     pub fn builder() -> NodeBuilder<Unset, Unset, Versionless, Unset, Unset> {
         NodeBuilder::new()
