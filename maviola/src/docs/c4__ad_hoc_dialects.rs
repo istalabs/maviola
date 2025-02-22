@@ -17,8 +17,9 @@ message `ID` namespace to ad-hoc dialects, you may achieve interesting results.
 Let's define a simple "small_talk" dialect:
 
 ```rust,no_run
-use maviola::dialects::minimal::messages::Heartbeat;
+use maviola::protocol::dialects::minimal::messages::Heartbeat;
 use maviola::protocol::derive::{Dialect, Enum, Message};
+use maviola::protocol::mavspec;
 
 /// Communication mood.
 #[repr(u8)]

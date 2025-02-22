@@ -122,7 +122,7 @@ use crate::prelude::*;
 /// signed incoming messages:
 ///
 /// ```rust,no_run
-/// use maviola::dialects::minimal::messages::Heartbeat;
+/// use maviola::protocol::dialects::minimal::messages::Heartbeat;
 /// use maviola::prelude::*;
 /// use maviola::sync::prelude::*;
 ///

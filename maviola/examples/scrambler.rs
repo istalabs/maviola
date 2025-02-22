@@ -1,8 +1,8 @@
 use portpicker::{pick_unused_port, Port};
 use std::time::Duration;
 
-use maviola::dialects::minimal::messages::Heartbeat;
 use maviola::error::FrameError;
+use maviola::protocol::dialects::minimal::messages::Heartbeat;
 use maviola::protocol::{
     Checksum, CrcExtra, Header, MavFrame, ProcessFrame, ProcessFrameCase, Signature, UpdateFrame,
     UpdateFrameUnsafe,

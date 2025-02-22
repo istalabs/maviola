@@ -4,8 +4,8 @@ use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
-use maviola::dialects::minimal::enums::{MavAutopilot, MavModeFlag, MavState, MavType};
-use maviola::dialects::minimal::messages::Heartbeat;
+use maviola::protocol::dialects::minimal::enums::{MavAutopilot, MavModeFlag, MavState, MavType};
+use maviola::protocol::dialects::minimal::messages::Heartbeat;
 
 use maviola::prelude::*;
 use maviola::sync::prelude::*;

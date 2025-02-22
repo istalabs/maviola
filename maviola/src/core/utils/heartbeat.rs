@@ -3,7 +3,7 @@ use crate::protocol::DialectVersion;
 pub(crate) fn make_heartbeat_message(
     version: Option<DialectVersion>,
 ) -> mavio::dialects::minimal::messages::Heartbeat {
-    use crate::dialects::minimal as dialect;
+    use crate::protocol::dialects::minimal as dialect;
 
     dialect::messages::Heartbeat {
         type_: Default::default(),

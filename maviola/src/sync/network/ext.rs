@@ -75,7 +75,7 @@ mod tests {
     use crate::core::consts::SERVER_HANG_UP_TIMEOUT;
     use crate::core::io::RetryStrategy;
     use crate::core::utils::net::pick_unused_port;
-    use crate::dialects::minimal::messages::Heartbeat;
+    use crate::protocol::dialects::minimal::messages::Heartbeat;
 
     use crate::sync::prelude::*;
 

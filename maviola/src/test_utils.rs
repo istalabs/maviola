@@ -14,8 +14,9 @@ pub mod smalltalk {
     //! });
     //! ```
 
-    use crate::dialects::minimal::messages::Heartbeat;
     use crate::protocol::derive::{Dialect, Enum, Message};
+    use crate::protocol::dialects::minimal::messages::Heartbeat;
+    use crate::protocol::mavspec;
 
     /// Communication mood.
     #[repr(u8)]

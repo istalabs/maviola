@@ -185,7 +185,7 @@ in our network. Let's respond to a heartbeat with a heartbeat:
 #    .connection(TcpServer::new("127.0.0.1:5600").unwrap())
 #    .build().unwrap();
 #
-use maviola::dialects::minimal::messages::Heartbeat;
+use maviola::protocol::dialects::minimal::messages::Heartbeat;
 
 for event in node.events() {
     if let Event::Frame(frame, callback) = event {
@@ -213,7 +213,7 @@ our node's system and component `ID`s and a proper MAVLink frame sequence. We ca
 #    .connection(TcpServer::new("127.0.0.1:5600").unwrap())
 #    .build().unwrap();
 #
-use maviola::dialects::minimal::messages::Heartbeat;
+use maviola::protocol::dialects::minimal::messages::Heartbeat;
 
 for event in node.events() {
     if let Event::Frame(frame, callback) = event {
@@ -241,8 +241,8 @@ use our node's [`send`] method:
 #    .connection(TcpServer::new("127.0.0.1:5600").unwrap())
 #    .build().unwrap();
 #
-use maviola::dialects::minimal::messages::Heartbeat;
-use maviola::dialects::minimal::enums;
+use maviola::protocol::dialects::minimal::messages::Heartbeat;
+use maviola::protocol::dialects::minimal::enums;
 
 let msg = Heartbeat {
     type_: enums::MavType::FixedWing,

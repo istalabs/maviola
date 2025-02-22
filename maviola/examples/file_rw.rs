@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 
-use maviola::dialects::minimal as dialect;
+use maviola::protocol::dialects::minimal as dialect;
 
 use maviola::prelude::*;
 use maviola::sync::prelude::*;

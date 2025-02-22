@@ -42,6 +42,10 @@ use crate::protocol::MessageId;
 pub use crate::error::Error as CoreError;
 /// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
 #[doc(inline)]
+#[cfg(feature = "msrv-utils-mission")]
+pub use mavio::error::MissionError;
+/// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
+#[doc(inline)]
 pub use mavio::error::{
     ChecksumError, FrameError, IncompatFlagsError, IoError, SignatureError, SpecError, VersionError,
 };
@@ -115,6 +119,11 @@ pub enum Error {
     /// Serial port error.
     #[error("serial port error: {0:?}")]
     Serial(#[from] SerialError),
+
+    /// Mission-related errors.
+    #[cfg(feature = "msrv-utils-mission")]
+    #[error("mission error: {0:?}")]
+    Mission(#[from] MissionError),
 
     /// Other errors.
     #[error("error: {0}")]
@@ -293,6 +302,8 @@ impl From<mavio::error::Error> for Error {
             mavio::error::Error::Io(err) => Self::Io(err),
             mavio::error::Error::Frame(err) => Self::Frame(err),
             mavio::error::Error::Spec(err) => Self::Spec(err),
+            #[cfg(feature = "msrv-utils-mission")]
+            mavio::error::Error::Mission(err) => Self::Mission(err),
         }
     }
 }

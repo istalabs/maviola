@@ -97,7 +97,7 @@ specify this dialect during node construction using `dialect` method and
 ```rust,no_run
 # use maviola::prelude::*;
 # use maviola::sync::prelude::*;
-use maviola::dialects::Minimal;
+use maviola::protocol::dialects::Minimal;
 
 let node = Node::builder()
     .dialect::<Minimal>()
@@ -128,7 +128,7 @@ To add an extra dialect, simply use `add_dialect` of the node builder and our be
 # use maviola::prelude::*;
 # use maviola::sync::prelude::*;
 #
-use maviola::dialects::Minimal;
+use maviola::protocol::dialects::Minimal;
 
 let node = Node::builder()
     .add_dialect::<Minimal>()
@@ -177,7 +177,7 @@ easier and specific, is explained in [Ad-hoc Dialects](crate::docs::c4__ad_hoc_d
 
 <em>[← Asynchronous API](crate::docs::a4__async_api) | [Message Signing →](crate::docs::b2__signing)</em>
 
-[`Minimal`]: crate::dialects::Minimal
+[`Minimal`]: crate::protocol::dialects::Minimal
 [`dialect`]: crate::core::node::Node::dialect
 [`known_dialects`]: crate::core::node::Node::known_dialects
  */

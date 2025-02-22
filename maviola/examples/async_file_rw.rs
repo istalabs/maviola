@@ -2,7 +2,7 @@ use std::fs::remove_file;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use maviola::dialects::minimal as dialect;
+use maviola::protocol::dialects::minimal as dialect;
 
 use maviola::asnc::prelude::*;
 use maviola::prelude::*;

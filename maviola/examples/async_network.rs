@@ -1,7 +1,7 @@
 use portpicker::{pick_unused_port, Port};
 use std::time::Duration;
 
-use maviola::dialects::minimal::messages::Heartbeat;
+use maviola::protocol::dialects::minimal::messages::Heartbeat;
 use maviola::protocol::ComponentId;
 
 use maviola::asnc::prelude::*;

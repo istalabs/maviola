@@ -184,7 +184,7 @@ Once node is created, we can send messages:
 #    .connection(TcpServer::new("127.0.0.1:5600").unwrap())
 #    .build().unwrap();
 #
-use maviola::dialects::minimal::messages::Heartbeat;
+use maviola::protocol::dialects::minimal::messages::Heartbeat;
 
 node.send(&Heartbeat::default()).unwrap();
 ```
@@ -198,7 +198,7 @@ We can also send frames directly:
 #    .id(MavLinkId::new(1, 17))
 #    .connection(TcpServer::new("127.0.0.1:5600").unwrap())
 #    .build().unwrap();
-# use maviola::dialects::minimal::messages::Heartbeat;
+# use maviola::protocol::dialects::minimal::messages::Heartbeat;
 #
 let frame = node.next_frame(&Heartbeat::default()).unwrap();
 node.send_frame(&frame).unwrap();
@@ -382,7 +382,7 @@ We also can send frames of a specific protocol version:
 #    .connection(TcpServer::new("127.0.0.1:5600").unwrap())
 #    .build().unwrap();
 #
-use maviola::dialects::minimal::messages::Heartbeat;
+use maviola::protocol::dialects::minimal::messages::Heartbeat;
 
 let frame = node.next_frame_versioned::<V2>(&Heartbeat::default()).unwrap();
 node.send_frame(&frame).unwrap();
@@ -683,8 +683,8 @@ documentation for details.
 
 <em>[← Quickstart](crate::docs::a1__quickstart) | [Synchronous API →](crate::docs::a3__sync_api)</em>
 
-[`dialects`]: crate::dialects
-[`Minimal`]: crate::dialects::Minimal
+[`dialects`]: crate::protocol::dialects
+[`Minimal`]: crate::protocol::dialects::Minimal
 [`protocol`]: crate::protocol
 [`message_id`]: crate::protocol::Frame::message_id
 [`prelude`]: crate::prelude

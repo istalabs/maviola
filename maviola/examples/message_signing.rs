@@ -1,7 +1,7 @@
 use mavio::protocol::SignedLinkId;
 use portpicker::{pick_unused_port, Port};
 
-use maviola::dialects::minimal::messages::Heartbeat;
+use maviola::protocol::dialects::minimal::messages::Heartbeat;
 
 use maviola::prelude::*;
 use maviola::sync::prelude::*;

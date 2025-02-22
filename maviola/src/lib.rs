@@ -13,15 +13,15 @@ _stateful_ features of MAVLink protocol: sequencing, message signing, automatic 
 on.
 
 This library is a part of [Mavka](https://mavka.gitlab.io/home/) toolchain. It is based on
-[Mavio](https://gitlab.com/mavka/libs/mavio), a low-level MAVLink library, and compatible with
-[MAVSpec](https://gitlab.com/mavka/libs/mavspec) MAVLink dialects generator.
+[Mavio](https://crates.io/crates/mavio), a low-level MAVLink library, and compatible with
+[MAVSpec](https://crates.io/crates/mavspec) MAVLink dialects generator.
 
 ## 📖 Documentation
 
 If you want to learn how to use Maviola, start from reading [Maviola Playbook](crate::docs).
 This page contains only a brief introduction.
 
-## Usage
+# Usage
 
 Maviola provides both synchronous and asynchronous API. The synchronous API is available
 in [`sync`] module and can be enabled by `sync` feature flag. The asynchronous API is based on
@@ -71,12 +71,12 @@ Also check [Overview](crate::docs::a2__overview), [Synchronous API](crate::docs:
 and [Asynchronous API](crate::docs::a4__async_api) documentation sections for details on how to
 use different types of API.
 
-## Features
+# Features
 
 Maviola is designed to hide most of its functionality under corresponding feature flags. If you
 need certain features, you have to explicitly opt-in.
 
-### API Modes
+## API Modes
 
 * `sync` enables synchronous API (see [`sync`] module and
    [Synchronous API](crate::docs::a3__sync_api)).
@@ -86,16 +86,7 @@ need certain features, you have to explicitly opt-in.
 These features are not mutually exclusive, you can use both synchronous and asynchronous API in
 different parts of the project.
 
-### MAVLink Dialects
-
-Maviola packages standard MAVLink dialects under corresponding feature flags. It is possible
-to define your own dialects with XML message definitions using
-[MAVSpec](https://gitlab.com/mavka/libs/mavspec) or even create your ad-hoc dialects using pure
-Rust.
-
-Check [Dialects](crate::docs::a2__overview#dialects) documentation section for details.
-
-### Unstable Features
+## Unstable Features
 
 Some parts of the API are still considered to be unstable and available only under the
 `unstable` feature flag. We mark unstable and experimental entities with <sup>`⍚`</sup> in
@@ -103,11 +94,41 @@ documentation.
 
 ## Embedded Devices
 
-Maviola is based on [Mavio](https://gitlab.com/mavka/libs/mavio), a low-level library with
+Maviola is based on [Mavio](https://crates.io/crates/mavio), a low-level library with
 `no-std` support. If you are looking for a solution for embedded devices, then Mavio would
 probably be a better option.
-*/
 
+# MAVLink Protocol
+
+Protocol entities reside in the [`protocol`] module.
+
+## Dialects
+
+Maviola packages standard MAVLink dialects under corresponding feature flags. It is possible
+to define your own dialects with XML message definitions using
+[MAVSpec](https://crates.io/crates/mavspec) or even create your ad-hoc dialects using pure
+Rust.
+
+Check [Dialects](crate::docs::a2__overview#dialects) documentation section for details.
+
+## Microservices
+
+We utilise [MAVSpec](https://crates.io/crates/mavspec) ability to generate MAVLink
+[microservices](https://mavlink.io/en/services/) as sub-dialects. Use `msrv-*` feature flags to
+enable specific microservices.
+
+We also re-export additional microservice utils as [`protocol::microservices`]. You should enable
+the corresponding `msrv-utils-*` feature flag to access such functionality.
+
+## Message Definitions
+
+You may access metadata for MAVLink message definitions by enabling `definitions` feature flag.
+The metadata is available at [`protocol::definitions`].
+
+# Feature Flags
+*/
+#![doc = document_features::document_features!()]
+//
 #![warn(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![doc(
@@ -124,14 +145,12 @@ pub mod protocol;
 #[cfg(feature = "sync")]
 pub mod sync;
 
+// #[doc(inline)]
+// pub use protocol::{default_dialect, derive, dialects, DefaultDialect};
+
 #[cfg(any(doc, doctest, rustdoc))]
 pub mod docs;
 
 #[cfg(feature = "test_utils")]
 #[doc(hidden)]
 pub mod test_utils;
-
-#[doc(inline = true)]
-/// <sup>[`mavio`](https://crates.io/crates/mavio)</sup>
-/// MAVLink dialects
-pub use mavio::dialects;

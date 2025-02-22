@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use portpicker::Port;
 
-use maviola::dialects::minimal;
+use maviola::protocol::dialects::minimal;
 use maviola::protocol::{ComponentId, SystemId};
 use maviola::sync::node::Event;
 

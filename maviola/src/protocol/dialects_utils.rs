@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Formatter};
 
-use crate::dialects::Minimal;
 use crate::error::FrameError;
+use crate::protocol::dialects::Minimal;
 use crate::protocol::{DialectSpec, MessageId, MessageInfo};
 
 use crate::prelude::*;

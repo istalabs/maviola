@@ -5,8 +5,8 @@ use std::time::{Duration, SystemTime};
 
 use tokio::sync::Barrier;
 
-use maviola::dialects::minimal::enums::{MavAutopilot, MavModeFlag, MavState, MavType};
-use maviola::dialects::minimal::messages::Heartbeat;
+use maviola::protocol::dialects::minimal::enums::{MavAutopilot, MavModeFlag, MavState, MavType};
+use maviola::protocol::dialects::minimal::messages::Heartbeat;
 
 use maviola::asnc::prelude::*;
 use maviola::prelude::*;

@@ -179,7 +179,7 @@ impl<V: MaybeVersioned> Drop for Connection<V> {
 mod tests {
     use super::*;
     use crate::core::utils::net::pick_unused_port;
-    use crate::dialects::minimal::messages::Heartbeat;
+    use crate::protocol::dialects::minimal::messages::Heartbeat;
     use std::time::Duration;
 
     #[test]

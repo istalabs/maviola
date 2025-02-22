@@ -184,7 +184,7 @@ impl<
     /// Default dialect is [`DefaultDialect`]. The [`Minimal`] dialect will always remain in the
     /// list of [`NodeConf::known_dialects`] no matter what you are doing.
     ///
-    /// [`Minimal`]: crate::dialects::Minimal
+    /// [`Minimal`]: crate::protocol::dialects::Minimal
     pub fn dialect<D: Dialect>(mut self) -> Self {
         self.dialects = self.dialects.with_dialect(D::spec());
         self
@@ -205,7 +205,7 @@ impl<
     /// dialect with the name "minimal" since the canonical minimal dialect is essential for
     /// validating and encoding / decoding heartbeat messages.
     ///
-    /// [`Minimal`]: crate::dialects::Minimal
+    /// [`Minimal`]: crate::protocol::dialects::Minimal
     pub fn add_dialect<D: Dialect>(mut self) -> Self {
         self.dialects = self.dialects.with_known_dialect(D::spec());
         self
@@ -219,7 +219,7 @@ impl<
     /// **⚠** The [`Minimal`] dialect will always remain in the list of the known dialects no matter
     /// what you are doing.
     ///
-    /// [`Minimal`]: crate::dialects::Minimal
+    /// [`Minimal`]: crate::protocol::dialects::Minimal
     pub fn no_default_dialect(mut self) -> Self {
         self.dialects = self.dialects.without_default_dialect();
         self
