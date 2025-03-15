@@ -38,7 +38,7 @@ thiserror = "2.0.9"
 serialport = { version = "4.6.1", optional = true }
 
 # Mavka
-mavio = { version = "0.5.4", features = ["extras", "dlct-minimal", "sha2", "std"] }
+mavio = { version = "0.5.5", features = ["extras", "dlct-minimal", "sha2", "std"] }
 
 # Async dependencies
 async-stream = { version = "0.3.5", optional = true }
@@ -100,6 +100,11 @@ definitions = [
     "mavio/definitions",
 ]
 
+## Adds additional metadata to MAVLink entities.
+metadata = [
+    "mavio/metadata"
+]
+
 #==========================================================
 #! ## I/O
 #==========================================================
@@ -146,35 +151,65 @@ specta = [
 #! [MAVSpec](https://crates.io/crates/mavspec).
 
 ## Include `ardupilotmega` dialect
+##
+## The dialect can be found in [`protocol::dialects::ardupilotmega`] module.
 dlct-ardupilotmega = ["dlct-common", "mavio/dlct-ardupilotmega"]
 ## Include `ASLUAV` dialect
+##
+## The dialect can be found in [`protocol::dialects::asluav`] module.
 dlct-asluav = ["mavio/dlct-asluav"]
 ## Include `AVSSUAS` dialect
+##
+## The dialect can be found in [`protocol::dialects::avssuas`] module.
 dlct-avssuas = ["dlct-common", "mavio/dlct-avssuas"]
 ## Include `common` dialect
+##
+## The dialect can be found in [`protocol::dialects::common`] module.
 dlct-common = ["dlct-minimal", "mavio/dlct-common"]
 ## Include `csAirLink` dialect
+##
+## The dialect can be found in [`protocol::dialects::cs_air_link`] module.
 dlct-cs_air_link = ["mavio/dlct-cs_air_link"]
 ## Include `cubepilot` dialect
+##
+## The dialect can be found in [`protocol::dialects::cubepilot`] module.
 dlct-cubepilot = ["dlct-common", "mavio/dlct-cubepilot"]
 ## Include `development` dialect
+##
+## The dialect can be found in [`protocol::dialects::development`] module.
 dlct-development = ["dlct-common", "mavio/dlct-development"]
 ## Include `icarous` dialect
+##
+## The dialect can be found in [`protocol::dialects::icarous`] module.
 dlct-icarous = ["mavio/dlct-icarous"]
 ## Include `matrixpilot` dialect
+##
+## The dialect can be found in [`protocol::dialects::matrixpilot`] module.
 dlct-matrixpilot = ["dlct-common", "mavio/dlct-matrixpilot"]
 ## Include `minimal` dialect
+##
+## The dialect can be found in [`protocol::dialects::minimal`] module.
 dlct-minimal = ["mavio/dlct-minimal"]
 ## Include `paparazzi` dialect
+##
+## The dialect can be found in [`protocol::dialects::paparazzi`] module.
 dlct-paparazzi = ["dlct-common", "mavio/dlct-paparazzi"]
 ## Include `standard` dialect
+##
+## The dialect can be found in [`protocol::dialects::ualberta`] module.
 dlct-standard = ["dlct-minimal", "mavio/dlct-standard"]
 ## Include `ualberta` dialect
+##
+## The dialect can be found in [`protocol::dialects::ualberta`] module.
 dlct-ualberta = ["dlct-common", "mavio/dlct-ualberta"]
 ## Include `uAvionix` dialect
+##
+## The dialect can be found in [`protocol::dialects::u_avionix`] module.
 dlct-uavionix = ["dlct-common", "mavio/dlct-uavionix"]
 
 ## Include `all` meta-dialect
+##
+## The dialect can be found in [`protocol::dialects::all`] module.
 dlct-all = [
     "dlct-ardupilotmega",
     "dlct-common",
@@ -197,6 +232,8 @@ dlct-all = [
 #! ## MAVLink microservices
 #==========================================================
 #! These features will control generation of MAVLink microservice-specific bindings.
+#!
+#! If enabled, microservices can be found in [`protocol::microservices`] module.
 
 ## Support for all MavLink microservices
 msrv-all = [
@@ -228,55 +265,105 @@ msrv-all = [
     "mavio/msrv-all",
 ]
 ## Heartbeat protocol support
-msrv-heartbeat = ["msrv", "mavio/msrv-heartbeat"]
+##
+## This microservice can be found in [`protocol::microservices::heartbeat`] module.
+msrv-heartbeat = ["msrv", "mavio/msrv-heartbeat", "dlct-minimal"]
 ## Mission protocol support
-msrv-mission = ["msrv", "mavio/msrv-mission"]
+##
+## This microservice can be found in [`protocol::microservices::mission`] module.
+msrv-mission = ["msrv", "mavio/msrv-mission", "dlct-common"]
 ## Parameter protocol support
-msrv-parameter = ["msrv", "mavio/msrv-parameter"]
+##
+## This microservice can be found in [`protocol::microservices::parameter`] module.
+msrv-parameter = ["msrv", "mavio/msrv-parameter", "dlct-common"]
 ## Extended parameter protocol support
-msrv-parameter-ext = ["msrv", "mavio/msrv-parameter-ext"]
+##
+## This microservice can be found in [`protocol::microservices::parameter_ext`] module.
+msrv-parameter-ext = ["msrv", "mavio/msrv-parameter-ext", "dlct-common"]
 ## Command protocol support
-msrv-command = ["msrv", "mavio/msrv-command"]
+##
+## This microservice can be found in [`protocol::microservices::command`] module.
+msrv-command = ["msrv", "mavio/msrv-command", "dlct-common"]
 ## Manual control protocol support
-msrv-manual-control = ["msrv", "mavio/msrv-manual-control"]
+##
+## This microservice can be found in [`protocol::microservices::manual_control`] module.
+msrv-manual-control = ["msrv", "mavio/msrv-manual-control", "dlct-common"]
 ## Camera protocol v2 support
-msrv-camera = ["msrv", "mavio/msrv-camera"]
+##
+## This microservice can be found in [`protocol::microservices::camera`] module.
+msrv-camera = ["msrv", "mavio/msrv-camera", "dlct-common"]
 ## Gimbal protocol v1 support
-msrv-gimbal-v1 = ["msrv", "mavio/msrv-gimbal-v1"]
+##
+## This microservice can be found in [`protocol::microservices::gimbal_v1`] module.
+msrv-gimbal-v1 = ["msrv", "mavio/msrv-gimbal-v1", "dlct-common"]
 ## Gimbal protocol v2 support
-msrv-gimbal-v2 = ["msrv", "mavio/msrv-gimbal-v2"]
+##
+## This microservice can be found in [`protocol::microservices::gimbal_v2`] module.
+msrv-gimbal-v2 = ["msrv", "mavio/msrv-gimbal-v2", "dlct-common"]
 ## Arm authorization protocol support
-msrv-arm-auth = ["msrv", "mavio/msrv-arm-auth"]
+##
+## This microservice can be found in [`protocol::microservices::arm_auth`] module.
+msrv-arm-auth = ["msrv", "mavio/msrv-arm-auth", "dlct-common"]
 ## Image transmission protocol support
-msrv-image-transmission = ["msrv", "mavio/msrv-image-transmission"]
+##
+## This microservice can be found in [`protocol::microservices::image_transmission`] module.
+msrv-image-transmission = ["msrv", "mavio/msrv-image-transmission", "dlct-common"]
 ## File transfer protocol support
-msrv-ftp = ["msrv", "mavio/msrv-ftp"]
+##
+## This microservice can be found in [`protocol::microservices::ftp`] module.
+msrv-ftp = ["msrv", "mavio/msrv-ftp", "dlct-common"]
 ## Landing target protocol support
-msrv-landing-target = ["msrv", "mavio/msrv-landing-target"]
+##
+## This microservice can be found in [`protocol::microservices::landing_target`] module.
+msrv-landing-target = ["msrv", "mavio/msrv-landing-target", "dlct-common"]
 ## Ping protocol support
-msrv-ping = ["msrv", "mavio/msrv-ping"]
+##
+## This microservice can be found in [`protocol::microservices::ping`] module.
+msrv-ping = ["msrv", "mavio/msrv-ping", "dlct-common"]
 ## Path planning protocol support
-msrv-path-planning = ["msrv", "mavio/msrv-path-planning"]
+##
+## This microservice can be found in [`protocol::microservices::path_planning`] module.
+msrv-path-planning = ["msrv", "mavio/msrv-path-planning", "dlct-common"]
 ## Battery protocol support
-msrv-battery = ["msrv", "mavio/msrv-battery"]
+##
+## This microservice can be found in [`protocol::microservices::battery`] module.
+msrv-battery = ["msrv", "mavio/msrv-battery", "dlct-common"]
 ## Terrain protocol support
-msrv-terrain = ["msrv", "mavio/msrv-terrain"]
+##
+## This microservice can be found in [`protocol::microservices::terrain`] module.
+msrv-terrain = ["msrv", "mavio/msrv-terrain", "dlct-common"]
 ## Tunnel protocol support
-msrv-tunnel = ["msrv", "mavio/msrv-tunnel"]
+##
+## This microservice can be found in [`protocol::microservices::tunnel`] module.
+msrv-tunnel = ["msrv", "mavio/msrv-tunnel", "dlct-common"]
 ## Open Drone ID protocol support
-msrv-open-drone-id = ["msrv", "mavio/msrv-open-drone-id"]
+##
+## This microservice can be found in [`protocol::microservices::open_drone_id`] module.
+msrv-open-drone-id = ["msrv", "mavio/msrv-open-drone-id", "dlct-common"]
 ## High latency protocol support
-msrv-high-latency = ["msrv", "mavio/msrv-high-latency"]
+##
+## This microservice can be found in [`protocol::microservices::high_latency`] module.
+msrv-high-latency = ["msrv", "mavio/msrv-high-latency", "dlct-common"]
 ## Component metadata protocol support
-msrv-component-metadata = ["msrv", "mavio/msrv-component-metadata"]
+##
+## This microservice can be found in [`protocol::microservices::component_metadata`] module.
+msrv-component-metadata = ["msrv", "mavio/msrv-component-metadata", "dlct-common"]
 ## Payload protocol support
-msrv-payload = ["msrv", "mavio/msrv-payload"]
+##
+## This microservice can be found in [`protocol::microservices::payload`] module.
+msrv-payload = ["msrv", "mavio/msrv-payload", "dlct-common"]
 ## Traffic management protocol support
-msrv-traffic-management = ["msrv", "mavio/msrv-traffic-management"]
+##
+## This microservice can be found in [`protocol::microservices::traffic_management`] module.
+msrv-traffic-management = ["msrv", "mavio/msrv-traffic-management", "dlct-common"]
 ## Events interface protocol support
-msrv-events-interface = ["msrv", "mavio/msrv-events-interface"]
+##
+## This microservice can be found in [`protocol::microservices::events_interface`] module.
+msrv-events-interface = ["msrv", "mavio/msrv-events-interface", "dlct-common"]
 ## Time synchronization protocol support
-msrv-time-sync = ["msrv", "mavio/msrv-time-sync"]
+##
+## This microservice can be found in [`protocol::microservices::time_sync`] module.
+msrv-time-sync = ["msrv", "mavio/msrv-time-sync", "dlct-common"]
 
 #==========================================================
 #! ## Additional MAVLink tools
@@ -293,6 +380,9 @@ msrv-utils-all = [
     "mavio/msrv-utils-all",
 ]
 ## Mission protocol utils
+##
+## These additional utils are packaged into [`protocol::microservices::mission`] microservice and can be alternatively
+## accessed through [`protocol::microservices::utils::mission`].
 ##
 ## ⚠️ Requires `unstable` feature to take effect.
 msrv-utils-mission = [

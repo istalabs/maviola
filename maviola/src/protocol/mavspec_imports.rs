@@ -75,18 +75,15 @@ pub use mavspec::rust::default_dialect;
 pub use mavspec::rust::DefaultDialect;
 
 /// <sup>[`mavspec`](https://crates.io/crates/mavspec)</sup>
-/// Tools for MAVLink [microservices](https://mavlink.io/en/services/)
+/// MAVLink [microservices](https://mavlink.io/en/services/)
 ///
-/// Enabled by `msrv-utils-*` feature flags.
+/// Enabled by `msrv-*` feature flags, additional tools are available as [`microservices::utils`]
+/// via `msrv-utils-*` feature flags (requires `unstable` feature).
 ///
 /// Re-exported from [`mavspec::rust::microservices`].
 ///
-/// <section class="warning">
-/// These feature is considered unstable. Use `unstable` feature flag to access this functionality.
-/// </section>
-///
 /// ---
-#[cfg(all(feature = "msrv-utils", feature = "unstable"))]
+#[cfg(feature = "msrv")]
 #[doc(inline)]
 pub use mavspec::rust::microservices;
 

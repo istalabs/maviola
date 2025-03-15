@@ -106,9 +106,9 @@ Protocol entities reside in the [`protocol`] module.
 
 ## Dialects
 
-Maviola packages standard MAVLink dialects under corresponding feature flags. It is possible
-to define your own dialects with XML message definitions using
-[MAVSpec](https://crates.io/crates/mavspec) or even create your ad-hoc dialects using pure
+Maviola packages standard MAVLink dialects under corresponding `dlct-*` feature flags in
+[`protocol::dialects`]. It is possible to define your own dialects with XML message definitions
+using [MAVSpec](https://crates.io/crates/mavspec) or even create your ad-hoc dialects using pure
 Rust.
 
 Check [Dialects](crate::docs::a2__overview#dialects) documentation section for details.
